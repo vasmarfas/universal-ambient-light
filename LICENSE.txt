@@ -1,0 +1,35 @@
+# PolyForm Noncommercial License 1.0.0
+
+## Acceptance
+
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
+
+## Copyright License
+
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe their copyright in it for any noncommercial purpose.
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any copyright notices and license texts in the software.
+
+## Noncommercial Purposes
+
+Any noncommercial purpose is a permitted purpose.
+
+## Commercial Purposes
+
+Commercial purposes include:
+
+* Using the software to provide a service or product that is sold for a fee.
+* Using the software in a way that generates revenue, directly or indirectly.
+* Using the software within a commercial organization for business operations.
+
+If you wish to use the software for any commercial purpose, you must contact the licensor to obtain a separate commercial license.
+
+## No Other Rights
+
+These terms do not imply any other license.
+
+## Disclaimer
+
+AS FAR AS THE LAW ALLOWS, THE SOFTWARE COMES AS IS, WITHOUT ANY WARRANTY OR CONDITION, AND THE LICENSOR WILL NOT BE LIABLE TO YOU FOR ANY DAMAGES ARISING OUT OF THESE TERMS OR THE USE OR NATURE OF THE SOFTWARE, UNDER ANY KIND OF LEGAL CLAIM.

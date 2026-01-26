@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <string-array name="pref_list_framerate">
+    <item>10 fps</item>
+    <item>15 fps</item>
+    <item>24 fps</item>
+    <item>30 fps</item>
+    <item>60 fps</item>
+  </string-array>
+  <string name="app_name">Universal Ambient Light</string>
+  <string name="pref_title">Настройки</string>
+  <string name="enabled">Включено</string>
+  <string name="disabled">Выключено</string>
+  <!-- notification button -->
+  <string name="notification_exit_button">Выход</string>
+  <!-- Network scanner -->
+  <string name="scanner_title">Привет!</string>
+  <string name="scanner_description">Universal Ambient Light может просканировать вашу сеть для поиска серверов, чтобы вам не пришлось вводить IP-адрес вручную.</string>
+  <string name="scanner_start_scan_button">Начать сканирование</string>
+  <string name="scanner_scan_in_progress_text">Сканирование локальной сети на наличие серверов Hyperion %s</string>
+  <string name="scanner_scan_in_progress_button">Сканирование…</string>
+  <string name="scanner_no_results">Ничего не найдено %s</string>
+  <string name="scanner_retry_button">Повторить</string>
+  <string name="scanner_manual_setup_button">Ручная настройка</string>
+  <!-- Network Scanner result -->
+  <string name="scan_result_title">И победитель…</string>
+  <string name="scan_result_description">В честь этого мы включили фиолетовую подсветку %s</string>
+  <string name="scan_result_confirm_button_text">Мне нравится!</string>
+  <string name="scan_result_alternative_color_button_text">Не люблю фиолетовый</string>
+  <!-- Connection settings -->
+  <string name="pref_group_connection">Подключение</string>
+  <string name="pref_title_host">Хост</string>
+  <string name="pref_summary_host">Адрес (IP или имя хоста) вашего LED контроллера</string>
+  <string name="pref_title_port">Порт</string>
+  <string name="pref_summary_port">Порт (Hyperion: 19400, WLED: 19446 DRGB или 21324 WARLS)</string>
+  <string name="pref_title_y_led">LED по вертикали</string>
+  <string name="pref_summary_y_led">Количество светодиодов по вертикали</string>
+  <string name="pref_title_x_led">LED по горизонтали</string>
+  <string name="pref_summary_x_led">Количество светодиодов по горизонтали</string>
+  <string name="pref_title_priority">Приоритет</string>
+  <string name="pref_summary_priority">Канал приоритета сообщений</string>
+  <string name="pref_title_reconnect">Переподключение</string>
+  <string name="pref_summary_reconnect">Автоматическое переподключение при потере связи</string>
+  <string name="pref_title_reconnect_delay">Задержка переподключения</string>
+  <string name="pref_summary_reconnect_delay">Секунды ожидания перед попыткой переподключения</string>
+  <!-- Capturing settings -->
+  <string name="pref_group_capturing">Захват</string>
+  <string name="pref_title_framerate">Частота захвата</string>
+  <string name="pref_summary_framerate">Кадров в секунду для отправки на контроллер</string>
+  <string name="pref_title_capture_quality">Качество захвата</string>
+  <string name="pref_summary_capture_quality">Разрешение захвата экрана (влияет на производительность)</string>
+  <string-array name="pref_list_capture_quality">
+    <item>Низкое (64px)</item>
+    <item>Среднее (128px)</item>
+    <item>Высокое (256px)</item>
+    <item>Ультра (512px)</item>
+  </string-array>
+  <string-array name="pref_list_capture_quality_values">
+    <item>64</item>
+    <item>128</item>
+    <item>256</item>
+    <item>512</item>
+  </string-array>
+  <!-- General settings -->
+  <string name="pref_group_general">Общие</string>
+  <string name="pref_summary_boot">Запускать захват при старте устройства</string>
+  <string name="pref_title_boot">Запуск при загрузке</string>
+  <string name="pref_title_language">Язык</string>
+  <string name="pref_summary_language">Выберите язык приложения</string>
+  <string name="pref_key_language">language</string>
+  <string-array name="pref_list_language">
+    <item>По умолчанию</item>
+    <item>English</item>
+    <item>Русский</item>
+    <item>Deutsch</item>
+  </string-array>
+  <string-array name="pref_list_language_values">
+    <item>default</item>
+    <item>en</item>
+    <item>ru</item>
+    <item>de</item>
+  </string-array>
+
+  <string name="pref_error_missing_field">%s не должно быть пустым</string>
+  <string name="pref_error_invalid_field" formatted="false">%s недопустимо для %s</string>
+  <string name="error_empty_host">Хост не должен быть пустым</string>
+  <string name="error_empty_port">Порт не должен быть пустым</string>
+  <string name="error_invalid_led_counts">Количество LED должно быть указано и больше 0</string>
+  <string name="error_server_unreachable">Не удалось подключиться к серверу. Проверьте настройки и запущен ли сервер</string>
+  <string name="error_adalight_unreachable">Не удалось подключиться к Adalight. Убедитесь: 1) Устройство подключено через USB OTG, 2) Разрешение USB предоставлено, 3) Верная скорость (baud rate)</string>
+  <string name="error_connection_lost">Связь с сервером потеряна, остановка захвата</string>
+  <string name="error_adalight_connection_lost">Связь с Adalight потеряна, остановка захвата</string>
+  <string name="error_foreground_blocked">Это устройство блокирует фоновый захват экрана. Разрешите Universal Ambient Light работу в фоне или автозапуск</string>
+  <string name="error_media_projection_denied">В доступе к экрану отказано. Пожалуйста, разрешите доступ при запросе</string>
+  <string name="toast_must_give_permission">Необходимо разрешение на запись экрана.</string>
+  <string name="message_service_started">Нажмите Назад чтобы свернуть. Захват экрана продолжится в фоне</string>
+  <string name="error_no_host_name_extra">Странно, здесь ожидалось имя хоста</string>
+  <string name="notification_channel_label">Уведомления Universal Ambient Light</string>
+  <string name="notification_description">Идет захват содержимого экрана</string>
+  <string name="pref_title_use_avg_color">Средний цвет экрана</string>
+  <string name="pref_summary_use_avg_color">Отправлять один средний цвет вместо всего изображения</string>
+  <string name="pref_title_connection_type">Тип подключения</string>
+  <string name="pref_summary_connection_type">Выберите тип контроллера LED</string>
+  <string-array name="pref_list_connection_type">
+    <item>Hyperion</item>
+    <item>WLED</item>
+    <item>Adalight</item>
+  </string-array>
+  <string-array name="pref_list_connection_type_values">
+    <item>hyperion</item>
+    <item>wled</item>
+    <item>adalight</item>
+  </string-array>
+  <string name="pref_title_adalight_baudrate">Скорость Adalight</string>
+  <string name="pref_summary_adalight_baudrate">Скорость serial порта для Adalight (обычно 115200)</string>
+  <string name="pref_title_wled_color_order">Порядок цветов WLED</string>
+  <string name="pref_summary_wled_color_order">Порядок каналов для WLED (RGB, GRB и т.д.)</string>
+  <string-array name="pref_list_wled_color_order">
+    <item>RGB</item>
+    <item>GRB</item>
+    <item>BRG</item>
+    <item>RBG</item>
+    <item>GBR</item>
+    <item>BGR</item>
+  </string-array>
+  <string-array name="pref_list_wled_color_order_values">
+    <item>rgb</item>
+    <item>grb</item>
+    <item>brg</item>
+    <item>rbg</item>
+    <item>gbr</item>
+    <item>bgr</item>
+    </string-array>
+  
+  <!-- Smoothing settings -->
+  <string name="pref_group_smoothing">Сглаживание</string>
+  <string name="pref_title_smoothing_enabled">Включить сглаживание</string>
+  <string name="pref_summary_smoothing_enabled">Плавные переходы цветов для устранения мерцания</string>
+  <string name="pref_title_smoothing_preset">Пресет сглаживания</string>
+  <string name="pref_summary_smoothing_preset">Быстрый выбор настроек сглаживания</string>
+  <string-array name="pref_list_smoothing_preset">
+    <item>Выключено</item>
+    <item>Быстрый отклик</item>
+    <item>Сбалансированный</item>
+    <item>Плавный</item>
+  </string-array>
+  <string-array name="pref_list_smoothing_preset_values">
+    <item>off</item>
+    <item>responsive</item>
+    <item>balanced</item>
+    <item>smooth</item>
+  </string-array>
+  <string name="pref_title_settling_time">Время перехода</string>
+  <string name="pref_summary_settling_time">Время перехода между цветами в мс (50-500)</string>
+  <string name="pref_title_output_delay">Задержка вывода</string>
+  <string name="pref_summary_output_delay">Буферизация кадров (0-10)</string>
+  <string name="pref_title_update_frequency">Частота обновления</string>
+  <string name="pref_summary_update_frequency">Частота отправки данных (Гц)</string>
+  <string-array name="pref_list_update_frequency">
+    <item>20 Гц</item>
+    <item>25 Гц</item>
+    <item>30 Гц</item>
+    <item>40 Гц</item>
+    <item>50 Гц</item>
+    <item>60 Гц</item>
+  </string-array>
+  <string-array name="pref_list_update_frequency_values">
+    <item>20</item>
+    <item>25</item>
+    <item>30</item>
+    <item>40</item>
+    <item>50</item>
+    <item>60</item>
+  </string-array>
+  
+  <!-- WLED advanced settings -->
+  <string name="pref_title_wled_protocol">Протокол WLED</string>
+  <string name="pref_summary_wled_protocol">DDP (рек. для WLED 0.11+) или UDP Raw</string>
+  <string-array name="pref_list_wled_protocol">
+    <item>DDP (порт 4048)</item>
+    <item>UDP Raw (порт 19446)</item>
+  </string-array>
+  <string-array name="pref_list_wled_protocol_values">
+    <item>ddp</item>
+    <item>udp_raw</item>
+  </string-array>
+  <string name="pref_title_wled_rgbw">WLED RGBW</string>
+  <string name="pref_summary_wled_rgbw">Включить поддержку белого канала (RGBW)</string>
+  <string name="pref_title_wled_brightness">Яркость WLED</string>
+  <string name="pref_summary_wled_brightness">Яркость при стриминге (0-255)</string>
+  
+  <!-- Adalight advanced settings -->
+  <string name="pref_title_adalight_protocol">Протокол Adalight</string>
+  <string name="pref_summary_adalight_protocol">Тип протокола Adalight</string>
+  <string-array name="pref_list_adalight_protocol">
+    <item>ADA (Стандарт)</item>
+    <item>LBAPA (LightBerry APA102)</item>
+    <item>AWA (Hyperserial)</item>
+  </string-array>
+  <string-array name="pref_list_adalight_protocol_values">
+    <item>ada</item>
+    <item>lbapa</item>
+    <item>awa</item>
+  </string-array>
+
+  <!-- App Specific Strings -->
+  <string name="guidedstep_basic_settings_title">Совет</string>
+  <string name="guidedstep_basic_settings_description">Загрузите приложение Android TV Remote на телефон для удобного ввода</string>
+  <string name="guidedstep_second_title">Проверка соединения</string>
+  <string name="guidedstep_section_advanced_title">Дополнительные параметры</string>
+  <string name="guidedstep_section_advanced_description">Настройки ниже можно оставить по умолчанию</string>
+  <string name="guidedstep_save">Сохранить</string>
+  <string name="guidedstep_test">Тест</string>
+  <string name="guidedstep_test_description">Да будет свет</string>
+  <string name="guidedstep_test_success">Результат: OK. Не горит? Попробуйте уменьшить приоритет</string>
+  <string name="guidedstep_test_host_unreachable">Результат: Нет связи. Проверьте хост и порт</string>
+  <string name="guidedstep_test_unknown_error">Результат: неизвестная ошибка</string>
+  <string name="guidedstep_continue">Продолжить</string>
+  <string name="guidedstep_letsdoit">Поехали</string>
+  <string name="guidedstep_nevermind">Неважно</string>
+  <string name="guidedstep_cancel">Отмена</string>
+  <string name="guidedstep_required">Требуется</string>
+  <string name="toggle_activity_label">Universal Ambient Light (Переключатель)</string>
+  <string name="settings">Настройки</string>
+  <string name="quick_tile_label">Universal Ambient Light</string>
+  <string name="quick_tile_toast_setup_required">Сначала выполните настройку в приложении</string>
+</resources>
