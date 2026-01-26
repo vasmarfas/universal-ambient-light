@@ -39,7 +39,6 @@ import com.vasmarfas.UniversalAmbientLight.common.BootActivity
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
-import com.vasmarfas.UniversalAmbientLight.common.util.UpdateChecker
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.focusable
@@ -47,6 +46,10 @@ import androidx.navigation.compose.rememberNavController
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import kotlin.math.sqrt
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.google.android.play.core.appupdate.AppUpdateManager
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.UpdateAvailability
 
 class MainActivity : ComponentActivity() {
 
@@ -58,6 +61,7 @@ class MainActivity : ComponentActivity() {
     private var mMediaProjectionManager: MediaProjectionManager? = null
     private var mPermissionDeniedCount = 0
     private var mTclWarningShown = false
+    private lateinit var appUpdateManager: AppUpdateManager
 
     private val mMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -83,7 +87,8 @@ class MainActivity : ComponentActivity() {
 
         mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
-        // Check for updates
+        // Initialize Play In-App Updates
+        appUpdateManager = AppUpdateManagerFactory.create(this)
         checkForUpdates()
 
         LocalBroadcastManager.getInstance(this).registerReceiver(
@@ -115,7 +120,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        checkForUpdates()
+        
+        appUpdateManager
+            .appUpdateInfo
+            .addOnSuccessListener { appUpdateInfo ->
+                if (appUpdateInfo.updateAvailability()
+                    == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
+                ) {
+                    // If an in-app update is already running, resume the update.
+                    appUpdateManager.startUpdateFlowForResult(
+                        appUpdateInfo,
+                        AppUpdateType.IMMEDIATE,
+                        this,
+                        REQUEST_UPDATE_CODE
+                    )
+                }
+            }
     }
 
     override fun onDestroy() {
@@ -138,7 +158,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun toggleScreenCapture() {
-        checkForUpdates()
         if (!mRecorderRunning) {
             requestScreenCapture()
         } else {
@@ -183,6 +202,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_UPDATE_CODE) {
+            if (resultCode != Activity.RESULT_OK) {
+                Log.e(TAG, "Update flow failed! Result code: $resultCode")
+                // If the update is cancelled or fails,
+                // you can request to start the update again.
+            }
+        }
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
             if (resultCode != Activity.RESULT_OK) {
                 mPermissionDeniedCount++
@@ -242,22 +268,26 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkForUpdates() {
-        Thread {
-            try {
-                Log.d(TAG, "Checking for updates...")
-                val checker = UpdateChecker(this)
-                val release = checker.checkForUpdates()
-                if (release != null) {
-                    Log.d(TAG, "Update found: " + release.tagName)
-                    // runOnUiThread { showUpdateDialog(release) }
-                    // TODO: Show update dialog via Compose state
-                } else {
-                    Log.d(TAG, "No updates available")
+        val appUpdateInfoTask = appUpdateManager.appUpdateInfo
+        appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
+            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                // This example applies an immediate update. To apply a flexible update
+                // instead, pass in AppUpdateType.FLEXIBLE
+                && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+            ) {
+                // Request the update
+                try {
+                    appUpdateManager.startUpdateFlowForResult(
+                        appUpdateInfo,
+                        AppUpdateType.IMMEDIATE,
+                        this,
+                        REQUEST_UPDATE_CODE
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start update flow", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking for updates", e)
             }
-        }.start()
+        }
     }
 
     private fun isServiceRunning(): Boolean {
@@ -274,6 +304,7 @@ class MainActivity : ComponentActivity() {
         const val REQUEST_MEDIA_PROJECTION = 1
         private const val REQUEST_NOTIFICATION_PERMISSION = 2
         private const val REQUEST_OVERLAY_PERMISSION = 3
+        private const val REQUEST_UPDATE_CODE = 4
         private const val TAG = "DEBUG"
     }
 }

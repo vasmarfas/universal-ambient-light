@@ -1,7 +1,9 @@
 package com.vasmarfas.UniversalAmbientLight.ui.settings
 
 import android.content.Context
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -269,18 +271,21 @@ fun CheckBoxPreference(
     onValueChange: ((Boolean) -> Unit)? = null
 ) {
     var checked by remember { mutableStateOf(prefs.getBoolean(keyRes)) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .toggleable(
                 value = checked,
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Checkbox,
                 onValueChange = {
                     checked = it
                     prefs.putBoolean(keyRes, it)
                     onValueChange?.invoke(it)
-                },
-                role = Role.Checkbox
+                }
             )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -302,11 +307,16 @@ fun EditTextPreference(
 ) {
     var value by remember { mutableStateOf(prefs.getString(keyRes) ?: "") }
     var showDialog by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { showDialog = true }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = { showDialog = true }
+            )
             .padding(16.dp)
     ) {
         Text(text = title, style = MaterialTheme.typography.bodyLarge)
@@ -364,13 +374,18 @@ fun ListPreference(
     
     var value by remember { mutableStateOf(prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "") }
     var showDialog by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     val summary = entries.getOrNull(entryValues.indexOf(value)) ?: value
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { showDialog = true }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = { showDialog = true }
+            )
             .padding(16.dp)
     ) {
         Text(text = title, style = MaterialTheme.typography.bodyLarge)
@@ -388,16 +403,21 @@ fun ListPreference(
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     entries.forEachIndexed { index, entry ->
+                        val interactionSource = remember { MutableInteractionSource() }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    val newValue = entryValues[index]
-                                    value = newValue
-                                    prefs.putString(keyRes, newValue)
-                                    onValueChange?.invoke(newValue)
-                                    showDialog = false
-                                }
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = LocalIndication.current,
+                                    onClick = {
+                                        val newValue = entryValues[index]
+                                        value = newValue
+                                        prefs.putString(keyRes, newValue)
+                                        onValueChange?.invoke(newValue)
+                                        showDialog = false
+                                    }
+                                )
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

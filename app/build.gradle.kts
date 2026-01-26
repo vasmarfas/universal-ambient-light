@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val versionBase = "0.0.1"
+val versionBase = "0.0.2"
 val buildNumber = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0
 // Example: 0.0.1 or 0.0.1-beta.1 if suffix provided
 val appVersionName = versionBase
@@ -114,4 +114,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
 }
