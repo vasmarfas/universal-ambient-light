@@ -112,4 +112,12 @@
 
     <string name="pref_key_bottom_gap" translatable="false">pref_key_bottom_gap</string>
     <integer name="pref_default_bottom_gap" translatable="false">0</integer>
+
+    <!-- LED index offset along perimeter -->
+    <string name="pref_key_led_offset" translatable="false">pref_key_led_offset</string>
+    <integer name="pref_default_led_offset" translatable="false">0</integer>
+
+    <!-- Capture margin (in percent of screen size) -->
+    <string name="pref_key_capture_margin" translatable="false">pref_key_capture_margin</string>
+    <integer name="pref_default_capture_margin" translatable="false">0</integer>
 </resources>

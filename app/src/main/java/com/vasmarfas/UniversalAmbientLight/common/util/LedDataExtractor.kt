@@ -31,6 +31,8 @@ object LedDataExtractor {
         var sideBottom = "enabled"
         var sideLeft = "enabled"
         var bottomGap = 0
+        var captureMarginPercent = 0
+        var ledOffset = 0
         
         try {
             val prefs = Preferences(context)
@@ -43,13 +45,16 @@ object LedDataExtractor {
             sideBottom = prefs.getString(R.string.pref_key_led_side_bottom, "enabled") ?: "enabled"
             sideLeft = prefs.getString(R.string.pref_key_led_side_left, "enabled") ?: "enabled"
             bottomGap = prefs.getInt(R.string.pref_key_bottom_gap, 0)
+            captureMarginPercent = prefs.getInt(R.string.pref_key_capture_margin, 0)
+            ledOffset = prefs.getInt(R.string.pref_key_led_offset, 0)
         } catch (e: Exception) {
             if (logsEnabled) Log.w(TAG, "Failed to get LED settings from preferences", e)
         }
 
         return extractPerimeterPixels(
             screenData, width, height, xLed, yLed, startCorner, direction,
-            sideTop, sideRight, sideBottom, sideLeft, bottomGap, reuseBuffer
+            sideTop, sideRight, sideBottom, sideLeft, bottomGap,
+            captureMarginPercent, ledOffset, reuseBuffer
         )
     }
 
@@ -96,6 +101,8 @@ object LedDataExtractor {
         sideBottom: String,
         sideLeft: String,
         bottomGap: Int,
+        captureMarginPercent: Int,
+        ledOffset: Int,
         reuseBuffer: Array<ColorRgb>?
     ): Array<ColorRgb> {
         // Calculate total LEDs considering which sides are installed
@@ -125,9 +132,22 @@ object LedDataExtractor {
 
         var ledIdx = 0
 
-        // Calculate step sizes
-        val stepX = width.toFloat() / xLed
-        val stepY = height.toFloat() / yLed
+        // Calculate capture area with margin
+        val margin = captureMarginPercent.coerceIn(0, 40) // не даём вырезать слишком много
+        val marginX = width * margin / 100f
+        val marginY = height * margin / 100f
+
+        val captureLeft = marginX
+        val captureRight = width - marginX
+        val captureTop = marginY
+        val captureBottom = height - marginY
+
+        val captureWidth = (captureRight - captureLeft).coerceAtLeast(1f)
+        val captureHeight = (captureBottom - captureTop).coerceAtLeast(1f)
+
+        // Calculate step sizes по области захвата, а не по всему экрану
+        val stepX = captureWidth / xLed
+        val stepY = captureHeight / yLed
 
         // Calculate gap range for bottom edge
         val gapStart = if (bottomGap > 0) (xLed - bottomGap) / 2 else -1
@@ -154,8 +174,8 @@ object LedDataExtractor {
                     // Top edge (left to right)
                     for (i in 0 until xLed) {
                         if (sideMode == "enabled") {
-                            val x = min((i * stepX + stepX / 2).toInt(), width - 1)
-                            val y = 0
+                            val x = min((captureLeft + i * stepX + stepX / 2).toInt(), width - 1)
+                            val y = captureTop.toInt().coerceAtLeast(0)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -166,8 +186,8 @@ object LedDataExtractor {
                     // Top edge (right to left)
                     for (i in 0 until xLed) {
                         if (sideMode == "enabled") {
-                            val x = min(((xLed - 1 - i) * stepX + stepX / 2).toInt(), width - 1)
-                            val y = 0
+                            val x = min((captureLeft + (xLed - 1 - i) * stepX + stepX / 2).toInt(), width - 1)
+                            val y = captureTop.toInt().coerceAtLeast(0)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -178,8 +198,8 @@ object LedDataExtractor {
                     // Right edge (top to bottom)
                     for (i in 0 until yLed) {
                         if (sideMode == "enabled") {
-                            val x = width - 1
-                            val y = min((i * stepY + stepY / 2).toInt(), height - 1)
+                            val x = captureRight.toInt().coerceAtMost(width - 1)
+                            val y = min((captureTop + i * stepY + stepY / 2).toInt(), height - 1)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -190,8 +210,8 @@ object LedDataExtractor {
                     // Right edge (bottom to top)
                     for (i in 0 until yLed) {
                         if (sideMode == "enabled") {
-                            val x = width - 1
-                            val y = min(((yLed - 1 - i) * stepY + stepY / 2).toInt(), height - 1)
+                            val x = captureRight.toInt().coerceAtMost(width - 1)
+                            val y = min((captureTop + (yLed - 1 - i) * stepY + stepY / 2).toInt(), height - 1)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -204,8 +224,8 @@ object LedDataExtractor {
                         val ledIndex = xLed - 1 - i
                         val isInGap = bottomGap > 0 && ledIndex >= gapStart && ledIndex < gapEnd
                         if (sideMode == "enabled" && !isInGap) {
-                            val x = min(((xLed - 1 - i) * stepX + stepX / 2).toInt(), width - 1)
-                            val y = height - 1
+                            val x = min((captureLeft + (xLed - 1 - i) * stepX + stepX / 2).toInt(), width - 1)
+                            val y = captureBottom.toInt().coerceAtMost(height - 1)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -217,8 +237,8 @@ object LedDataExtractor {
                     for (i in 0 until xLed) {
                         val isInGap = bottomGap > 0 && i >= gapStart && i < gapEnd
                         if (sideMode == "enabled" && !isInGap) {
-                            val x = min((i * stepX + stepX / 2).toInt(), width - 1)
-                            val y = height - 1
+                            val x = min((captureLeft + i * stepX + stepX / 2).toInt(), width - 1)
+                            val y = captureBottom.toInt().coerceAtMost(height - 1)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -229,8 +249,8 @@ object LedDataExtractor {
                     // Left edge (bottom to top)
                     for (i in 0 until yLed) {
                         if (sideMode == "enabled") {
-                            val x = 0
-                            val y = min(((yLed - 1 - i) * stepY + stepY / 2).toInt(), height - 1)
+                            val x = captureLeft.toInt().coerceAtLeast(0)
+                            val y = min((captureTop + (yLed - 1 - i) * stepY + stepY / 2).toInt(), height - 1)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -241,8 +261,8 @@ object LedDataExtractor {
                     // Left edge (top to bottom)
                     for (i in 0 until yLed) {
                         if (sideMode == "enabled") {
-                            val x = 0
-                            val y = min((i * stepY + stepY / 2).toInt(), height - 1)
+                            val x = captureLeft.toInt().coerceAtLeast(0)
+                            val y = min((captureTop + i * stepY + stepY / 2).toInt(), height - 1)
                             setPixelFromData(ledData[ledIdx++], screenData, width, x, y)
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
@@ -257,7 +277,17 @@ object LedDataExtractor {
             ledData[ledIdx++].set(0, 0, 0)
         }
 
-        return ledData
+        // Apply LED offset (rotation along perimeter)
+        val offset = (ledOffset % totalLEDs + totalLEDs) % totalLEDs
+        if (offset == 0) return ledData
+
+        val rotated = Array(totalLEDs) { ColorRgb(0, 0, 0) }
+        for (i in 0 until totalLEDs) {
+            val targetIndex = (i + offset) % totalLEDs
+            rotated[targetIndex].set(ledData[i])
+        }
+
+        return rotated
     }
 
     /**

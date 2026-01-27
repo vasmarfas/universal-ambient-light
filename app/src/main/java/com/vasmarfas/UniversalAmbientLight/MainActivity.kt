@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.usb.UsbManager
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -49,6 +50,7 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.vasmarfas.UniversalAmbientLight.common.BootActivity
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
@@ -67,6 +69,8 @@ class MainActivity : ComponentActivity() {
     private var mTclWarningShown = false
     private lateinit var appUpdateManager: AppUpdateManager
     private var currentEffect by mutableStateOf(EffectMode.RAINBOW)
+
+    private var usbPermissionReceiverRegistered = false
 
     private val mMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -167,7 +171,9 @@ class MainActivity : ComponentActivity() {
 
     private fun toggleScreenCapture() {
         if (!mRecorderRunning) {
-            requestScreenCapture()
+            ensureUsbPermissionForAdalight {
+                requestScreenCapture()
+            }
         } else {
             stopScreenRecorder()
             mRecorderRunning = false
@@ -206,6 +212,80 @@ class MainActivity : ComponentActivity() {
             Log.e(TAG, "Failed to request screen capture: " + e.message)
             Toast.makeText(this, "Failed to request screen recording: " + e.message, Toast.LENGTH_LONG).show()
         }
+    }
+
+    /**
+     * Перед началом захвата экрана для Adalight проверяем и запрашиваем USB‑разрешение.
+     * Для Hyperion/WLED просто выполняем [onReady].
+     */
+    private fun ensureUsbPermissionForAdalight(onReady: () -> Unit) {
+        val prefs = Preferences(this)
+        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+
+        if (connectionType != "adalight") {
+            onReady()
+            return
+        }
+
+        val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+        if (usbManager == null) {
+            Toast.makeText(this, "USB service is not available on this device", Toast.LENGTH_LONG).show()
+            onReady()
+            return
+        }
+
+        val drivers = com.hoho.android.usbserial.driver.UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
+        if (drivers.isEmpty()) {
+            Toast.makeText(this, "No USB serial devices found. Please connect your Adalight device via USB OTG cable", Toast.LENGTH_LONG).show()
+            onReady()
+            return
+        }
+
+        val device = drivers[0].device
+        if (usbManager.hasPermission(device)) {
+            onReady()
+            return
+        }
+
+        // Запросить разрешение через системный диалог
+        val permissionIntent = android.app.PendingIntent.getBroadcast(
+            this,
+            0,
+            Intent("com.vasmarfas.UniversalAmbientLight.USB_PERMISSION"),
+            android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        if (!usbPermissionReceiverRegistered) {
+            val filter = IntentFilter("com.vasmarfas.UniversalAmbientLight.USB_PERMISSION")
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                    unregisterReceiver(this)
+                    usbPermissionReceiverRegistered = false
+
+                    if (granted) {
+                        onReady()
+                    } else {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "USB device permission denied. Please allow USB access or grant it in Android Settings > Apps > Hyperion Grabber > Permissions",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(receiver, filter)
+            }
+
+            usbPermissionReceiverRegistered = true
+        }
+
+        usbManager.requestPermission(device, permissionIntent)
+        Toast.makeText(this, "Please confirm USB access for your Adalight device", Toast.LENGTH_LONG).show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

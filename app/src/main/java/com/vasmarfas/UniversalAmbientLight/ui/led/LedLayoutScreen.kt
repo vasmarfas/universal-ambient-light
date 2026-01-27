@@ -43,10 +43,14 @@ fun LedLayoutScreen(
     var xLedText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_x_led).toString()) }
     var yLedText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_y_led).toString()) }
     var bottomGapText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_bottom_gap, 0).toString()) }
+    var captureMarginText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_capture_margin, 0).toString()) }
+    var ledOffsetText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_led_offset, 0).toString()) }
     
     val xLed = xLedText.toIntOrNull() ?: 1
     val yLed = yLedText.toIntOrNull() ?: 1
     val bottomGap = bottomGapText.toIntOrNull() ?: 0
+    val captureMargin = captureMarginText.toIntOrNull() ?: 0
+    val ledOffset = ledOffsetText.toIntOrNull() ?: 0
     
     var startCorner by remember { 
         mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "top_left") ?: "top_left") 
@@ -123,6 +127,8 @@ fun LedLayoutScreen(
                     sideBottom = sideBottom,
                     sideLeft = sideLeft,
                     bottomGap = bottomGap,
+                    captureMarginPercent = captureMargin.coerceIn(0, 40),
+                    ledOffset = ledOffset,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
@@ -248,6 +254,54 @@ fun LedLayoutScreen(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     isError = bottomGapText.isNotEmpty() && bottomGapText.toIntOrNull() == null
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Capture margin
+                OutlinedTextField(
+                    value = captureMarginText,
+                    onValueChange = { newText ->
+                        captureMarginText = newText
+                        newText.toIntOrNull()?.let { value ->
+                            val clamped = value.coerceIn(0, 40)
+                            prefs.putInt(R.string.pref_key_capture_margin, clamped)
+                        }
+                    },
+                    label = { Text("Отступ от края захвата (%)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    supportingText = {
+                        Text(
+                            text = "0–40%. 0% — весь экран, 10% — небольшая рамка внутри.",
+                            fontSize = 12.sp
+                        )
+                    },
+                    isError = captureMarginText.isNotEmpty() && captureMarginText.toIntOrNull() == null
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // LED offset along perimeter
+                OutlinedTextField(
+                    value = ledOffsetText,
+                    onValueChange = { newText ->
+                        ledOffsetText = newText
+                        newText.toIntOrNull()?.let { value ->
+                            // позволяем любое целое, внутри логики оно нормализуется по модулю
+                            prefs.putInt(R.string.pref_key_led_offset, value)
+                        }
+                    },
+                    label = { Text("Смещение LED (шагов по периметру)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    supportingText = {
+                        Text(
+                            text = "Положительное — по направлению обхода, отрицательное — против.",
+                            fontSize = 12.sp
+                        )
+                    },
+                    isError = ledOffsetText.isNotEmpty() && ledOffsetText.toIntOrNull() == null
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -385,6 +439,8 @@ fun LedVisualization(
     sideBottom: String,
     sideLeft: String,
     bottomGap: Int,
+    captureMarginPercent: Int,
+    ledOffset: Int,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -414,13 +470,46 @@ fun LedVisualization(
                     ),
                     style = Stroke(width = 2f)
                 )
+
+                // Draw capture area with margin (as inner rectangle)
+                val margin = captureMarginPercent.coerceIn(0, 40)
+                if (margin > 0) {
+                    val innerLeft = screenPadding + (width - screenPadding * 2) * margin / 100f
+                    val innerTop = screenPadding + (height - screenPadding * 2) * margin / 100f
+                    val innerRight = width - screenPadding - (width - screenPadding * 2) * margin / 100f
+                    val innerBottom = height - screenPadding - (height - screenPadding * 2) * margin / 100f
+
+                    drawRect(
+                        color = Color.Yellow.copy(alpha = 0.35f),
+                        topLeft = Offset(innerLeft, innerTop),
+                        size = androidx.compose.ui.geometry.Size(
+                            innerRight - innerLeft,
+                            innerBottom - innerTop
+                        ),
+                        style = Stroke(width = 2f)
+                    )
+                }
                 
                 // Calculate LED positions
-                val ledPositions = calculateLedPositions(
+                var ledPositions = calculateLedPositions(
                     xLed, yLed, startCorner, direction,
                     sideTop, sideRight, sideBottom, sideLeft, bottomGap,
                     width, height, screenPadding
                 )
+
+                // Apply same offset in visualization so порядок номеров совпадает
+                if (ledPositions.isNotEmpty()) {
+                    val size = ledPositions.size
+                    val offset = ((ledOffset % size) + size) % size
+                    if (offset != 0) {
+                        val rotated = MutableList(size) { ledPositions[0] }
+                        for (i in 0 until size) {
+                            val targetIndex = (i + offset) % size
+                            rotated[targetIndex] = ledPositions[i]
+                        }
+                        ledPositions = rotated
+                    }
+                }
                 
                 // Draw LEDs
                 ledPositions.forEachIndexed { index, ledData ->

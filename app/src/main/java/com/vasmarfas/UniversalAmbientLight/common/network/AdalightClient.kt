@@ -1,11 +1,7 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
-import android.os.Build
 import android.util.Log
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -72,23 +68,11 @@ class AdalightClient(
         val driver = availableDrivers[0]
         val device = driver.device
 
-        // Check if we have permission
+        // Check if we have permission.
+        // На этом этапе диалог уже должен быть показан активити,
+        // поэтому из сервиса мы только проверяем флаг.
         if (!usbManager.hasPermission(device)) {
-            // Request permission from user
-            Log.i(TAG, "USB permission not granted, requesting permission...")
-            requestUsbPermission(usbManager, device)
-
-            // Wait a bit for permission dialog
-            try {
-                Thread.sleep(500)
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-
-            // Check again after request
-            if (!usbManager.hasPermission(device)) {
-                throw IOException("USB device permission denied. Please allow USB access when prompted, or grant permission manually in Android Settings > Apps > Hyperion Grabber > Permissions")
-            }
+            throw IOException("USB device permission denied. Please allow USB access when prompted, or grant permission manually in Android Settings > Apps > Hyperion Grabber > Permissions")
         }
 
         // Open the port
@@ -118,28 +102,6 @@ class AdalightClient(
                 "Failed to configure USB serial port: " + e.message +
                         ". Try different baud rate or check device compatibility", e
             )
-        }
-    }
-
-    /**
-     * Request USB permission from user
-     */
-    private fun requestUsbPermission(usbManager: UsbManager, device: UsbDevice) {
-        try {
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                PendingIntent.FLAG_MUTABLE
-            else
-                0
-            val permissionIntent = PendingIntent.getBroadcast(
-                mContext,
-                0,
-                Intent("com.vasmarfas.UniversalAmbientLight.USB_PERMISSION"),
-                flags
-            )
-            usbManager.requestPermission(device, permissionIntent)
-            Log.d(TAG, "USB permission request sent")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to request USB permission", e)
         }
     }
 

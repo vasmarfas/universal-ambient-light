@@ -153,12 +153,12 @@ fun SettingsScreen(
                 }
 
                 if (isAdalight) {
-                    EditTextPreference(
+                    ListPreference(
                         prefs = prefs,
                         keyRes = R.string.pref_key_adalight_baudrate,
                         title = stringResource(R.string.pref_title_adalight_baudrate),
-                        summaryProvider = { it },
-                        keyboardType = KeyboardType.Number
+                        entriesRes = R.array.pref_list_adalight_baudrate,
+                        entryValuesRes = R.array.pref_list_adalight_baudrate_values
                     )
                     ListPreference(
                         prefs = prefs,

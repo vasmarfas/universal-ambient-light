@@ -134,7 +134,25 @@
     <item>adalight</item>
   </string-array>
   <string name="pref_title_adalight_baudrate">Adalight Baud Rate</string>
-  <string name="pref_summary_adalight_baudrate">Serial communication speed for Adalight (usually 115200)</string>
+  <string name="pref_summary_adalight_baudrate">Serial communication speed for Adalight</string>
+  <string-array name="pref_list_adalight_baudrate">
+    <item>9600</item>
+    <item>19200</item>
+    <item>38400</item>
+    <item>57600</item>
+    <item>115200 (recommended)</item>
+    <item>230400</item>
+    <item>250000</item>
+  </string-array>
+  <string-array name="pref_list_adalight_baudrate_values" translatable="false">
+    <item>9600</item>
+    <item>19200</item>
+    <item>38400</item>
+    <item>57600</item>
+    <item>115200</item>
+    <item>230400</item>
+    <item>250000</item>
+  </string-array>
   <string name="pref_title_wled_color_order">WLED Color Order</string>
   <string name="pref_summary_wled_color_order">Color channel order for WLED (RGB, GRB, BRG, etc.)</string>
   <string-array name="pref_list_wled_color_order">
