@@ -184,34 +184,6 @@ fun SettingsScreen(
 
             // Capturing Group
             SettingsGroup(title = stringResource(R.string.pref_group_capturing)) {
-                EditTextPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_x_led,
-                    title = stringResource(R.string.pref_title_x_led),
-                    summaryProvider = { it },
-                    keyboardType = KeyboardType.Number
-                )
-                EditTextPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_y_led,
-                    title = stringResource(R.string.pref_title_y_led),
-                    summaryProvider = { it },
-                    keyboardType = KeyboardType.Number
-                )
-                ListPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_led_start_corner,
-                    title = stringResource(R.string.pref_title_led_start_corner),
-                    entriesRes = R.array.pref_list_led_start_corner,
-                    entryValuesRes = R.array.pref_list_led_start_corner_values
-                )
-                ListPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_led_direction,
-                    title = stringResource(R.string.pref_title_led_direction),
-                    entriesRes = R.array.pref_list_led_direction,
-                    entryValuesRes = R.array.pref_list_led_direction_values
-                )
                 ClickablePreference(
                     title = stringResource(R.string.pref_title_led_layout),
                     summary = stringResource(R.string.pref_summary_led_layout),

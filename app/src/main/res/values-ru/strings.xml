@@ -51,7 +51,7 @@
     <item>По часовой стрелке</item>
     <item>Против часовой стрелки</item>
   </string-array>
-  <string name="pref_title_led_layout">Визуализация раскладки LED</string>
+  <string name="pref_title_led_layout">Раскладка LED</string>
   <string name="pref_summary_led_layout">Просмотр и настройка раскладки светодиодов</string>
   <string name="pref_title_priority">Приоритет</string>
   <string name="pref_summary_priority">Канал приоритета сообщений</string>

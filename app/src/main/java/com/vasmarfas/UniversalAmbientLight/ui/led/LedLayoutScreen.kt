@@ -15,12 +15,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,86 +61,134 @@ fun LedLayoutScreen(
             )
         }
     ) { padding ->
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
         ) {
-            Text(
-                text = "Раскладка светодиодов",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Всего LED: ${2 * (xLed + yLed)} (${xLed}×2 + ${yLed}×2)",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // LED visualization
-            LedVisualization(
-                xLed = xLed,
-                yLed = yLed,
-                startCorner = startCorner,
-                direction = direction,
+            // Left Side: Visualization (Fixed)
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Settings cards
-            SettingCard(
-                title = "Начальный угол",
-                value = getCornerName(startCorner),
-                onClick = { showEditDialog = true }
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            SettingCard(
-                title = "Направление",
-                value = getDirectionName(direction),
-                onClick = { showEditDialog = true }
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Legend
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Раскладка светодиодов",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
                 )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Легенда:",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LegendItem(color = Color(0xFF4CAF50), text = "LED #1 (первый)")
-                    LegendItem(color = Color(0xFF2196F3), text = "Остальные LED")
-                    LegendItem(color = Color.Gray, text = "Экран")
-                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Всего LED: ${2 * (xLed + yLed)} (${xLed}×2 + ${yLed}×2)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // LED visualization
+                LedVisualization(
+                    xLed = xLed,
+                    yLed = yLed,
+                    startCorner = startCorner,
+                    direction = direction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .weight(1f, fill = false)
+                )
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Button(
-                onClick = { showEditDialog = true },
-                modifier = Modifier.fillMaxWidth()
+
+            // Right Side: Settings (Scrollable)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
-                Text("Изменить настройки")
+                // LED count inputs
+                OutlinedTextField(
+                    value = xLed.toString(),
+                    onValueChange = {
+                        val newValue = it.toIntOrNull() ?: xLed
+                        if (newValue > 0) {
+                            xLed = newValue
+                            prefs.putString(R.string.pref_key_x_led, newValue.toString())
+                        }
+                    },
+                    label = { Text("Горизонтальные LED") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = yLed.toString(),
+                    onValueChange = {
+                        val newValue = it.toIntOrNull() ?: yLed
+                        if (newValue > 0) {
+                            yLed = newValue
+                            prefs.putString(R.string.pref_key_y_led, newValue.toString())
+                        }
+                    },
+                    label = { Text("Вертикальные LED") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Settings cards
+                SettingCard(
+                    title = "Начальный угол",
+                    value = getCornerName(startCorner),
+                    onClick = { showEditDialog = true }
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                SettingCard(
+                    title = "Направление",
+                    value = getDirectionName(direction),
+                    onClick = { showEditDialog = true }
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Legend
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Легенда:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LegendItem(color = Color(0xFF4CAF50), text = "LED #1 (первый)")
+                        LegendItem(color = Color(0xFF2196F3), text = "Остальные LED")
+                        LegendItem(color = Color.Gray, text = "Экран")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Изменить настройки")
+                }
             }
         }
     }

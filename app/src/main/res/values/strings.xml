@@ -51,7 +51,7 @@
     <item>Clockwise</item>
     <item>Counterclockwise</item>
   </string-array>
-  <string name="pref_title_led_layout">LED Layout Visualization</string>
+  <string name="pref_title_led_layout">LED Layout</string>
   <string name="pref_summary_led_layout">View and edit LED layout on screen</string>
   <string name="pref_title_priority">Message Priority</string>
   <string name="pref_summary_priority">Message priority channel to use</string>
