@@ -63,7 +63,7 @@ jobs:
           app/build/outputs/apk/release/app-release.apk
           app/build/outputs/bundle/release/app-release.aab
 
-  release:
+  github_release:
     runs-on: ubuntu-latest
     needs: build
     permissions:
@@ -92,6 +92,19 @@ jobs:
         draft: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  google_play:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: android-release
+        path: dist
 
     - name: Upload to Google Play
       uses: r0adkll/upload-google-play@v1
