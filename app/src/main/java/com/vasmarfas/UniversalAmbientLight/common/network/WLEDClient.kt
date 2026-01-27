@@ -75,7 +75,7 @@ class WLEDClient(
             mSocket!!.soTimeout = 1000
             mConnected = true
             mSmoothing.start()
-            Log.d(TAG, "Connected to WLED at $mHost:$mPort")
+            if (logsEnabled) Log.d(TAG, "Connected to WLED at $mHost:$mPort")
         } catch (e: Exception) {
             mConnected = false
             throw IOException("Failed to connect to WLED: " + e.message, e)
@@ -148,6 +148,18 @@ class WLEDClient(
         mLastLeds = leds // Save for keepalive
 
         try {
+            // Log occasionally for debugging
+            if (System.currentTimeMillis() % 2000 < 100) {
+                if (logsEnabled) Log.d(TAG, "sendLedData: sending ${leds.size} LEDs via ${if (mProtocol == Protocol.DDP) "DDP" else "UDP Raw"} to $mAddress:$mPort")
+                // Sample first few LEDs
+                if (leds.isNotEmpty()) {
+                    val sample = leds.take(5).mapIndexed { idx, led -> 
+                        "[$idx: R=${led.red}, G=${led.green}, B=${led.blue}]" 
+                    }.joinToString(", ")
+                    if (logsEnabled) Log.v(TAG, "Sample LEDs: $sample")
+                }
+            }
+            
             if (mProtocol == Protocol.DDP) {
                 val packets = createDdpPackets(leds)
                 for (packet in packets) {
@@ -322,6 +334,7 @@ class WLEDClient(
 
     companion object {
         private const val TAG = "WLEDClient"
+        private val logsEnabled = false
         private const val DEFAULT_PORT_DDP = 4048
         private const val DEFAULT_PORT_DRGB = 19446
 

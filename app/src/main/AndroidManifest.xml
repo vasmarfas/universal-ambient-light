@@ -41,16 +41,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".SettingsActivity"
-            android:label="@string/settings"
-            android:parentActivityName=".MainActivity"
-            android:exported="false">
-            <meta-data
-                android:name="androidx.PARENT_ACTIVITY"
-                android:value=".MainActivity" />
-        </activity>
-
 
         <service
             android:name="com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService"

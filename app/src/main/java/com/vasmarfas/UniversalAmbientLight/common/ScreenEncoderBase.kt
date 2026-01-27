@@ -26,6 +26,10 @@ abstract class ScreenEncoderBase(
     private val mInitOrientation: Int
     private val mWidthScaled: Int
     private val mHeightScaled: Int
+    
+    // Store real screen dimensions
+    private val mScreenWidth: Int = width
+    private val mScreenHeight: Int = height
 
     // Components
     protected val mBorderProcessor: BorderProcessor
@@ -92,6 +96,15 @@ abstract class ScreenEncoderBase(
 
     protected fun getGrabberHeight(): Int {
         return if (mInitOrientation != mCurrentOrientation) mWidthScaled else mHeightScaled
+    }
+    
+    // Get real screen dimensions (not scaled down by divisor)
+    protected fun getScreenWidth(): Int {
+        return if (mInitOrientation != mCurrentOrientation) mScreenHeight else mScreenWidth
+    }
+    
+    protected fun getScreenHeight(): Int {
+        return if (mInitOrientation != mCurrentOrientation) mScreenWidth else mScreenHeight
     }
 
     abstract fun stopRecording()

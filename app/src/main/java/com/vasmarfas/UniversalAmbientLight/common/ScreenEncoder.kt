@@ -95,16 +95,28 @@ class ScreenEncoder(
         var quality = mOptions.captureQuality
         if (quality <= 0) quality = 128 // fallback
 
-        // Calculate aspect ratio
-        val ratio = getGrabberWidth().toFloat() / getGrabberHeight()
+        // Use REAL screen dimensions, not the scaled-down ones from base class
+        // The base class uses findDivisor() which is meant for full-frame protocols,
+        // but we only need perimeter pixels for WLED/LED strips
+        val screenWidth = getScreenWidth()
+        val screenHeight = getScreenHeight()
+        
+        Log.d(TAG, "initCaptureDimensions: quality=$quality, screenWidth=$screenWidth, screenHeight=$screenHeight")
+
+        // Calculate aspect ratio from real screen dimensions
+        val ratio = screenWidth.toFloat() / screenHeight
+        Log.d(TAG, "initCaptureDimensions: ratio=$ratio")
 
         // Limit width by quality settings
-        val w = min(getGrabberWidth(), quality)
+        val w = min(screenWidth, quality)
         val h = (w / ratio).toInt()
+        Log.d(TAG, "initCaptureDimensions: calculated w=$w, h=$h")
 
         // Ensure even dimensions
         mCaptureWidth = max(32, w and 1.inv())
         mCaptureHeight = max(32, h and 1.inv())
+        
+        Log.d(TAG, "initCaptureDimensions: FINAL mCaptureWidth=$mCaptureWidth, mCaptureHeight=$mCaptureHeight")
     }
 
     @Throws(MediaCodec.CodecException::class)
@@ -207,6 +219,12 @@ class ScreenEncoder(
         if (effWidth <= 0 || effHeight <= 0) return
 
         val rgb = extractRgb(buffer, width, height, rowStride, pixelStride, bx, by, effWidth, effHeight)
+        
+        // Log occasionally for debugging
+        if (DEBUG && System.currentTimeMillis() % 5000 < 100) {
+            Log.d(TAG, "sendPixelData: effWidth=$effWidth, effHeight=$effHeight, rgb.size=${rgb.size}, expected=${effWidth * effHeight * 3}")
+        }
+        
         mListener.sendFrame(rgb, effWidth, effHeight)
     }
 

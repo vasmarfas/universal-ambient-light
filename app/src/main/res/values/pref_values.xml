@@ -79,4 +79,21 @@
     <!-- Adalight advanced settings -->
     <string name="pref_key_adalight_protocol" translatable="false">pref_key_adalight_protocol</string>
     <string name="pref_default_adalight_protocol" translatable="false">ada</string>
+
+    <!-- LED layout settings -->
+    <string name="pref_key_led_start_corner" translatable="false">pref_key_led_start_corner</string>
+    <string name="pref_default_led_start_corner" translatable="false">top_left</string>
+    <string-array name="pref_list_led_start_corner_values" translatable="false">
+        <item>top_left</item>
+        <item>top_right</item>
+        <item>bottom_right</item>
+        <item>bottom_left</item>
+    </string-array>
+
+    <string name="pref_key_led_direction" translatable="false">pref_key_led_direction</string>
+    <string name="pref_default_led_direction" translatable="false">clockwise</string>
+    <string-array name="pref_list_led_direction_values" translatable="false">
+        <item>clockwise</item>
+        <item>counterclockwise</item>
+    </string-array>
 </resources>

@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.vasmarfas.UniversalAmbientLight.MainScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
+import com.vasmarfas.UniversalAmbientLight.ui.led.LedLayoutScreen
 
 @Composable
 fun AppNavHost(
@@ -24,6 +25,12 @@ fun AppNavHost(
         }
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onLedLayoutClick = { navController.navigate(Screen.LedLayout.route) }
+            )
+        }
+        composable(Screen.LedLayout.route) {
+            LedLayoutScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }

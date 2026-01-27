@@ -29,17 +29,21 @@ import android.app.Activity
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onLedLayoutClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
     
     // State for dependencies
-    var connectionType by remember { 
-        mutableStateOf(prefs.getString(R.string.pref_key_connection_type) ?: "hyperion") 
+    var connectionType by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_connection_type) ?: "hyperion")
     }
     var reconnectEnabled by remember {
         mutableStateOf(prefs.getBoolean(R.string.pref_key_reconnect))
+    }
+    var wledProtocol by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_wled_protocol) ?: "ddp")
     }
 
     Scaffold(
@@ -68,7 +72,18 @@ fun SettingsScreen(
                     title = stringResource(R.string.pref_title_connection_type),
                     entriesRes = R.array.pref_list_connection_type,
                     entryValuesRes = R.array.pref_list_connection_type_values,
-                    onValueChange = { connectionType = it }
+                    onValueChange = { newType ->
+                        connectionType = newType
+                        // Auto-set port when connection type changes
+                        val defaultPort = when (newType) {
+                            "hyperion" -> "19400"
+                            "wled" -> if (wledProtocol == "ddp") "4048" else "19446"
+                            else -> null
+                        }
+                        if (defaultPort != null) {
+                            prefs.putString(R.string.pref_key_port, defaultPort)
+                        }
+                    }
                 )
 
                 val isNetwork = connectionType == "hyperion" || connectionType == "wled"
@@ -82,13 +97,34 @@ fun SettingsScreen(
                         title = stringResource(R.string.pref_title_host),
                         summaryProvider = { it }
                     )
-                    EditTextPreference(
-                        prefs = prefs,
-                        keyRes = R.string.pref_key_port,
-                        title = stringResource(R.string.pref_title_port),
-                        summaryProvider = { it },
-                        keyboardType = KeyboardType.Number
-                    )
+
+                    // Show WLED protocol selector between host and port for WLED connections
+                    if (isWled) {
+                        ListPreference(
+                            prefs = prefs,
+                            keyRes = R.string.pref_key_wled_protocol,
+                            title = stringResource(R.string.pref_title_wled_protocol),
+                            entriesRes = R.array.pref_list_wled_protocol,
+                            entryValuesRes = R.array.pref_list_wled_protocol_values,
+                            onValueChange = { newProtocol ->
+                                wledProtocol = newProtocol
+                                // Auto-set port when WLED protocol changes
+                                val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
+                                prefs.putString(R.string.pref_key_port, defaultPort)
+                            }
+                        )
+                    }
+
+                    // Use key to force recomposition when connection type or WLED protocol changes
+                    key("${connectionType}_${wledProtocol}") {
+                        EditTextPreference(
+                            prefs = prefs,
+                            keyRes = R.string.pref_key_port,
+                            title = stringResource(R.string.pref_title_port),
+                            summaryProvider = { it },
+                            keyboardType = KeyboardType.Number
+                        )
+                    }
                     EditTextPreference(
                         prefs = prefs,
                         keyRes = R.string.pref_key_priority,
@@ -138,13 +174,6 @@ fun SettingsScreen(
                         entriesRes = R.array.pref_list_wled_color_order,
                         entryValuesRes = R.array.pref_list_wled_color_order_values
                     )
-                    ListPreference(
-                        prefs = prefs,
-                        keyRes = R.string.pref_key_wled_protocol,
-                        title = stringResource(R.string.pref_title_wled_protocol),
-                        entriesRes = R.array.pref_list_wled_protocol,
-                        entryValuesRes = R.array.pref_list_wled_protocol_values
-                    )
                     CheckBoxPreference(
                         prefs = prefs,
                         keyRes = R.string.pref_key_wled_rgbw,
@@ -168,6 +197,25 @@ fun SettingsScreen(
                     title = stringResource(R.string.pref_title_y_led),
                     summaryProvider = { it },
                     keyboardType = KeyboardType.Number
+                )
+                ListPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_led_start_corner,
+                    title = stringResource(R.string.pref_title_led_start_corner),
+                    entriesRes = R.array.pref_list_led_start_corner,
+                    entryValuesRes = R.array.pref_list_led_start_corner_values
+                )
+                ListPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_led_direction,
+                    title = stringResource(R.string.pref_title_led_direction),
+                    entriesRes = R.array.pref_list_led_direction,
+                    entryValuesRes = R.array.pref_list_led_direction_values
+                )
+                ClickablePreference(
+                    title = stringResource(R.string.pref_title_led_layout),
+                    summary = stringResource(R.string.pref_summary_led_layout),
+                    onClick = onLedLayoutClick
                 )
                 ListPreference(
                     prefs = prefs,
@@ -303,9 +351,18 @@ fun EditTextPreference(
     keyRes: Int,
     title: String,
     summaryProvider: (String) -> String = { it },
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    externalValue: String? = null,
+    onValueChange: ((String) -> Unit)? = null
 ) {
-    var value by remember { mutableStateOf(prefs.getString(keyRes) ?: "") }
+    // Read value from prefs, but allow it to be overridden during composition
+    var value by remember(keyRes) { mutableStateOf(prefs.getString(keyRes) ?: "") }
+    
+    // Update value when external value changes (only if provided)
+    LaunchedEffect(externalValue) {
+        externalValue?.let { value = it }
+    }
+    
     var showDialog by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -344,7 +401,7 @@ fun EditTextPreference(
                 TextButton(
                     onClick = {
                         value = tempValue
-                        prefs.putString(keyRes, value)
+                        onValueChange?.invoke(value) ?: prefs.putString(keyRes, value)
                         showDialog = false
                     }
                 ) {
@@ -438,5 +495,45 @@ fun ListPreference(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun ClickablePreference(
+    title: String,
+    summary: String? = null,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val indication = LocalIndication.current
+    
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = indication,
+                onClick = onClick
+            ),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (summary != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }

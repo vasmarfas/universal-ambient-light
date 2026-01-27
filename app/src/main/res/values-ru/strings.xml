@@ -37,6 +37,22 @@
   <string name="pref_summary_y_led">Количество светодиодов по вертикали</string>
   <string name="pref_title_x_led">LED по горизонтали</string>
   <string name="pref_summary_x_led">Количество светодиодов по горизонтали</string>
+  <string name="pref_title_led_start_corner">Начальный угол LED</string>
+  <string name="pref_summary_led_start_corner">Угол, где находится первый светодиод</string>
+  <string-array name="pref_list_led_start_corner">
+    <item>Верхний левый</item>
+    <item>Верхний правый</item>
+    <item>Нижний правый</item>
+    <item>Нижний левый</item>
+  </string-array>
+  <string name="pref_title_led_direction">Направление LED</string>
+  <string name="pref_summary_led_direction">Направление ленты вокруг экрана</string>
+  <string-array name="pref_list_led_direction">
+    <item>По часовой стрелке</item>
+    <item>Против часовой стрелки</item>
+  </string-array>
+  <string name="pref_title_led_layout">Визуализация раскладки LED</string>
+  <string name="pref_summary_led_layout">Просмотр и настройка раскладки светодиодов</string>
   <string name="pref_title_priority">Приоритет</string>
   <string name="pref_summary_priority">Канал приоритета сообщений</string>
   <string name="pref_title_reconnect">Переподключение</string>

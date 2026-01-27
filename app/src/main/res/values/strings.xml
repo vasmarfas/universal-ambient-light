@@ -37,6 +37,22 @@
   <string name="pref_summary_y_led">The vertical count of LEDs on your hardware</string>
   <string name="pref_title_x_led">Horizontal LED Count</string>
   <string name="pref_summary_x_led">The horizontal count of LEDs on your hardware</string>
+  <string name="pref_title_led_start_corner">LED Start Corner</string>
+  <string name="pref_summary_led_start_corner">Corner where the first LED is located</string>
+  <string-array name="pref_list_led_start_corner">
+    <item>Top Left</item>
+    <item>Top Right</item>
+    <item>Bottom Right</item>
+    <item>Bottom Left</item>
+  </string-array>
+  <string name="pref_title_led_direction">LED Direction</string>
+  <string name="pref_summary_led_direction">Direction of LED strip around the screen</string>
+  <string-array name="pref_list_led_direction">
+    <item>Clockwise</item>
+    <item>Counterclockwise</item>
+  </string-array>
+  <string name="pref_title_led_layout">LED Layout Visualization</string>
+  <string name="pref_summary_led_layout">View and edit LED layout on screen</string>
   <string name="pref_title_priority">Message Priority</string>
   <string name="pref_summary_priority">Message priority channel to use</string>
   <string name="pref_title_reconnect">Reconnect</string>
