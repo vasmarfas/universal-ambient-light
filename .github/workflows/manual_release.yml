@@ -123,3 +123,47 @@ jobs:
         releaseFiles: dist/bundle/release/app-release.aab
         track: ${{ inputs.track }}
         status: ${{ inputs.status }}
+
+  rustore:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Create draft version in RuStore
+      env:
+        RUSTORE_PUBLIC_TOKEN: ${{ secrets.RUSTORE_PUBLIC_TOKEN }}
+        PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
+        APP_VERSION_NAME: ${{ github.event.inputs.version_name }}
+      run: |
+        RESPONSE=$(curl --fail -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version" \
+          -H "Content-Type: application/json" \
+          -H "Public-Token: ${RUSTORE_PUBLIC_TOKEN}" \
+          -d @- <<EOF
+        {
+          "minAndroidVersion": 8
+        }
+        EOF
+        )
+        echo "RuStore draft response: $RESPONSE"
+        VERSION_ID=$(echo "$RESPONSE" | jq -r '.body')
+        if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
+          echo "Failed to parse versionId from RuStore response"
+          exit 1
+        fi
+        echo "RUSTORE_VERSION_ID=$VERSION_ID" >> $GITHUB_ENV
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: android-release
+        path: dist
+
+    - name: Upload APK to RuStore
+      env:
+        RUSTORE_PUBLIC_TOKEN: ${{ secrets.RUSTORE_PUBLIC_TOKEN }}
+        PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
+        RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
+      run: |
+        curl --fail -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
+          -H "Public-Token: ${RUSTORE_PUBLIC_TOKEN}" \
+          -F "file=@dist/apk/release/app-release.apk"

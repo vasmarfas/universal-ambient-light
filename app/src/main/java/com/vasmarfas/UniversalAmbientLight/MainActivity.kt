@@ -36,6 +36,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -679,7 +680,7 @@ fun MainScreen(
             // Status Text
             if (isRunning) {
                 Text(
-                    text = "Grabber Started",
+                    text = stringResource(id = R.string.status_grabber_running),
                     style = MaterialTheme.typography.headlineSmall,
                     color = Color.White,
                     modifier = Modifier

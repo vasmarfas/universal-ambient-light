@@ -246,4 +246,5 @@
   <string name="settings">Настройки</string>
   <string name="quick_tile_label">Universal Ambient Light</string>
   <string name="quick_tile_toast_setup_required">Сначала выполните настройку в приложении</string>
+  <string name="status_grabber_running">Сервис подсветки запущен</string>
 </resources>
