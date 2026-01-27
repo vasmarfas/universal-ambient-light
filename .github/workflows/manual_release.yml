@@ -16,10 +16,8 @@ on:
         required: true
 
 jobs:
-  build_and_release:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
     - uses: actions/checkout@v4
@@ -30,6 +28,9 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: gradle
+
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
 
     - name: Decode Keystore
       env:
@@ -53,6 +54,30 @@ jobs:
         APP_VERSION_NAME: ${{ inputs.version_name }}
       run: ./gradlew assembleRelease bundleRelease
 
+    - name: Upload build artifacts (APK/AAB)
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-release
+        if-no-files-found: error
+        path: |
+          app/build/outputs/apk/release/app-release.apk
+          app/build/outputs/bundle/release/app-release.aab
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: android-release
+        path: dist
+
     - name: Create Release Tag
       id: tag
       run: |
@@ -63,7 +88,7 @@ jobs:
       with:
         tag_name: ${{ steps.tag.outputs.tag_name }}
         name: Release ${{ steps.tag.outputs.tag_name }}
-        files: app/build/outputs/apk/release/app-release.apk
+        files: dist/app-release.apk
         draft: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,6 +98,6 @@ jobs:
       with:
         serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         packageName: com.vasmarfas.UniversalAmbientLight
-        releaseFiles: app/build/outputs/bundle/release/app-release.aab
+        releaseFiles: dist/app-release.aab
         track: ${{ inputs.track }}
         status: ${{ inputs.status }}
