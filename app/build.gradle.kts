@@ -7,15 +7,16 @@ plugins {
     alias(libs.plugins.firebase.perf)
 }
 
-val versionBase = "0.0.2"
+val defaultVersionName = "0.0.2"
+
+val appVersionName: String = System.getenv("APP_VERSION_NAME") ?: defaultVersionName
+
 val buildNumber = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0
-// Example: 0.0.1 or 0.0.1-beta.1 if suffix provided
-val appVersionName = versionBase
 
 fun getVersionCodeFrom(name: String, build: Int): Int {
     val cleanVersion = name.substringBefore("-")
     val parts = cleanVersion.split(".").map { it.toIntOrNull() ?: 0 }
-    
+
     val major = parts.getOrElse(0) { 0 }
     val minor = parts.getOrElse(1) { 0 }
     val patch = parts.getOrElse(2) { 0 }
