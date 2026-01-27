@@ -29,6 +29,13 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    - name: Cache Gradle wrapper
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/wrapper
+        key: gradle-wrapper-${{ runner.os }}-8.14.4
+
     - name: Make gradlew executable
       run: chmod +x ./gradlew
 
@@ -81,14 +88,16 @@ jobs:
     - name: Create Release Tag
       id: tag
       run: |
-        echo "tag_name=v$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+        echo "tag_name=v${{ github.event.inputs.version_name }}" >> $GITHUB_OUTPUT
 
     - name: Upload APK to GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.tag.outputs.tag_name }}
-        name: Release ${{ steps.tag.outputs.tag_name }}
-        files: dist/app-release.apk
+        name: Release ${{ github.event.inputs.version_name }}
+        files: |
+          dist/apk/release/app-release.apk
+          dist/bundle/release/app-release.aab
         draft: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,6 +120,6 @@ jobs:
       with:
         serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         packageName: com.vasmarfas.UniversalAmbientLight
-        releaseFiles: dist/app-release.aab
+        releaseFiles: dist/bundle/release/app-release.aab
         track: ${{ inputs.track }}
         status: ${{ inputs.status }}
