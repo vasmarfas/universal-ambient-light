@@ -89,6 +89,7 @@ fun SettingsScreen(
                 val isNetwork = connectionType == "hyperion" || connectionType == "wled"
                 val isAdalight = connectionType == "adalight"
                 val isWled = connectionType == "wled"
+                val isHyperion = connectionType == "hyperion"
 
                 if (isNetwork) {
                     EditTextPreference(
@@ -125,27 +126,29 @@ fun SettingsScreen(
                             keyboardType = KeyboardType.Number
                         )
                     }
-                    EditTextPreference(
-                        prefs = prefs,
-                        keyRes = R.string.pref_key_priority,
-                        title = stringResource(R.string.pref_title_priority),
-                        summaryProvider = { it },
-                        keyboardType = KeyboardType.Number
-                    )
-                    CheckBoxPreference(
-                        prefs = prefs,
-                        keyRes = R.string.pref_key_reconnect,
-                        title = stringResource(R.string.pref_title_reconnect),
-                        onValueChange = { reconnectEnabled = it }
-                    )
-                    if (reconnectEnabled) {
+                    if (isHyperion) {
                         EditTextPreference(
                             prefs = prefs,
-                            keyRes = R.string.pref_key_reconnect_delay,
-                            title = stringResource(R.string.pref_title_reconnect_delay),
+                            keyRes = R.string.pref_key_priority,
+                            title = stringResource(R.string.pref_title_priority),
                             summaryProvider = { it },
                             keyboardType = KeyboardType.Number
                         )
+                        CheckBoxPreference(
+                            prefs = prefs,
+                            keyRes = R.string.pref_key_reconnect,
+                            title = stringResource(R.string.pref_title_reconnect),
+                            onValueChange = { reconnectEnabled = it }
+                        )
+                        if (reconnectEnabled) {
+                            EditTextPreference(
+                                prefs = prefs,
+                                keyRes = R.string.pref_key_reconnect_delay,
+                                title = stringResource(R.string.pref_title_reconnect_delay),
+                                summaryProvider = { it },
+                                keyboardType = KeyboardType.Number
+                            )
+                        }
                     }
                 }
 
