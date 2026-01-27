@@ -53,6 +53,12 @@
   </string-array>
   <string name="pref_title_led_layout">Раскладка LED</string>
   <string name="pref_summary_led_layout">Просмотр и настройка раскладки светодиодов</string>
+  <string name="pref_title_led_side_top">Верхние LED</string>
+  <string name="pref_title_led_side_right">Правые LED</string>
+  <string name="pref_title_led_side_bottom">Нижние LED</string>
+  <string name="pref_title_led_side_left">Левые LED</string>
+  <string name="pref_title_bottom_gap">Пропуск снизу (LED)</string>
+  <string name="pref_summary_bottom_gap">Количество LED, которые нужно пропустить снизу (например, для саундбара)</string>
   <string name="pref_title_priority">Приоритет</string>
   <string name="pref_summary_priority">Канал приоритета сообщений</string>
   <string name="pref_title_reconnect">Переподключение</string>

@@ -251,6 +251,13 @@ class ScreenGrabberService : Service() {
                     }
                 }
                 ACTION_STOP -> stopScreenRecord()
+                ACTION_CLEAR -> {
+                    // Send one black frame but keep connection
+                    if (mScreenEncoder != null) {
+                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once")
+                        mScreenEncoder!!.clearLights()
+                    }
+                }
                 GET_STATUS -> notifyActivity()
                 ACTION_EXIT -> stopSelf()
             }
@@ -497,6 +504,7 @@ class ScreenGrabberService : Service() {
         private const val BASE = "com.vasmarfas.UniversalAmbientLight.service."
         const val ACTION_START = BASE + "ACTION_START"
         const val ACTION_STOP = BASE + "ACTION_STOP"
+        const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_EXIT = BASE + "ACTION_EXIT"
         const val GET_STATUS = BASE + "ACTION_STATUS"
         const val EXTRA_RESULT_CODE = BASE + "EXTRA_RESULT_CODE"

@@ -65,15 +65,19 @@ abstract class ScreenEncoderBase(
 
     fun clearLights() {
         Thread {
-            sleep(CLEAR_DELAY_MS.toLong())
-            mListener.clear()
+            repeat(CLEAR_FRAMES) {
+                sleep(CLEAR_DELAY_MS.toLong())
+                mListener.clear()
+            }
         }.start()
     }
 
     protected fun clearAndDisconnect() {
         Thread {
-            sleep(CLEAR_DELAY_MS.toLong())
-            mListener.clear()
+            repeat(CLEAR_FRAMES) {
+                sleep(CLEAR_DELAY_MS.toLong())
+                mListener.clear()
+            }
             mListener.disconnect()
         }.start()
     }
@@ -115,6 +119,7 @@ abstract class ScreenEncoderBase(
         private const val TAG = "ScreenEncoderBase"
         const val DEBUG = false
         private const val CLEAR_DELAY_MS = 100
+        private const val CLEAR_FRAMES = 5
 
         private fun sleep(ms: Long) {
             try {

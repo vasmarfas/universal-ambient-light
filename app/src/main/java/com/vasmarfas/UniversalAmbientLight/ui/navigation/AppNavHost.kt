@@ -4,23 +4,28 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.vasmarfas.UniversalAmbientLight.EffectMode
 import com.vasmarfas.UniversalAmbientLight.MainScreen
-import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.led.LedLayoutScreen
+import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     startDestination: String = Screen.Home.route,
     isRunning: Boolean,
-    onToggleClick: () -> Unit
+    onToggleClick: () -> Unit,
+    onEffectsClick: () -> Unit,
+    effectMode: EffectMode
 ) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Home.route) {
             MainScreen(
                 isRunning = isRunning,
                 onToggleClick = onToggleClick,
-                onSettingsClick = { navController.navigate(Screen.Settings.route) }
+                onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                onEffectsClick = onEffectsClick,
+                effectMode = effectMode
             )
         }
         composable(Screen.Settings.route) {

@@ -53,6 +53,12 @@
   </string-array>
   <string name="pref_title_led_layout">LED Layout</string>
   <string name="pref_summary_led_layout">View and edit LED layout on screen</string>
+  <string name="pref_title_led_side_top">Top LEDs</string>
+  <string name="pref_title_led_side_right">Right LEDs</string>
+  <string name="pref_title_led_side_bottom">Bottom LEDs</string>
+  <string name="pref_title_led_side_left">Left LEDs</string>
+  <string name="pref_title_bottom_gap">Bottom Gap (LEDs)</string>
+  <string name="pref_summary_bottom_gap">Number of LEDs to skip at the bottom (e.g., for soundbar)</string>
   <string name="pref_title_priority">Message Priority</string>
   <string name="pref_summary_priority">Message priority channel to use</string>
   <string name="pref_title_reconnect">Reconnect</string>
