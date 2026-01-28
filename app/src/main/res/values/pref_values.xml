@@ -12,6 +12,19 @@
     <string name="pref_key_x_led" translatable="false">pref_key_x_led</string>
     <integer name="pref_default_x_led" translatable="false">60</integer>
 
+    <!-- Per-side LED counts (top/right/bottom/left) -->
+    <string name="pref_key_led_count_top" translatable="false">pref_key_led_count_top</string>
+    <integer name="pref_default_led_count_top" translatable="false">60</integer>
+
+    <string name="pref_key_led_count_right" translatable="false">pref_key_led_count_right</string>
+    <integer name="pref_default_led_count_right" translatable="false">34</integer>
+
+    <string name="pref_key_led_count_bottom" translatable="false">pref_key_led_count_bottom</string>
+    <integer name="pref_default_led_count_bottom" translatable="false">60</integer>
+
+    <string name="pref_key_led_count_left" translatable="false">pref_key_led_count_left</string>
+    <integer name="pref_default_led_count_left" translatable="false">34</integer>
+
     <string name="pref_key_priority" translatable="false">pref_key_priority</string>
     <integer name="pref_default_priority" translatable="false">100</integer>
 

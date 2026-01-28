@@ -11,7 +11,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.LocalIndication
@@ -21,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -40,14 +46,38 @@ fun LedLayoutScreen(
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
     
-    var xLedText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_x_led).toString()) }
-    var yLedText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_y_led).toString()) }
+    // Старые общие значения оставляем для обратной совместимости и начальной инициализации
+    val legacyX = prefs.getInt(R.string.pref_key_x_led)
+    val legacyY = prefs.getInt(R.string.pref_key_y_led)
+
+    var topLedText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_led_count_top, legacyX).toString()
+        )
+    }
+    var rightLedText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_led_count_right, legacyY).toString()
+        )
+    }
+    var bottomLedText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_led_count_bottom, legacyX).toString()
+        )
+    }
+    var leftLedText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_led_count_left, legacyY).toString()
+        )
+    }
     var bottomGapText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_bottom_gap, 0).toString()) }
     var captureMarginText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_capture_margin, 0).toString()) }
     var ledOffsetText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_led_offset, 0).toString()) }
     
-    val xLed = xLedText.toIntOrNull() ?: 1
-    val yLed = yLedText.toIntOrNull() ?: 1
+    val topLed = topLedText.toIntOrNull() ?: 0
+    val rightLed = rightLedText.toIntOrNull() ?: 0
+    val bottomLed = bottomLedText.toIntOrNull() ?: 0
+    val leftLed = leftLedText.toIntOrNull() ?: 0
     val bottomGap = bottomGapText.toIntOrNull() ?: 0
     val captureMargin = captureMarginText.toIntOrNull() ?: 0
     val ledOffset = ledOffsetText.toIntOrNull() ?: 0
@@ -69,10 +99,13 @@ fun LedLayoutScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("LED Layout") },
+                title = { Text(stringResource(R.string.pref_title_led_layout)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 }
             )
@@ -92,24 +125,33 @@ fun LedLayoutScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Раскладка светодиодов",
+                    text = stringResource(R.string.pref_title_led_layout),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
-                val totalLeds = remember(xLed, yLed, sideTop, sideRight, sideBottom, sideLeft) {
+
+                val totalLeds = remember(
+                    topLed,
+                    rightLed,
+                    bottomLed,
+                    leftLed,
+                    sideTop,
+                    sideRight,
+                    sideBottom,
+                    sideLeft
+                ) {
                     var total = 0
-                    if (sideTop != "not_installed") total += xLed
-                    if (sideRight != "not_installed") total += yLed
-                    if (sideBottom != "not_installed") total += xLed
-                    if (sideLeft != "not_installed") total += yLed
+                    if (sideTop != "not_installed") total += topLed.coerceAtLeast(0)
+                    if (sideRight != "not_installed") total += rightLed.coerceAtLeast(0)
+                    if (sideBottom != "not_installed") total += bottomLed.coerceAtLeast(0)
+                    if (sideLeft != "not_installed") total += leftLed.coerceAtLeast(0)
                     total
                 }
-                
+
                 Text(
-                    text = "Всего LED: $totalLeds",
+                    text = stringResource(R.string.led_layout_total_leds, totalLeds),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -118,8 +160,10 @@ fun LedLayoutScreen(
                 
                 // LED visualization
                 LedVisualization(
-                    xLed = xLed,
-                    yLed = yLed,
+                    topLed = topLed,
+                    rightLed = rightLed,
+                    bottomLed = bottomLed,
+                    leftLed = leftLed,
                     startCorner = startCorner,
                     direction = direction,
                     sideTop = sideTop,
@@ -144,46 +188,82 @@ fun LedLayoutScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
-                // LED count inputs
+                // LED count inputs per side
                 OutlinedTextField(
-                    value = xLedText,
+                    value = topLedText,
                     onValueChange = { newText ->
-                        xLedText = newText
+                        topLedText = newText
                         newText.toIntOrNull()?.let { value ->
-                            if (value > 0) {
-                                prefs.putString(R.string.pref_key_x_led, value.toString())
-                            }
+                            if (value >= 0) {
+                                prefs.putInt(R.string.pref_key_led_count_top, value)
+                        }
                         }
                     },
-                    label = { Text("Горизонтальные LED") },
+                    label = { Text(stringResource(R.string.led_layout_top_count_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = xLedText.isNotEmpty() && xLedText.toIntOrNull() == null
+                    isError = topLedText.isNotEmpty() && topLedText.toIntOrNull() == null
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedTextField(
-                    value = yLedText,
+                    value = rightLedText,
                     onValueChange = { newText ->
-                        yLedText = newText
+                        rightLedText = newText
                         newText.toIntOrNull()?.let { value ->
-                            if (value > 0) {
-                                prefs.putString(R.string.pref_key_y_led, value.toString())
+                            if (value >= 0) {
+                                prefs.putInt(R.string.pref_key_led_count_right, value)
+                        }
+                        }
+                    },
+                    label = { Text(stringResource(R.string.led_layout_right_count_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = rightLedText.isNotEmpty() && rightLedText.toIntOrNull() == null
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = bottomLedText,
+                    onValueChange = { newText ->
+                        bottomLedText = newText
+                        newText.toIntOrNull()?.let { value ->
+                            if (value >= 0) {
+                                prefs.putInt(R.string.pref_key_led_count_bottom, value)
                             }
                         }
                     },
-                    label = { Text("Вертикальные LED") },
+                    label = { Text(stringResource(R.string.led_layout_bottom_count_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = yLedText.isNotEmpty() && yLedText.toIntOrNull() == null
+                    isError = bottomLedText.isNotEmpty() && bottomLedText.toIntOrNull() == null
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = leftLedText,
+                    onValueChange = { newText ->
+                        leftLedText = newText
+                        newText.toIntOrNull()?.let { value ->
+                            if (value >= 0) {
+                                prefs.putInt(R.string.pref_key_led_count_left, value)
+                            }
+                        }
+                    },
+                    label = { Text(stringResource(R.string.led_layout_left_count_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // LED sides configuration
                 Text(
-                    text = "Активные стороны",
+                    text = stringResource(R.string.led_layout_active_sides),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -191,7 +271,7 @@ fun LedLayoutScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 SideSelectorCard(
-                    title = "Верх",
+                    title = stringResource(R.string.led_layout_side_top),
                     selectedMode = sideTop,
                     onModeSelected = { mode ->
                         sideTop = mode
@@ -203,7 +283,7 @@ fun LedLayoutScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 SideSelectorCard(
-                    title = "Право",
+                    title = stringResource(R.string.led_layout_side_right),
                     selectedMode = sideRight,
                     onModeSelected = { mode ->
                         sideRight = mode
@@ -215,7 +295,7 @@ fun LedLayoutScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 SideSelectorCard(
-                    title = "Низ",
+                    title = stringResource(R.string.led_layout_side_bottom),
                     selectedMode = sideBottom,
                     onModeSelected = { mode ->
                         sideBottom = mode
@@ -227,7 +307,7 @@ fun LedLayoutScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 SideSelectorCard(
-                    title = "Лево",
+                    title = stringResource(R.string.led_layout_side_left),
                     selectedMode = sideLeft,
                     onModeSelected = { mode ->
                         sideLeft = mode
@@ -250,7 +330,7 @@ fun LedLayoutScreen(
                             }
                         }
                     },
-                    label = { Text("Пропуск снизу (для саундбара)") },
+                    label = { Text(stringResource(R.string.led_layout_bottom_gap_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     isError = bottomGapText.isNotEmpty() && bottomGapText.toIntOrNull() == null
@@ -268,12 +348,12 @@ fun LedLayoutScreen(
                             prefs.putInt(R.string.pref_key_capture_margin, clamped)
                         }
                     },
-                    label = { Text("Отступ от края захвата (%)") },
+                    label = { Text(stringResource(R.string.led_layout_capture_margin_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     supportingText = {
                         Text(
-                            text = "0–40%. 0% — весь экран, 10% — небольшая рамка внутри.",
+                            text = stringResource(R.string.led_layout_capture_margin_help),
                             fontSize = 12.sp
                         )
                     },
@@ -292,12 +372,12 @@ fun LedLayoutScreen(
                             prefs.putInt(R.string.pref_key_led_offset, value)
                         }
                     },
-                    label = { Text("Смещение LED (шагов по периметру)") },
+                    label = { Text(stringResource(R.string.led_layout_offset_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     supportingText = {
                         Text(
-                            text = "Положительное — по направлению обхода, отрицательное — против.",
+                            text = stringResource(R.string.led_layout_offset_help),
                             fontSize = 12.sp
                         )
                     },
@@ -308,7 +388,7 @@ fun LedLayoutScreen(
 
                 // Settings cards
                 SettingCard(
-                    title = "Начальный угол",
+                    title = stringResource(R.string.pref_title_led_start_corner),
                     value = getCornerName(startCorner),
                     onClick = { showEditDialog = true }
                 )
@@ -316,7 +396,7 @@ fun LedLayoutScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 SettingCard(
-                    title = "Направление",
+                    title = stringResource(R.string.pref_title_led_direction),
                     value = getDirectionName(direction),
                     onClick = { showEditDialog = true }
                 )
@@ -332,15 +412,27 @@ fun LedLayoutScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Легенда:",
+                            text = stringResource(R.string.led_layout_legend_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        LegendItem(color = Color(0xFF4CAF50), text = "LED #1 (первый)")
-                        LegendItem(color = Color(0xFF2196F3), text = "Активные LED")
-                        LegendItem(color = Color.Gray.copy(alpha = 0.4f), text = "Отключенные LED")
-                        LegendItem(color = Color.Gray, text = "Экран")
+                        LegendItem(
+                            color = Color(0xFF4CAF50),
+                            text = stringResource(R.string.led_layout_legend_first_led)
+                        )
+                        LegendItem(
+                            color = Color(0xFF2196F3),
+                            text = stringResource(R.string.led_layout_legend_active_leds)
+                        )
+                        LegendItem(
+                            color = Color.Gray.copy(alpha = 0.4f),
+                            text = stringResource(R.string.led_layout_legend_disabled_leds)
+                        )
+                        LegendItem(
+                            color = Color.Gray,
+                            text = stringResource(R.string.led_layout_legend_screen)
+                        )
                     }
                 }
                 
@@ -350,7 +442,7 @@ fun LedLayoutScreen(
                     onClick = { showEditDialog = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Изменить настройки")
+                    Text(stringResource(R.string.led_layout_change_button))
                 }
             }
         }
@@ -358,20 +450,13 @@ fun LedLayoutScreen(
     
     if (showEditDialog) {
         EditLayoutDialog(
-            xLed = xLed,
-            yLed = yLed,
             startCorner = startCorner,
             direction = direction,
             onDismiss = { showEditDialog = false },
-            onSave = { newX, newY, newCorner, newDir ->
-                xLedText = newX.toString()
-                yLedText = newY.toString()
+            onSave = { newCorner, newDir ->
                 startCorner = newCorner
                 direction = newDir
-                
-                // Save to preferences
-                prefs.putString(R.string.pref_key_x_led, newX.toString())
-                prefs.putString(R.string.pref_key_y_led, newY.toString())
+
                 prefs.putString(R.string.pref_key_led_start_corner, newCorner)
                 prefs.putString(R.string.pref_key_led_direction, newDir)
                 
@@ -408,19 +493,19 @@ fun SideSelectorCard(
                 FilterChip(
                     selected = selectedMode == "enabled",
                     onClick = { onModeSelected("enabled") },
-                    label = { Text("Вкл", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.led_side_mode_on), fontSize = 12.sp) },
                     modifier = Modifier.weight(1f)
                 )
                 FilterChip(
                     selected = selectedMode == "disabled",
                     onClick = { onModeSelected("disabled") },
-                    label = { Text("Откл", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.led_side_mode_off), fontSize = 12.sp) },
                     modifier = Modifier.weight(1f)
                 )
                 FilterChip(
                     selected = selectedMode == "not_installed",
                     onClick = { onModeSelected("not_installed") },
-                    label = { Text("Нет", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.led_side_mode_none), fontSize = 12.sp) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -430,8 +515,10 @@ fun SideSelectorCard(
 
 @Composable
 fun LedVisualization(
-    xLed: Int,
-    yLed: Int,
+    topLed: Int,
+    rightLed: Int,
+    bottomLed: Int,
+    leftLed: Int,
     startCorner: String,
     direction: String,
     sideTop: String,
@@ -492,7 +579,8 @@ fun LedVisualization(
                 
                 // Calculate LED positions
                 var ledPositions = calculateLedPositions(
-                    xLed, yLed, startCorner, direction,
+                    topLed, rightLed, bottomLed, leftLed,
+                    startCorner, direction,
                     sideTop, sideRight, sideBottom, sideLeft, bottomGap,
                     width, height, screenPadding
                 )
@@ -560,8 +648,10 @@ data class LedData(
 )
 
 fun calculateLedPositions(
-    xLed: Int,
-    yLed: Int,
+    topLed: Int,
+    rightLed: Int,
+    bottomLed: Int,
+    leftLed: Int,
     startCorner: String,
     direction: String,
     sideTop: String,
@@ -577,15 +667,26 @@ fun calculateLedPositions(
     
     val screenWidth = width - padding * 2
     val screenHeight = height - padding * 2
-    val stepX = screenWidth / (xLed - 1).coerceAtLeast(1)
-    val stepY = screenHeight / (yLed - 1).coerceAtLeast(1)
+    val topCount = topLed.coerceAtLeast(0)
+    val rightCount = rightLed.coerceAtLeast(0)
+    val bottomCount = bottomLed.coerceAtLeast(0)
+    val leftCount = leftLed.coerceAtLeast(0)
+
+    fun step(length: Float, count: Int): Float {
+        return if (count <= 1) 0f else length / (count - 1)
+    }
+
+    val stepTop = step(screenWidth, topCount)
+    val stepRight = step(screenHeight, rightCount)
+    val stepBottom = step(screenWidth, bottomCount)
+    val stepLeft = step(screenHeight, leftCount)
     
     // Determine edge order
     val edges = getEdgeOrder(startCorner, direction)
     
     // Calculate gap range for bottom edge
-    val gapStart = if (bottomGap > 0) (xLed - bottomGap) / 2 else -1
-    val gapEnd = if (bottomGap > 0) gapStart + bottomGap else -1
+    val gapStart = if (bottomGap > 0 && bottomCount > 0) (bottomCount - bottomGap) / 2 else -1
+    val gapEnd = if (bottomGap > 0 && bottomCount > 0) gapStart + bottomGap else -1
     
     for (edge in edges) {
         val sideMode = when {
@@ -602,75 +703,118 @@ fun calculateLedPositions(
         when (edge) {
             "top_lr" -> {
                 // Top edge (left to right)
-                for (i in 0 until xLed) {
+                for (i in 0 until topCount) {
+                    val x = if (topCount <= 1) {
+                        padding + screenWidth / 2f
+                    } else {
+                        padding + i * stepTop
+                    }
                     positions.add(LedData(
-                        position = Offset(padding + i * stepX, padding),
+                        position = Offset(x, padding),
                         enabled = sideMode == "enabled"
                     ))
                 }
             }
             "top_rl" -> {
                 // Top edge (right to left)
-                for (i in 0 until xLed) {
+                for (i in 0 until topCount) {
+                    val ledIndex = topCount - 1 - i
+                    val x = if (topCount <= 1) {
+                        padding + screenWidth / 2f
+                    } else {
+                        padding + ledIndex * stepTop
+                    }
                     positions.add(LedData(
-                        position = Offset(padding + (xLed - 1 - i) * stepX, padding),
+                        position = Offset(x, padding),
                         enabled = sideMode == "enabled"
                     ))
                 }
             }
             "right_tb" -> {
                 // Right edge (top to bottom)
-                for (i in 0 until yLed) {
+                for (i in 0 until rightCount) {
+                    val y = if (rightCount <= 1) {
+                        padding + screenHeight / 2f
+                    } else {
+                        padding + i * stepRight
+                    }
                     positions.add(LedData(
-                        position = Offset(padding + screenWidth, padding + i * stepY),
+                        position = Offset(padding + screenWidth, y),
                         enabled = sideMode == "enabled"
                     ))
                 }
             }
             "right_bt" -> {
                 // Right edge (bottom to top)
-                for (i in 0 until yLed) {
+                for (i in 0 until rightCount) {
+                    val ledIndex = rightCount - 1 - i
+                    val y = if (rightCount <= 1) {
+                        padding + screenHeight / 2f
+                    } else {
+                        padding + ledIndex * stepRight
+                    }
                     positions.add(LedData(
-                        position = Offset(padding + screenWidth, padding + (yLed - 1 - i) * stepY),
+                        position = Offset(padding + screenWidth, y),
                         enabled = sideMode == "enabled"
                     ))
                 }
             }
             "bottom_rl" -> {
                 // Bottom edge (right to left)
-                for (i in 0 until xLed) {
-                    val ledIndex = xLed - 1 - i
-                    val isInGap = bottomGap > 0 && ledIndex >= gapStart && ledIndex < gapEnd
+                for (i in 0 until bottomCount) {
+                    val ledIndex = bottomCount - 1 - i
+                    val isInGap = bottomGap > 0 && bottomCount > 0 && ledIndex >= gapStart && ledIndex < gapEnd
+                    val x = if (bottomCount <= 1) {
+                        padding + screenWidth / 2f
+                    } else {
+                        padding + ledIndex * stepBottom
+                    }
                     positions.add(LedData(
-                        position = Offset(padding + ledIndex * stepX, padding + screenHeight),
+                        position = Offset(x, padding + screenHeight),
                         enabled = sideMode == "enabled" && !isInGap
                     ))
                 }
             }
             "bottom_lr" -> {
                 // Bottom edge (left to right)
-                for (i in 0 until xLed) {
-                    val isInGap = bottomGap > 0 && i >= gapStart && i < gapEnd
+                for (i in 0 until bottomCount) {
+                    val isInGap = bottomGap > 0 && bottomCount > 0 && i >= gapStart && i < gapEnd
+                    val x = if (bottomCount <= 1) {
+                        padding + screenWidth / 2f
+                    } else {
+                        padding + i * stepBottom
+                    }
                     positions.add(LedData(
-                        position = Offset(padding + i * stepX, padding + screenHeight),
+                        position = Offset(x, padding + screenHeight),
                         enabled = sideMode == "enabled" && !isInGap
                     ))
                 }
             }
             "left_bt" -> {
                 // Left edge (bottom to top)
-                for (i in 0 until yLed) {
+                for (i in 0 until leftCount) {
+                    val ledIndex = leftCount - 1 - i
+                    val y = if (leftCount <= 1) {
+                        padding + screenHeight / 2f
+                    } else {
+                        padding + ledIndex * stepLeft
+                    }
                     positions.add(LedData(
-                        position = Offset(padding, padding + (yLed - 1 - i) * stepY),
+                        position = Offset(padding, y),
                         enabled = sideMode == "enabled"
                     ))
                 }
             }
             "left_tb" -> {
                 // Left edge (top to bottom)
-                for (i in 0 until yLed) {
+                for (i in 0 until leftCount) {
+                    val y = if (leftCount <= 1) {
+                        padding + screenHeight / 2f
+                    } else {
+                        padding + i * stepLeft
+                    }
                     positions.add(LedData(
-                        position = Offset(padding, padding + i * stepY),
+                        position = Offset(padding, y),
                         enabled = sideMode == "enabled"
                     ))
                 }
@@ -786,12 +930,10 @@ fun LegendItem(color: Color, text: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditLayoutDialog(
-    xLed: Int,
-    yLed: Int,
     startCorner: String,
     direction: String,
     onDismiss: () -> Unit,
-    onSave: (Int, Int, String, String) -> Unit
+    onSave: (String, String) -> Unit
 ) {
     var newStartCorner by remember { mutableStateOf(startCorner) }
     var newDirection by remember { mutableStateOf(direction) }
@@ -801,7 +943,7 @@ fun EditLayoutDialog(
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Настройки раскладки") },
+        title = { Text(stringResource(R.string.led_layout_dialog_title)) },
         text = {
             Column {
                 ExposedDropdownMenuBox(
@@ -812,7 +954,7 @@ fun EditLayoutDialog(
                         value = getCornerName(newStartCorner),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Начальный угол") },
+                        label = { Text(stringResource(R.string.pref_title_led_start_corner)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCorner) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -845,7 +987,7 @@ fun EditLayoutDialog(
                         value = getDirectionName(newDirection),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Направление") },
+                        label = { Text(stringResource(R.string.pref_title_led_direction)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDirection) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -872,34 +1014,36 @@ fun EditLayoutDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onSave(xLed, yLed, newStartCorner, newDirection)
+                    onSave(newStartCorner, newDirection)
                 }
             ) {
-                Text("Сохранить")
+                Text(stringResource(R.string.guidedstep_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена")
+                Text(stringResource(R.string.guidedstep_cancel))
             }
         }
     )
 }
 
+@Composable
 fun getCornerName(corner: String): String {
     return when (corner) {
-        "top_left" -> "Верхний левый"
-        "top_right" -> "Верхний правый"
-        "bottom_right" -> "Нижний правый"
-        "bottom_left" -> "Нижний левый"
+        "top_left" -> stringResource(R.string.led_corner_top_left)
+        "top_right" -> stringResource(R.string.led_corner_top_right)
+        "bottom_right" -> stringResource(R.string.led_corner_bottom_right)
+        "bottom_left" -> stringResource(R.string.led_corner_bottom_left)
         else -> corner
     }
 }
 
+@Composable
 fun getDirectionName(direction: String): String {
     return when (direction) {
-        "clockwise" -> "По часовой стрелке"
-        "counterclockwise" -> "Против часовой стрелки"
+        "clockwise" -> stringResource(R.string.led_direction_clockwise)
+        "counterclockwise" -> stringResource(R.string.led_direction_counterclockwise)
         else -> direction
     }
 }
