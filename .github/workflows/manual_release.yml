@@ -177,7 +177,7 @@ jobs:
         PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
         APP_VERSION_NAME: ${{ github.event.inputs.version_name }}
       run: |
-        RESPONSE=$(curl --fail -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version" \
+        RESPONSE=$(curl -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version" \
           -H "Content-Type: application/json" \
           -H "Public-Token: ${RUSTORE_JWE}" \
           -d @- <<EOF
@@ -187,6 +187,11 @@ jobs:
         EOF
         )
         echo "RuStore draft response: $RESPONSE"
+        DRAFT_CODE=$(echo "$RESPONSE" | jq -r '.code // empty')
+        if [ "$DRAFT_CODE" != "OK" ]; then
+          echo "RuStore draft failed, code=$DRAFT_CODE"
+          exit 1
+        fi
         VERSION_ID=$(echo "$RESPONSE" | jq -r '.body')
         if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
           echo "Failed to parse versionId from RuStore response"
