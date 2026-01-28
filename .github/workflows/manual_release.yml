@@ -140,7 +140,9 @@ jobs:
           exit 1
         fi
 
-        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3fZ")
+        # RuStore требует формат вида yyyy-MM-dd'T'HH:mm:ssXXX, пример: 2024-01-01T12:34:56.789+03:00
+        # Используем UTC с миллисекундами и явным смещением +00:00
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3N+00:00")
         MESSAGE="${RUSTORE_KEY_ID}${TIMESTAMP}"
 
         echo "$RUSTORE_PRIVATE_KEY" | base64 -d > rustore_key.der
