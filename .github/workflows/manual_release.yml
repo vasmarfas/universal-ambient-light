@@ -130,166 +130,105 @@ jobs:
     needs: build
 
     steps:
-    - name: Get RuStore API token (JWE)
-      env:
-        RUSTORE_KEY_ID: ${{ secrets.RUSTORE_KEY_ID }}
-        RUSTORE_PRIVATE_KEY: ${{ secrets.RUSTORE_PRIVATE_KEY }}
-      run: |
-        if [ -z "$RUSTORE_KEY_ID" ] || [ -z "$RUSTORE_PRIVATE_KEY" ]; then
-          echo "RuStore key id or private key is not set"
-          exit 1
-        fi
+      - name: Get RuStore API token (JWE)
+        env:
+          RUSTORE_KEY_ID: ${{ secrets.RUSTORE_KEY_ID }}
+          RUSTORE_PRIVATE_KEY: ${{ secrets.RUSTORE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$RUSTORE_KEY_ID" ] || [ -z "$RUSTORE_PRIVATE_KEY" ]; then
+            echo "RuStore key id or private key is not set"
+            exit 1
+          fi
+          
+          python - << 'EOF'
+          import os, base64, datetime, json, sys
+          import requests
+          from Crypto.PublicKey import RSA
+          from Crypto.Signature import pkcs1_15
+          from Crypto.Hash import SHA512
+          
+          key_id = os.getenv("RUSTORE_KEY_ID")
+          private_key_b64 = os.getenv("RUSTORE_PRIVATE_KEY")
+          github_env = os.getenv("GITHUB_ENV")
+          
+          if not key_id or not private_key_b64 or not github_env:
+              print("Required env vars are not set", file=sys.stderr)
+              sys.exit(1)
+          
+          private_key = RSA.import_key(base64.b64decode(private_key_b64))
+          timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
+          message = key_id + timestamp
+          
+          h = SHA512.new(message.encode())
+          signer = pkcs1_15.new(private_key)
+          signature = base64.b64encode(signer.sign(h)).decode()
+          
+          body = {"keyId": key_id, "timestamp": timestamp, "signature": signature}
+          print("RuStore auth request body:", json.dumps(body, ensure_ascii=False), file=sys.stderr)
+          
+          resp = requests.post(
+              "https://public-api.rustore.ru/public/auth",
+              headers={"Content-Type": "application/json"},
+              data=json.dumps(body),
+              timeout=10,
+          )
+          
+          print("RuStore auth raw response:", resp.text, file=sys.stderr)
+          data = resp.json()
+          
+          if data.get("code") != "OK":
+              print(f"RuStore auth failed, code={data.get('code')}, message={data.get('message')}", file=sys.stderr)
+              sys.exit(1)
+          
+          jwe = data.get("body", {}).get("jwe")
+          if not jwe:
+              print("No jwe in auth response body", file=sys.stderr)
+              sys.exit(1)
+          
+          with open(github_env, "a", encoding="utf-8") as f:
+              f.write(f"RUSTORE_JWE={jwe}\n")
+          EOF
 
-        python - << 'EOF'
-import os
-import base64
-import datetime
-import json
-import sys
+      - name: Create draft version in RuStore
+        env:
+          RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
+          PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
+          APP_VERSION_NAME: ${{ github.event.inputs.version_name }}
+        run: |
+          RESPONSE=$(curl -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version" \
+            -H "Content-Type: application/json" \
+            -H "Public-Token: ${RUSTORE_JWE}" \
+            -d @- <<EOF
+          {
+            "minAndroidVersion": 8
+          }
+          EOF
+          )
+          echo "RuStore draft response: $RESPONSE"
+          DRAFT_CODE=$(echo "$RESPONSE" | jq -r '.code // empty')
+          if [ "$DRAFT_CODE" != "OK" ]; then
+            echo "RuStore draft failed, code=$DRAFT_CODE"
+            exit 1
+          fi
+          VERSION_ID=$(echo "$RESPONSE" | jq -r '.body')
+          if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
+            echo "Failed to parse versionId from RuStore response"
+            exit 1
+          fi
+          echo "RUSTORE_VERSION_ID=$VERSION_ID" >> $GITHUB_ENV
 
-from Crypto.PublicKey import RSA
-from Crypto.Signature import pkcs1_15
-from Crypto.Hash import SHA512
-import requests
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: dist
 
-key_id = os.getenv("RUSTORE_KEY_ID")
-private_key_b64 = os.getenv("RUSTORE_PRIVATE_KEY")
-
-if not key_id or not private_key_b64:
-    print("RuStore key id or private key is not set in env", file=sys.stderr)
-    sys.exit(1)
-
-private_key = RSA.import_key(base64.b64decode(private_key_b64))
-
-timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
-message_to_sign = key_id + timestamp
-
-hash_obj = SHA512.new(message_to_sign.encode())
-signer = pkcs1_15.new(private_key)
-signature_bytes = signer.sign(hash_obj)
-signature_value = base64.b64encode(signature_bytes).decode()
-
-auth_body = {
-    "keyId": key_id,
-    "timestamp": timestamp,
-    "signature": signature_value,
-}
-
-print("RuStore auth request body:", json.dumps(auth_body, ensure_ascii=False), file=sys.stderr)
-
-resp = requests.post(
-    "https://public-api.rustore.ru/public/auth",
-    headers={"Content-Type": "application/json"},
-    data=json.dumps(auth_body),
-    timeout=10,
-)
-
-print("RuStore auth raw response:", resp.text, file=sys.stderr)
-
-try:
-    data = resp.json()
-except Exception as e:
-    print("Failed to parse auth response as JSON:", e, file=sys.stderr)
-    sys.exit(1)
-
-if data.get("code") != "OK":
-    print(f"RuStore auth failed, code={data.get('code')}, message={data.get('message')}", file=sys.stderr)
-    sys.exit(1)
-
-jwe = data.get("body", {}).get("jwe")
-if not jwe:
-    print("No jwe in auth response body", file=sys.stderr)
-    sys.exit(1)
-
-print(f"RUSTORE_JWE={jwe}")
-EOF
-        # забираем строку вида RUSTORE_JWE=... из вывода python
-        RUSTORE_JWE_LINE=$(python - << 'EOF'
-import os
-import base64
-import datetime
-import json
-import sys
-
-from Crypto.PublicKey import RSA
-from Crypto.Signature import pkcs1_15
-from Crypto.Hash import SHA512
-import requests
-
-key_id = os.getenv("RUSTORE_KEY_ID")
-private_key_b64 = os.getenv("RUSTORE_PRIVATE_KEY")
-
-if not key_id or not private_key_b64:
-    sys.exit(1)
-
-private_key = RSA.import_key(base64.b64decode(private_key_b64))
-timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
-msg = key_id + timestamp
-hash_obj = SHA512.new(msg.encode())
-signer = pkcs1_15.new(private_key)
-signature = base64.b64encode(signer.sign(hash_obj)).decode()
-body = {"keyId": key_id, "timestamp": timestamp, "signature": signature}
-resp = requests.post(
-    "https://public-api.rustore.ru/public/auth",
-    headers={"Content-Type": "application/json"},
-    data=json.dumps(body),
-    timeout=10,
-)
-data = resp.json()
-if data.get("code") != "OK":
-    sys.exit(1)
-jwe = data.get("body", {}).get("jwe")
-if not jwe:
-    sys.exit(1)
-print(f"RUSTORE_JWE={jwe}")
-EOF
-)
-        if [ -z "$RUSTORE_JWE_LINE" ]; then
-          echo "Failed to obtain RuStore JWE via python helper"
-          exit 1
-        fi
-        echo "$RUSTORE_JWE_LINE" >> $GITHUB_ENV
-
-    - name: Create draft version in RuStore
-      env:
-        RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
-        PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
-        APP_VERSION_NAME: ${{ github.event.inputs.version_name }}
-      run: |
-        RESPONSE=$(curl -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version" \
-          -H "Content-Type: application/json" \
-          -H "Public-Token: ${RUSTORE_JWE}" \
-          -d @- <<EOF
-        {
-          "minAndroidVersion": 8
-        }
-        EOF
-        )
-        echo "RuStore draft response: $RESPONSE"
-        DRAFT_CODE=$(echo "$RESPONSE" | jq -r '.code // empty')
-        if [ "$DRAFT_CODE" != "OK" ]; then
-          echo "RuStore draft failed, code=$DRAFT_CODE"
-          exit 1
-        fi
-        VERSION_ID=$(echo "$RESPONSE" | jq -r '.body')
-        if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
-          echo "Failed to parse versionId from RuStore response"
-          exit 1
-        fi
-        echo "RUSTORE_VERSION_ID=$VERSION_ID" >> $GITHUB_ENV
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: android-release
-        path: dist
-
-    - name: Upload APK to RuStore
-      env:
-        RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
-        PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
-        RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
-      run: |
-        curl --fail -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
-          -H "Public-Token: ${RUSTORE_JWE}" \
-          -F "file=@dist/apk/release/app-release.apk"
+      - name: Upload APK to RuStore
+        env:
+          RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
+          PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
+          RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
+        run: |
+          curl --fail -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
+            -H "Public-Token: ${RUSTORE_JWE}" \
+            -F "file=@dist/apk/release/app-release.apk"
