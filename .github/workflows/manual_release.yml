@@ -1,4 +1,5 @@
 name: Manual Release
+run-name: Manual Release v${{ inputs.version_name }}
 
 on:
   workflow_dispatch:
@@ -129,15 +130,48 @@ jobs:
     needs: build
 
     steps:
+    - name: Get RuStore API token (JWE)
+      env:
+        RUSTORE_KEY_ID: ${{ secrets.RUSTORE_KEY_ID }}
+        RUSTORE_PRIVATE_KEY: ${{ secrets.RUSTORE_PRIVATE_KEY }}
+      run: |
+        if [ -z "$RUSTORE_KEY_ID" ] || [ -z "$RUSTORE_PRIVATE_KEY" ]; then
+          echo "RuStore key id or private key is not set"
+          exit 1
+        fi
+
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3fZ")
+        MESSAGE="${RUSTORE_KEY_ID}${TIMESTAMP}"
+
+        echo "$RUSTORE_PRIVATE_KEY" | base64 -d > rustore_key.der
+        openssl pkcs8 -inform DER -nocrypt -in rustore_key.der -out rustore_key.pem
+
+        SIGNATURE_BIN=$(printf '%s' "$MESSAGE" | openssl dgst -sha512 -sign rustore_key.pem)
+        SIGNATURE_B64=$(echo "$SIGNATURE_BIN" | base64 -w0)
+
+        AUTH_BODY=$(jq -n --arg keyId "$RUSTORE_KEY_ID" --arg ts "$TIMESTAMP" --arg sig "$SIGNATURE_B64" '{keyId:$keyId,timestamp:$ts,signature:$sig}')
+
+        AUTH_RESPONSE=$(curl --fail -s -X POST "https://public-api.rustore.ru/public/auth" \
+          -H "Content-Type: application/json" \
+          -d "$AUTH_BODY")
+
+        echo "RuStore auth response: $AUTH_RESPONSE"
+        RUSTORE_JWE=$(echo "$AUTH_RESPONSE" | jq -r '.body.jwe')
+        if [ -z "$RUSTORE_JWE" ] || [ "$RUSTORE_JWE" = "null" ]; then
+          echo "Failed to parse jwe from RuStore auth response"
+          exit 1
+        fi
+        echo "RUSTORE_JWE=$RUSTORE_JWE" >> $GITHUB_ENV
+
     - name: Create draft version in RuStore
       env:
-        RUSTORE_PUBLIC_TOKEN: ${{ secrets.RUSTORE_PUBLIC_TOKEN }}
+        RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
         PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
         APP_VERSION_NAME: ${{ github.event.inputs.version_name }}
       run: |
         RESPONSE=$(curl --fail -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version" \
           -H "Content-Type: application/json" \
-          -H "Public-Token: ${RUSTORE_PUBLIC_TOKEN}" \
+          -H "Public-Token: ${RUSTORE_JWE}" \
           -d @- <<EOF
         {
           "minAndroidVersion": 8
@@ -160,10 +194,10 @@ jobs:
 
     - name: Upload APK to RuStore
       env:
-        RUSTORE_PUBLIC_TOKEN: ${{ secrets.RUSTORE_PUBLIC_TOKEN }}
+        RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
         PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
         RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
       run: |
         curl --fail -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
-          -H "Public-Token: ${RUSTORE_PUBLIC_TOKEN}" \
+          -H "Public-Token: ${RUSTORE_JWE}" \
           -F "file=@dist/apk/release/app-release.apk"
