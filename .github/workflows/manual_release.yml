@@ -151,11 +151,19 @@ jobs:
 
         AUTH_BODY=$(jq -n --arg keyId "$RUSTORE_KEY_ID" --arg ts "$TIMESTAMP" --arg sig "$SIGNATURE_B64" '{keyId:$keyId,timestamp:$ts,signature:$sig}')
 
-        AUTH_RESPONSE=$(curl --fail -s -X POST "https://public-api.rustore.ru/public/auth" \
+        echo "RuStore auth request body: $AUTH_BODY"
+        AUTH_RESPONSE=$(curl -s -X POST "https://public-api.rustore.ru/public/auth" \
           -H "Content-Type: application/json" \
           -d "$AUTH_BODY")
 
         echo "RuStore auth response: $AUTH_RESPONSE"
+
+        AUTH_CODE=$(echo "$AUTH_RESPONSE" | jq -r '.code // empty')
+        if [ "$AUTH_CODE" != "OK" ]; then
+          echo "RuStore auth failed, code=$AUTH_CODE"
+          exit 1
+        fi
+
         RUSTORE_JWE=$(echo "$AUTH_RESPONSE" | jq -r '.body.jwe')
         if [ -z "$RUSTORE_JWE" ] || [ "$RUSTORE_JWE" = "null" ]; then
           echo "Failed to parse jwe from RuStore auth response"
