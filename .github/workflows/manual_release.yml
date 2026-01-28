@@ -136,9 +136,12 @@ jobs:
           RUSTORE_PRIVATE_KEY: ${{ secrets.RUSTORE_PRIVATE_KEY }}
         run: |
           if [ -z "$RUSTORE_KEY_ID" ] || [ -z "$RUSTORE_PRIVATE_KEY" ]; then
-            echo "RuStore key id or private key is not set"
-            exit 1
+          echo "RuStore key id or private key is not set"
+          exit 1
           fi
+          
+          python -m pip install --upgrade pip
+          python -m pip install pycryptodome requests
           
           python - << 'EOF'
           import os, base64, datetime, json, sys
@@ -152,8 +155,8 @@ jobs:
           github_env = os.getenv("GITHUB_ENV")
           
           if not key_id or not private_key_b64 or not github_env:
-              print("Required env vars are not set", file=sys.stderr)
-              sys.exit(1)
+           print("Required env vars are not set", file=sys.stderr)
+           sys.exit(1)
           
           private_key = RSA.import_key(base64.b64decode(private_key_b64))
           timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
@@ -167,26 +170,26 @@ jobs:
           print("RuStore auth request body:", json.dumps(body, ensure_ascii=False), file=sys.stderr)
           
           resp = requests.post(
-              "https://public-api.rustore.ru/public/auth",
-              headers={"Content-Type": "application/json"},
-              data=json.dumps(body),
-              timeout=10,
+           "https://public-api.rustore.ru/public/auth",
+           headers={"Content-Type": "application/json"},
+           data=json.dumps(body),
+           timeout=10,
           )
           
           print("RuStore auth raw response:", resp.text, file=sys.stderr)
           data = resp.json()
           
           if data.get("code") != "OK":
-              print(f"RuStore auth failed, code={data.get('code')}, message={data.get('message')}", file=sys.stderr)
-              sys.exit(1)
+           print(f"RuStore auth failed, code={data.get('code')}, message={data.get('message')}", file=sys.stderr)
+           sys.exit(1)
           
           jwe = data.get("body", {}).get("jwe")
           if not jwe:
-              print("No jwe in auth response body", file=sys.stderr)
-              sys.exit(1)
+           print("No jwe in auth response body", file=sys.stderr)
+           sys.exit(1)
           
           with open(github_env, "a", encoding="utf-8") as f:
-              f.write(f"RUSTORE_JWE={jwe}\n")
+           f.write(f"RUSTORE_JWE={jwe}\n")
           EOF
 
       - name: Create draft version in RuStore
