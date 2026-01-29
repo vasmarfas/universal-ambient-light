@@ -124,6 +124,7 @@ jobs:
         releaseFiles: dist/bundle/release/app-release.aab
         track: ${{ inputs.track }}
         status: ${{ inputs.status }}
+        changesNotSentForReview: true
 
   rustore:
     runs-on: ubuntu-latest
@@ -203,18 +204,26 @@ jobs:
             -H "Public-Token: ${RUSTORE_JWE}" \
             -d @- <<EOF
           {
-          "minAndroidVersion": 8,
-          "publishType": "MANUAL"
+            "minAndroidVersion": 8,
+            "publishType": "MANUAL"
           }
           EOF
           )
           echo "RuStore draft response: $RESPONSE"
           DRAFT_CODE=$(echo "$RESPONSE" | jq -r '.code // empty')
-          if [ "$DRAFT_CODE" != "OK" ]; then
-            echo "RuStore draft failed, code=$DRAFT_CODE"
+          MESSAGE=$(echo "$RESPONSE" | jq -r '.message // ""')
+
+          if [ "$DRAFT_CODE" = "OK" ]; then
+            VERSION_ID=$(echo "$RESPONSE" | jq -r '.body')
+          elif [ "$DRAFT_CODE" = "ERROR" ] && echo "$MESSAGE" | grep -q 'You already have draft version with ID ='; then
+            # выдёргиваем ID из сообщения вида "You already have draft version with ID = 2064472977"
+            VERSION_ID=$(echo "$MESSAGE" | sed -E 's/.*ID = ([0-9]+).*/\1/')
+            echo "Reusing existing RuStore draft versionId: $VERSION_ID"
+          else
+            echo "RuStore draft failed, code=$DRAFT_CODE, message=$MESSAGE"
             exit 1
           fi
-          VERSION_ID=$(echo "$RESPONSE" | jq -r '.body')
+
           if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
             echo "Failed to parse versionId from RuStore response"
             exit 1
