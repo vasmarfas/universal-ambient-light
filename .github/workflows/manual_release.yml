@@ -203,7 +203,8 @@ jobs:
             -H "Public-Token: ${RUSTORE_JWE}" \
             -d @- <<EOF
           {
-            "minAndroidVersion": 8
+          "minAndroidVersion": 8,
+          "publishType": "MANUAL"
           }
           EOF
           )
@@ -235,3 +236,18 @@ jobs:
           curl --fail -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
             -H "Public-Token: ${RUSTORE_JWE}" \
             -F "file=@dist/apk/release/app-release.apk"
+
+      - name: Commit RuStore version (send to moderation)
+        env:
+          RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
+          PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
+          RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
+        run: |
+          RESPONSE=$(curl -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/commit?priorityUpdate=0" \
+            -H "Public-Token: ${RUSTORE_JWE}")
+          echo "RuStore commit response: $RESPONSE"
+          CODE=$(echo "$RESPONSE" | jq -r '.code // empty')
+          if [ "$CODE" != "OK" ]; then
+            echo "RuStore commit failed, code=$CODE"
+            exit 1
+          fi
