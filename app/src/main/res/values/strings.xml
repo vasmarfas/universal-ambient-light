@@ -103,6 +103,7 @@
   <string name="pref_summary_framerate">Frames per second in which to send data to hyperion</string>
   <string name="pref_title_capture_quality">Capture Quality</string>
   <string name="pref_summary_capture_quality">Screen capture resolution (affects performance)</string>
+  <string name="battery_optimization_prompt">Чтобы захват/подсветка стабильнее работали в фоне (особенно на TV), рекомендуем отключить оптимизацию батареи для приложения.</string>
   <string-array name="pref_list_capture_quality">
     <item>Low (64px)</item>
     <item>Medium (128px)</item>
@@ -297,4 +298,5 @@
   <string name="quick_tile_label">Universal Ambient Light</string>
   <string name="quick_tile_toast_setup_required">Please complete the setup in the app first</string>
   <string name="status_grabber_running">Ambient light service is running</string>
+  <string name="foreground_service_media_projection_justification">This app uses MediaProjection foreground service to capture screen content in real-time and send color data to LED controllers for ambient lighting effects.</string>
 </resources>

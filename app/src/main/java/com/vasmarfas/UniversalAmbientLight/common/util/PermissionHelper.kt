@@ -53,7 +53,13 @@ object PermissionHelper {
                 intent.data = Uri.parse("package:" + activity.packageName)
                 activity.startActivity(intent)
             } catch (e: Exception) {
-                Log.e(TAG, "Cannot request battery optimization exemption", e)
+                // На некоторых TV этот интент может быть недоступен — откроем общий экран исключений.
+                Log.w(TAG, "Cannot request battery optimization exemption, opening settings", e)
+                try {
+                    activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                } catch (ignored: Exception) {
+                    openAppSettings(activity)
+                }
             }
         }
     }

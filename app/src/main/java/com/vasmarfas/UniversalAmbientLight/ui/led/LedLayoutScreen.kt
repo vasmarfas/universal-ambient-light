@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,6 +45,7 @@ fun LedLayoutScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val prefs = remember { Preferences(context) }
     
     // Старые общие значения оставляем для обратной совместимости и начальной инициализации
@@ -95,7 +97,9 @@ fun LedLayoutScreen(
     var sideLeft by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_left, "enabled") ?: "enabled") }
     
     var showEditDialog by remember { mutableStateOf(false) }
-    
+
+    val isPortrait = configuration.screenHeightDp > configuration.screenWidthDp
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -111,338 +115,342 @@ fun LedLayoutScreen(
             )
         }
     ) { padding ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Left Side: Visualization (Fixed)
+        if (isPortrait) {
+            // Портретная раскладка: сначала визуализация, под ней настройки (прокручиваемые)
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxSize()
+                    .padding(padding)
             ) {
-                Text(
-                    text = stringResource(R.string.pref_title_led_layout),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val totalLeds = remember(
-                    topLed,
-                    rightLed,
-                    bottomLed,
-                    leftLed,
-                    sideTop,
-                    sideRight,
-                    sideBottom,
-                    sideLeft
-                ) {
-                    var total = 0
-                    if (sideTop != "not_installed") total += topLed.coerceAtLeast(0)
-                    if (sideRight != "not_installed") total += rightLed.coerceAtLeast(0)
-                    if (sideBottom != "not_installed") total += bottomLed.coerceAtLeast(0)
-                    if (sideLeft != "not_installed") total += leftLed.coerceAtLeast(0)
-                    total
-                }
-
-                Text(
-                    text = stringResource(R.string.led_layout_total_leds, totalLeds),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // LED visualization
-                LedVisualization(
-                    topLed = topLed,
-                    rightLed = rightLed,
-                    bottomLed = bottomLed,
-                    leftLed = leftLed,
-                    startCorner = startCorner,
-                    direction = direction,
-                    sideTop = sideTop,
-                    sideRight = sideRight,
-                    sideBottom = sideBottom,
-                    sideLeft = sideLeft,
-                    bottomGap = bottomGap,
-                    captureMarginPercent = captureMargin.coerceIn(0, 40),
-                    ledOffset = ledOffset,
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .weight(1f, fill = false)
-                )
-            }
-
-            // Right Side: Settings (Scrollable)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-            ) {
-                // LED count inputs per side
-                OutlinedTextField(
-                    value = topLedText,
-                    onValueChange = { newText ->
-                        topLedText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            if (value >= 0) {
-                                prefs.putInt(R.string.pref_key_led_count_top, value)
-                        }
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_top_count_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = topLedText.isNotEmpty() && topLedText.toIntOrNull() == null
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = rightLedText,
-                    onValueChange = { newText ->
-                        rightLedText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            if (value >= 0) {
-                                prefs.putInt(R.string.pref_key_led_count_right, value)
-                        }
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_right_count_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = rightLedText.isNotEmpty() && rightLedText.toIntOrNull() == null
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = bottomLedText,
-                    onValueChange = { newText ->
-                        bottomLedText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            if (value >= 0) {
-                                prefs.putInt(R.string.pref_key_led_count_bottom, value)
-                            }
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_bottom_count_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = bottomLedText.isNotEmpty() && bottomLedText.toIntOrNull() == null
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = leftLedText,
-                    onValueChange = { newText ->
-                        leftLedText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            if (value >= 0) {
-                                prefs.putInt(R.string.pref_key_led_count_left, value)
-                            }
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_left_count_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // LED sides configuration
-                Text(
-                    text = stringResource(R.string.led_layout_active_sides),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                SideSelectorCard(
-                    title = stringResource(R.string.led_layout_side_top),
-                    selectedMode = sideTop,
-                    onModeSelected = { mode ->
-                        sideTop = mode
-                        prefs.putString(R.string.pref_key_led_side_top, mode)
-                        sendClearOnce(context)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val totalLeds = remember(
+                        topLed,
+                        rightLed,
+                        bottomLed,
+                        leftLed,
+                        sideTop,
+                        sideRight,
+                        sideBottom,
+                        sideLeft
+                    ) {
+                        var total = 0
+                        if (sideTop != "not_installed") total += topLed.coerceAtLeast(0)
+                        if (sideRight != "not_installed") total += rightLed.coerceAtLeast(0)
+                        if (sideBottom != "not_installed") total += bottomLed.coerceAtLeast(0)
+                        if (sideLeft != "not_installed") total += leftLed.coerceAtLeast(0)
+                        total
                     }
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                SideSelectorCard(
-                    title = stringResource(R.string.led_layout_side_right),
-                    selectedMode = sideRight,
-                    onModeSelected = { mode ->
-                        sideRight = mode
-                        prefs.putString(R.string.pref_key_led_side_right, mode)
-                        sendClearOnce(context)
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                SideSelectorCard(
-                    title = stringResource(R.string.led_layout_side_bottom),
-                    selectedMode = sideBottom,
-                    onModeSelected = { mode ->
-                        sideBottom = mode
-                        prefs.putString(R.string.pref_key_led_side_bottom, mode)
-                        sendClearOnce(context)
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                SideSelectorCard(
-                    title = stringResource(R.string.led_layout_side_left),
-                    selectedMode = sideLeft,
-                    onModeSelected = { mode ->
-                        sideLeft = mode
-                        prefs.putString(R.string.pref_key_led_side_left, mode)
-                        sendClearOnce(context)
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Bottom gap
-                OutlinedTextField(
-                    value = bottomGapText,
-                    onValueChange = { newText ->
-                        bottomGapText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            if (value >= 0) {
-                                prefs.putInt(R.string.pref_key_bottom_gap, value)
-                                sendClearOnce(context)
-                            }
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_bottom_gap_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = bottomGapText.isNotEmpty() && bottomGapText.toIntOrNull() == null
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Capture margin
-                OutlinedTextField(
-                    value = captureMarginText,
-                    onValueChange = { newText ->
-                        captureMarginText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            val clamped = value.coerceIn(0, 40)
-                            prefs.putInt(R.string.pref_key_capture_margin, clamped)
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_capture_margin_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    supportingText = {
-                        Text(
-                            text = stringResource(R.string.led_layout_capture_margin_help),
-                            fontSize = 12.sp
-                        )
-                    },
-                    isError = captureMarginText.isNotEmpty() && captureMarginText.toIntOrNull() == null
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // LED offset along perimeter
-                OutlinedTextField(
-                    value = ledOffsetText,
-                    onValueChange = { newText ->
-                        ledOffsetText = newText
-                        newText.toIntOrNull()?.let { value ->
-                            // позволяем любое целое, внутри логики оно нормализуется по модулю
-                            prefs.putInt(R.string.pref_key_led_offset, value)
-                        }
-                    },
-                    label = { Text(stringResource(R.string.led_layout_offset_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    supportingText = {
-                        Text(
-                            text = stringResource(R.string.led_layout_offset_help),
-                            fontSize = 12.sp
-                        )
-                    },
-                    isError = ledOffsetText.isNotEmpty() && ledOffsetText.toIntOrNull() == null
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Settings cards
-                SettingCard(
-                    title = stringResource(R.string.pref_title_led_start_corner),
-                    value = getCornerName(startCorner),
-                    onClick = { showEditDialog = true }
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                SettingCard(
-                    title = stringResource(R.string.pref_title_led_direction),
-                    value = getDirectionName(direction),
-                    onClick = { showEditDialog = true }
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Legend
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    Text(
+                        text = stringResource(R.string.pref_title_led_layout),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = stringResource(R.string.led_layout_legend_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LegendItem(
-                            color = Color(0xFF4CAF50),
-                            text = stringResource(R.string.led_layout_legend_first_led)
-                        )
-                        LegendItem(
-                            color = Color(0xFF2196F3),
-                            text = stringResource(R.string.led_layout_legend_active_leds)
-                        )
-                        LegendItem(
-                            color = Color.Gray.copy(alpha = 0.4f),
-                            text = stringResource(R.string.led_layout_legend_disabled_leds)
-                        )
-                        LegendItem(
-                            color = Color.Gray,
-                            text = stringResource(R.string.led_layout_legend_screen)
-                        )
-                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = stringResource(R.string.led_layout_total_leds, totalLeds),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    LedVisualization(
+                        topLed = topLed,
+                        rightLed = rightLed,
+                        bottomLed = bottomLed,
+                        leftLed = leftLed,
+                        startCorner = startCorner,
+                        direction = direction,
+                        sideTop = sideTop,
+                        sideRight = sideRight,
+                        sideBottom = sideBottom,
+                        sideLeft = sideLeft,
+                        bottomGap = bottomGap,
+                        captureMarginPercent = captureMargin.coerceIn(0, 40),
+                        ledOffset = ledOffset,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                    )
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Button(
-                    onClick = { showEditDialog = true },
-                    modifier = Modifier.fillMaxWidth()
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    Text(stringResource(R.string.led_layout_change_button))
+                    LedLayoutSettingsContent(
+                        topLedText = topLedText,
+                        onTopLedTextChange = { newText ->
+                            topLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_top, value)
+                                }
+                            }
+                        },
+                        rightLedText = rightLedText,
+                        onRightLedTextChange = { newText ->
+                            rightLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_right, value)
+                                }
+                            }
+                        },
+                        bottomLedText = bottomLedText,
+                        onBottomLedTextChange = { newText ->
+                            bottomLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_bottom, value)
+                                }
+                            }
+                        },
+                        leftLedText = leftLedText,
+                        onLeftLedTextChange = { newText ->
+                            leftLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_left, value)
+                                }
+                            }
+                        },
+                        bottomGapText = bottomGapText,
+                        onBottomGapTextChange = { newText ->
+                            bottomGapText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_bottom_gap, value)
+                                    sendClearOnce(context)
+                                }
+                            }
+                        },
+                        captureMarginText = captureMarginText,
+                        onCaptureMarginTextChange = { newText ->
+                            captureMarginText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin, clamped)
+                            }
+                        },
+                        ledOffsetText = ledOffsetText,
+                        onLedOffsetTextChange = { newText ->
+                            ledOffsetText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                prefs.putInt(R.string.pref_key_led_offset, value)
+                            }
+                        },
+                        sideTop = sideTop,
+                        onSideTopChange = { mode ->
+                            sideTop = mode
+                            prefs.putString(R.string.pref_key_led_side_top, mode)
+                            sendClearOnce(context)
+                        },
+                        sideRight = sideRight,
+                        onSideRightChange = { mode ->
+                            sideRight = mode
+                            prefs.putString(R.string.pref_key_led_side_right, mode)
+                            sendClearOnce(context)
+                        },
+                        sideBottom = sideBottom,
+                        onSideBottomChange = { mode ->
+                            sideBottom = mode
+                            prefs.putString(R.string.pref_key_led_side_bottom, mode)
+                            sendClearOnce(context)
+                        },
+                        sideLeft = sideLeft,
+                        onSideLeftChange = { mode ->
+                            sideLeft = mode
+                            prefs.putString(R.string.pref_key_led_side_left, mode)
+                            sendClearOnce(context)
+                        },
+                        startCorner = startCorner,
+                        direction = direction,
+                        onShowDialog = { showEditDialog = true }
+                    )
+                }
+            }
+        } else {
+            // Ландшафтная раскладка (как было, адаптировано в отдельный блок)
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Left Side: Visualization (Fixed)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = stringResource(R.string.pref_title_led_layout),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val totalLeds = remember(
+                        topLed,
+                        rightLed,
+                        bottomLed,
+                        leftLed,
+                        sideTop,
+                        sideRight,
+                        sideBottom,
+                        sideLeft
+                    ) {
+                        var total = 0
+                        if (sideTop != "not_installed") total += topLed.coerceAtLeast(0)
+                        if (sideRight != "not_installed") total += rightLed.coerceAtLeast(0)
+                        if (sideBottom != "not_installed") total += bottomLed.coerceAtLeast(0)
+                        if (sideLeft != "not_installed") total += leftLed.coerceAtLeast(0)
+                        total
+                    }
+
+                    Text(
+                        text = stringResource(R.string.led_layout_total_leds, totalLeds),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // LED visualization
+                    LedVisualization(
+                        topLed = topLed,
+                        rightLed = rightLed,
+                        bottomLed = bottomLed,
+                        leftLed = leftLed,
+                        startCorner = startCorner,
+                        direction = direction,
+                        sideTop = sideTop,
+                        sideRight = sideRight,
+                        sideBottom = sideBottom,
+                        sideLeft = sideLeft,
+                        bottomGap = bottomGap,
+                        captureMarginPercent = captureMargin.coerceIn(0, 40),
+                        ledOffset = ledOffset,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .weight(1f, fill = false)
+                    )
+                }
+
+                // Right Side: Settings (Scrollable)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                ) {
+                    LedLayoutSettingsContent(
+                        topLedText = topLedText,
+                        onTopLedTextChange = { newText ->
+                            topLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_top, value)
+                                }
+                            }
+                        },
+                        rightLedText = rightLedText,
+                        onRightLedTextChange = { newText ->
+                            rightLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_right, value)
+                                }
+                            }
+                        },
+                        bottomLedText = bottomLedText,
+                        onBottomLedTextChange = { newText ->
+                            bottomLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_bottom, value)
+                                }
+                            }
+                        },
+                        leftLedText = leftLedText,
+                        onLeftLedTextChange = { newText ->
+                            leftLedText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_led_count_left, value)
+                                }
+                            }
+                        },
+                        bottomGapText = bottomGapText,
+                        onBottomGapTextChange = { newText ->
+                            bottomGapText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                if (value >= 0) {
+                                    prefs.putInt(R.string.pref_key_bottom_gap, value)
+                                    sendClearOnce(context)
+                                }
+                            }
+                        },
+                        captureMarginText = captureMarginText,
+                        onCaptureMarginTextChange = { newText ->
+                            captureMarginText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin, clamped)
+                            }
+                        },
+                        ledOffsetText = ledOffsetText,
+                        onLedOffsetTextChange = { newText ->
+                            ledOffsetText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                prefs.putInt(R.string.pref_key_led_offset, value)
+                            }
+                        },
+                        sideTop = sideTop,
+                        onSideTopChange = { mode ->
+                            sideTop = mode
+                            prefs.putString(R.string.pref_key_led_side_top, mode)
+                            sendClearOnce(context)
+                        },
+                        sideRight = sideRight,
+                        onSideRightChange = { mode ->
+                            sideRight = mode
+                            prefs.putString(R.string.pref_key_led_side_right, mode)
+                            sendClearOnce(context)
+                        },
+                        sideBottom = sideBottom,
+                        onSideBottomChange = { mode ->
+                            sideBottom = mode
+                            prefs.putString(R.string.pref_key_led_side_bottom, mode)
+                            sendClearOnce(context)
+                        },
+                        sideLeft = sideLeft,
+                        onSideLeftChange = { mode ->
+                            sideLeft = mode
+                            prefs.putString(R.string.pref_key_led_side_left, mode)
+                            sendClearOnce(context)
+                        },
+                        startCorner = startCorner,
+                        direction = direction,
+                        onShowDialog = { showEditDialog = true }
+                    )
                 }
             }
         }
@@ -466,6 +474,227 @@ fun LedLayoutScreen(
     }
 }
 
+@Composable
+private fun LedLayoutSettingsContent(
+    topLedText: String,
+    onTopLedTextChange: (String) -> Unit,
+    rightLedText: String,
+    onRightLedTextChange: (String) -> Unit,
+    bottomLedText: String,
+    onBottomLedTextChange: (String) -> Unit,
+    leftLedText: String,
+    onLeftLedTextChange: (String) -> Unit,
+    bottomGapText: String,
+    onBottomGapTextChange: (String) -> Unit,
+    captureMarginText: String,
+    onCaptureMarginTextChange: (String) -> Unit,
+    ledOffsetText: String,
+    onLedOffsetTextChange: (String) -> Unit,
+    sideTop: String,
+    onSideTopChange: (String) -> Unit,
+    sideRight: String,
+    onSideRightChange: (String) -> Unit,
+    sideBottom: String,
+    onSideBottomChange: (String) -> Unit,
+    sideLeft: String,
+    onSideLeftChange: (String) -> Unit,
+    startCorner: String,
+    direction: String,
+    onShowDialog: () -> Unit
+) {
+    // LED count inputs per side
+    OutlinedTextField(
+        value = topLedText,
+        onValueChange = onTopLedTextChange,
+        label = { Text(stringResource(R.string.led_layout_top_count_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = topLedText.isNotEmpty() && topLedText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedTextField(
+        value = rightLedText,
+        onValueChange = onRightLedTextChange,
+        label = { Text(stringResource(R.string.led_layout_right_count_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = rightLedText.isNotEmpty() && rightLedText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedTextField(
+        value = bottomLedText,
+        onValueChange = onBottomLedTextChange,
+        label = { Text(stringResource(R.string.led_layout_bottom_count_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = bottomLedText.isNotEmpty() && bottomLedText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedTextField(
+        value = leftLedText,
+        onValueChange = onLeftLedTextChange,
+        label = { Text(stringResource(R.string.led_layout_left_count_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(24.dp))
+
+    // LED sides configuration
+    Text(
+        text = stringResource(R.string.led_layout_active_sides),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    SideSelectorCard(
+        title = stringResource(R.string.led_layout_side_top),
+        selectedMode = sideTop,
+        onModeSelected = onSideTopChange
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    SideSelectorCard(
+        title = stringResource(R.string.led_layout_side_right),
+        selectedMode = sideRight,
+        onModeSelected = onSideRightChange
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    SideSelectorCard(
+        title = stringResource(R.string.led_layout_side_bottom),
+        selectedMode = sideBottom,
+        onModeSelected = onSideBottomChange
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    SideSelectorCard(
+        title = stringResource(R.string.led_layout_side_left),
+        selectedMode = sideLeft,
+        onModeSelected = onSideLeftChange
+    )
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // Bottom gap
+    OutlinedTextField(
+        value = bottomGapText,
+        onValueChange = onBottomGapTextChange,
+        label = { Text(stringResource(R.string.led_layout_bottom_gap_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = bottomGapText.isNotEmpty() && bottomGapText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // Capture margin
+    OutlinedTextField(
+        value = captureMarginText,
+        onValueChange = onCaptureMarginTextChange,
+        label = { Text(stringResource(R.string.led_layout_capture_margin_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        supportingText = {
+            Text(
+                text = stringResource(R.string.led_layout_capture_margin_help),
+                fontSize = 12.sp
+            )
+        },
+        isError = captureMarginText.isNotEmpty() && captureMarginText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // LED offset along perimeter
+    OutlinedTextField(
+        value = ledOffsetText,
+        onValueChange = onLedOffsetTextChange,
+        label = { Text(stringResource(R.string.led_layout_offset_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        supportingText = {
+            Text(
+                text = stringResource(R.string.led_layout_offset_help),
+                fontSize = 12.sp
+            )
+        },
+        isError = ledOffsetText.isNotEmpty() && ledOffsetText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(24.dp))
+
+    // Settings cards
+    SettingCard(
+        title = stringResource(R.string.pref_title_led_start_corner),
+        value = getCornerName(startCorner),
+        onClick = onShowDialog
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    SettingCard(
+        title = stringResource(R.string.pref_title_led_direction),
+        value = getDirectionName(direction),
+        onClick = onShowDialog
+    )
+
+    Spacer(modifier = Modifier.height(24.dp))
+
+    // Legend
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.led_layout_legend_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LegendItem(
+                color = Color(0xFF4CAF50),
+                text = stringResource(R.string.led_layout_legend_first_led)
+            )
+            LegendItem(
+                color = Color(0xFF2196F3),
+                text = stringResource(R.string.led_layout_legend_active_leds)
+            )
+            LegendItem(
+                color = Color.Gray.copy(alpha = 0.4f),
+                text = stringResource(R.string.led_layout_legend_disabled_leds)
+            )
+            LegendItem(
+                color = Color.Gray,
+                text = stringResource(R.string.led_layout_legend_screen)
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    Button(
+        onClick = onShowDialog,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(stringResource(R.string.led_layout_change_button))
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SideSelectorCard(
@@ -600,41 +829,63 @@ fun LedVisualization(
                 }
                 
                 // Draw LEDs
-                ledPositions.forEachIndexed { index, ledData ->
-                    val color = when {
-                        !ledData.enabled -> Color.Gray.copy(alpha = 0.4f) // Disabled LED
-                        index == 0 -> Color(0xFF4CAF50) // Green for first LED
-                        else -> Color(0xFF2196F3) // Blue for others
-                    }
-                    
-                    // Draw LED circle
-                    drawCircle(
-                        color = color,
-                        radius = if (index == 0) 12f else 8f,
-                        center = ledData.position
-                    )
-                    
-                    // Draw LED number (for first few and last few)
-                    if (index < 5 || index >= ledPositions.size - 5 || index % 5 == 0) {
-                        val textPaint = android.graphics.Paint().apply {
-                            this.color = if (ledData.enabled) {
-                                android.graphics.Color.WHITE
-                            } else {
-                                android.graphics.Color.GRAY
-                            }
-                            textSize = if (index == 0) 24f else 20f
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            isFakeBoldText = index == 0
+                if (ledPositions.isNotEmpty()) {
+                    // Немного ограничим количество подписанных LED, чтобы не грузить слабые устройства
+                    val maxLabeled = 200
+                    val shouldLabelIndices: (Int) -> Boolean = { index ->
+                        if (ledPositions.size > maxLabeled) {
+                            // При очень большом количестве только первые/последние пару и каждый десятый
+                            index < 3 || index >= ledPositions.size - 3 || index % 10 == 0
+                        } else {
+                            index < 5 || index >= ledPositions.size - 5 || index % 5 == 0
                         }
-                        
-                        // Use native canvas to draw text
-                        val nativeCanvas = drawContext.canvas.nativeCanvas
-                        nativeCanvas.drawText(
-                            "${index + 1}",
-                            ledData.position.x,
-                            ledData.position.y + (if (index == 0) 8f else 7f),
-                            textPaint
+                    }
+
+                    val nativeCanvas = drawContext.canvas.nativeCanvas
+                    val enabledPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 20f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    val disabledPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.GRAY
+                        textSize = 20f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    val firstLedPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 24f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isFakeBoldText = true
+                    }
+
+                    ledPositions.forEachIndexed { index, ledData ->
+                        val color = when {
+                            !ledData.enabled -> Color.Gray.copy(alpha = 0.4f) // Disabled LED
+                            index == 0 -> Color(0xFF4CAF50) // Green for first LED
+                            else -> Color(0xFF2196F3) // Blue for others
+                        }
+
+                        // Draw LED circle
+                        drawCircle(
+                            color = color,
+                            radius = if (index == 0) 12f else 8f,
+                            center = ledData.position
                         )
+
+                        if (shouldLabelIndices(index)) {
+                            val paint = when {
+                                index == 0 -> firstLedPaint
+                                ledData.enabled -> enabledPaint
+                                else -> disabledPaint
+                            }
+                            nativeCanvas.drawText(
+                                "${index + 1}",
+                                ledData.position.x,
+                                ledData.position.y + if (index == 0) 8f else 7f,
+                                paint
+                            )
+                        }
                     }
                 }
             }
@@ -937,76 +1188,53 @@ fun EditLayoutDialog(
 ) {
     var newStartCorner by remember { mutableStateOf(startCorner) }
     var newDirection by remember { mutableStateOf(direction) }
-    
-    var expandedCorner by remember { mutableStateOf(false) }
-    var expandedDirection by remember { mutableStateOf(false) }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.led_layout_dialog_title)) },
         text = {
             Column {
-                ExposedDropdownMenuBox(
-                    expanded = expandedCorner,
-                    onExpandedChange = { expandedCorner = !expandedCorner }
+                Text(
+                    text = stringResource(R.string.pref_title_led_start_corner),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
-                        value = getCornerName(newStartCorner),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.pref_title_led_start_corner)) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCorner) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    
-                    ExposedDropdownMenu(
-                        expanded = expandedCorner,
-                        onDismissRequest = { expandedCorner = false }
-                    ) {
-                        listOf("top_left", "top_right", "bottom_right", "bottom_left").forEach { corner ->
-                            DropdownMenuItem(
-                                text = { Text(getCornerName(corner)) },
-                                onClick = {
-                                    newStartCorner = corner
-                                    expandedCorner = false
-                                }
-                            )
-                        }
+                    listOf("top_left", "top_right", "bottom_right", "bottom_left").forEach { corner ->
+                        FilterChip(
+                            selected = newStartCorner == corner,
+                            onClick = { newStartCorner = corner },
+                            label = { Text(getCornerName(corner), fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
-                ExposedDropdownMenuBox(
-                    expanded = expandedDirection,
-                    onExpandedChange = { expandedDirection = !expandedDirection }
+
+                Text(
+                    text = stringResource(R.string.pref_title_led_direction),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
-                        value = getDirectionName(newDirection),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.pref_title_led_direction)) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDirection) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    
-                    ExposedDropdownMenu(
-                        expanded = expandedDirection,
-                        onDismissRequest = { expandedDirection = false }
-                    ) {
-                        listOf("clockwise", "counterclockwise").forEach { dir ->
-                            DropdownMenuItem(
-                                text = { Text(getDirectionName(dir)) },
-                                onClick = {
-                                    newDirection = dir
-                                    expandedDirection = false
-                                }
-                            )
-                        }
+                    listOf("clockwise", "counterclockwise").forEach { dir ->
+                        FilterChip(
+                            selected = newDirection == dir,
+                            onClick = { newDirection = dir },
+                            label = { Text(getDirectionName(dir), fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }

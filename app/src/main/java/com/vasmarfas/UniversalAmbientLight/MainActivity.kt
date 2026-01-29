@@ -56,6 +56,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import kotlin.math.sqrt
+import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
 
@@ -83,7 +84,7 @@ class MainActivity : ComponentActivity() {
                 mTclWarningShown = true
                 TclBypass.showTclHelpDialog(this@MainActivity) { requestScreenCapture() }
             } else if (error != null &&
-                (Build.VERSION.SDK_INT < Build.VERSION_CODES.N ||
+                (false ||
                         !QuickTileService.isListening)
             ) {
                 Toast.makeText(baseContext, error, Toast.LENGTH_LONG).show()
@@ -111,6 +112,8 @@ class MainActivity : ComponentActivity() {
             requestNotificationPermission()
         }
 
+        maybeRequestBatteryOptimizationExemption()
+
         setContent {
             AppTheme {
                 val navController = rememberNavController()
@@ -130,9 +133,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun maybeRequestBatteryOptimizationExemption() {
+        if (PermissionHelper.isIgnoringBatteryOptimizations(this)) return
+
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+        // Не спамим каждый запуск: если пользователь не подтвердил, повторим позже.
+        val keyLastAttempt = "battery_opt_exemption_last_attempt_ms"
+        val lastAttempt = prefs.getLong(keyLastAttempt, 0L)
+        val now = System.currentTimeMillis()
+        val cooldownMs = 24L * 60L * 60L * 1000L // 24h
+        if (now - lastAttempt < cooldownMs) return
+
+        prefs.edit { putLong(keyLastAttempt, now) }
+
+        // Без собственного UI: сразу открываем системный запрос/настройку
+        PermissionHelper.requestIgnoreBatteryOptimizations(this)
+    }
+
     override fun onResume() {
         super.onResume()
-        
+
         appUpdateManager
             .appUpdateInfo
             .addOnSuccessListener { appUpdateInfo ->
@@ -275,11 +295,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(receiver, filter)
-            }
+            ContextCompat.registerReceiver(
+                this,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
 
             usbPermissionReceiverRegistered = true
         }
@@ -430,7 +451,7 @@ fun MainScreen(
     onToggleClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onEffectsClick: () -> Unit,
-    effectMode: EffectMode
+    effectMode: EffectMode,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Rainbow Background
@@ -545,7 +566,8 @@ fun MainScreen(
                 EffectMode.SOLID_WHITE,
                 EffectMode.SOLID_RED,
                 EffectMode.SOLID_GREEN,
-                EffectMode.SOLID_BLUE -> {
+                EffectMode.SOLID_BLUE,
+                    -> {
                     val color = when (effectMode) {
                         EffectMode.SOLID_WHITE -> Color.White
                         EffectMode.SOLID_RED -> Color.Red

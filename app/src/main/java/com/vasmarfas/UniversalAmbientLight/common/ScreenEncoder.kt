@@ -133,7 +133,11 @@ class ScreenEncoder(
 
         mMediaProjection.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
-                stopRecording()
+                // Важно для Android/Google TV: при уходе экрана в сон MediaProjection может
+                // дернуть onStop(). В этом случае НЕ рвём соединение с WLED/Hyperion,
+                // иначе WLED быстро возвращается к дефолтному эффекту и потом не
+                // переподключается без ручного перезапуска.
+                stopInternal(disconnect = false)
             }
         }, mHandler)
 
@@ -338,8 +342,8 @@ class ScreenEncoder(
         }
     }
 
-    override fun stopRecording() {
-        if (DEBUG) Log.i(TAG, "Stopping")
+    private fun stopInternal(disconnect: Boolean) {
+        if (DEBUG) Log.i(TAG, "Stopping (disconnect=$disconnect)")
         mRunning = false
         setCapturing(false)
 
@@ -364,13 +368,31 @@ class ScreenEncoder(
         mBorderY = 0
         mFrameCount = 0
 
+        // Останавливаем callback-thread энкодера
         mHandler.looper.quit()
-        clearAndDisconnect()
+
+        // Ключевой момент: при системном stop (сон) оставляем соединение живым.
+        if (disconnect) {
+            clearAndDisconnect()
+        } else {
+            clearLights()
+        }
 
         if (mImageReader != null) {
             mImageReader!!.close()
             mImageReader = null
         }
+    }
+
+    override fun stopRecording() {
+        stopInternal(disconnect = true)
+    }
+
+    /**
+     * Мягкая остановка без разрыва соединения (нужно для сна/пробуждения на TV).
+     */
+    fun stopRecordingNoDisconnect() {
+        stopInternal(disconnect = false)
     }
 
     override fun resumeRecording() {

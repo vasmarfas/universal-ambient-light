@@ -10,6 +10,7 @@ import java.net.InetAddress
 import java.util.ArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 class WLEDClient(
@@ -40,6 +41,9 @@ class WLEDClient(
     // KeepAlive
     private val mKeepAliveExecutor = Executors.newSingleThreadScheduledExecutor()
     private var mLastLeds: Array<ColorRgb>? = null
+    private val mLastReconnectAttemptMs = AtomicLong(0L)
+    private val mBlockedUntilMs = AtomicLong(0L)
+    private val mLastErrorLogMs = AtomicLong(0L)
 
     init {
         // Use default port based on protocol if not specified
@@ -79,6 +83,29 @@ class WLEDClient(
         } catch (e: Exception) {
             mConnected = false
             throw IOException("Failed to connect to WLED: " + e.message, e)
+        }
+    }
+
+    @Synchronized
+    private fun reconnectIfNeeded() {
+        val now = System.currentTimeMillis()
+        val last = mLastReconnectAttemptMs.get()
+        if (now - last < 2000) return // простой rate-limit, чтобы не спамить
+        mLastReconnectAttemptMs.set(now)
+
+        try {
+            // Закрыть старый сокет
+            try {
+                mSocket?.close()
+            } catch (ignored: Exception) {}
+            mSocket = null
+            mConnected = false
+
+            // Переоткрыть
+            connect()
+        } catch (e: Exception) {
+            // Если сеть реально запрещена (например, во сне) — просто молча ждём следующей попытки
+            if (logsEnabled) Log.w(TAG, "Reconnect failed", e)
         }
     }
 
@@ -147,6 +174,12 @@ class WLEDClient(
         if (!isConnected()) return
         mLastLeds = leds // Save for keepalive
 
+        // На некоторых Android TV при SCREEN_OFF прошивка режет UDP отправку (sendto EPERM).
+        // В это время не пытаемся слать каждую итерацию, чтобы не спамить лог и не жечь CPU.
+        val now = System.currentTimeMillis()
+        val blockedUntil = mBlockedUntilMs.get()
+        if (now < blockedUntil) return
+
         try {
             // Log occasionally for debugging
             if (System.currentTimeMillis() % 2000 < 100) {
@@ -170,7 +203,18 @@ class WLEDClient(
                 sendUdpRaw(leds)
             }
         } catch (e: IOException) {
-            Log.e(TAG, "Failed to send data to WLED", e)
+            val msg = e.message ?: ""
+            if (msg.contains("EPERM", ignoreCase = true) || msg.contains("Operation not permitted", ignoreCase = true)) {
+                // Блокируем попытки на короткое время (обычно период сна), затем попробуем снова.
+                mBlockedUntilMs.set(System.currentTimeMillis() + 15_000L)
+            }
+
+            // Rate-limit логов, иначе при SCREEN_OFF будет забивать logcat.
+            val lastLog = mLastErrorLogMs.get()
+            if (System.currentTimeMillis() - lastLog > 5_000L) {
+                mLastErrorLogMs.set(System.currentTimeMillis())
+                Log.e(TAG, "Failed to send data to WLED", e)
+            }
         }
     }
 
@@ -178,7 +222,14 @@ class WLEDClient(
     private fun sendPacket(packet: ByteArray) {
         if (mSocket == null || mAddress == null) return
         val datagramPacket = DatagramPacket(packet, packet.size, mAddress, mPort)
-        mSocket!!.send(datagramPacket)
+        try {
+            mSocket!!.send(datagramPacket)
+        } catch (e: IOException) {
+            // На Android TV в режиме сна может прилетать EPERM на sendto.
+            // Пробуем пересоздать сокет — после пробуждения это позволяет самовосстановиться.
+            reconnectIfNeeded()
+            throw e
+        }
     }
 
     // DDP Protocol Implementation

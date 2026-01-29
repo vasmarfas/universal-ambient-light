@@ -19,6 +19,7 @@ import android.os.PowerManager
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
+import android.net.wifi.WifiManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ServiceCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -34,6 +35,7 @@ class ScreenGrabberService : Service() {
     private var mForegroundFailed = false
     private var mTclBlocked = false
     private var mWakeLock: PowerManager.WakeLock? = null
+    private var mWifiLock: WifiManager.WifiLock? = null
     private var mHandler: Handler? = null
 
     private var mReconnectEnabled = false
@@ -49,6 +51,8 @@ class ScreenGrabberService : Service() {
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
     private var mConnectionType = "hyperion"
+    private var mProjectionResultCode: Int? = null
+    private var mProjectionDataExtras: android.os.Bundle? = null
 
     private val mReceiver = object : HyperionThreadBroadcaster {
         override fun onConnected() {
@@ -91,14 +95,29 @@ class ScreenGrabberService : Service() {
             when (Objects.requireNonNull(intent.action)) {
                 Intent.ACTION_SCREEN_ON -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SCREEN_ON intent received")
+                    // Если держали CPU wakelock для keepalive во время сна — отпускаем при пробуждении.
+                    releaseWakeLock()
+                    releaseWifiLock()
                     if (mScreenEncoder != null && !isCapturing) {
-                        if (DEBUG) Log.v(TAG, "Encoder not grabbing, attempting to restart")
+                        if (DEBUG) Log.v(TAG, "Encoder not grabbing, attempting to resume")
                         mScreenEncoder!!.resumeRecording()
+                    }
+
+                    // Если MediaProjection был остановлен системой (сон), resumeRecording() не поможет.
+                    // Тогда пересоздаём энкодер из сохранённых данных разрешения.
+                    if (!isCapturing) {
+                        if (DEBUG) Log.v(TAG, "Still not capturing after resume; trying to restart encoder")
+                        restartEncoderFromSavedProjection()
                     }
                     notifyActivity()
                 }
                 Intent.ACTION_SCREEN_OFF -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SCREEN_OFF intent received")
+                    // На некоторых ТВ CPU уходит в глубокий сон и keepalive-потоки перестают слать пакеты,
+                    // из-за чего WLED через ~10с возвращается к дефолтному эффекту.
+                    // PARTIAL_WAKE_LOCK помогает удержать CPU для keepalive.
+                    acquireWakeLock()
+                    acquireWifiLock()
                     if (mScreenEncoder != null) {
                         if (DEBUG) Log.v(TAG, "Clearing current light data")
                         mScreenEncoder!!.clearLights()
@@ -363,6 +382,31 @@ class ScreenGrabberService : Service() {
         }
     }
 
+    private fun acquireWifiLock() {
+        if (mWifiLock != null && mWifiLock!!.isHeld) return
+        try {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wm != null) {
+                // HighPerf чтобы не режало UDP при простое (помогает на части Android TV прошивок)
+                mWifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ScreenGrabberService::Wifi")
+                mWifiLock?.setReferenceCounted(false)
+                mWifiLock?.acquire()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire wifi lock", e)
+        }
+    }
+
+    private fun releaseWifiLock() {
+        val lock = mWifiLock ?: return
+        try {
+            if (lock.isHeld) lock.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to release wifi lock", e)
+        }
+        mWifiLock = null
+    }
+
     private fun notifyTclBlocked() {
         val intent = Intent(BROADCAST_FILTER)
         intent.putExtra(BROADCAST_TAG, false)
@@ -415,7 +459,14 @@ class ScreenGrabberService : Service() {
     private fun startScreenRecord(intent: Intent) {
         if (DEBUG) Log.v(TAG, "Starting screen recorder")
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
-        val projection = mMediaProjectionManager!!.getMediaProjection(resultCode, intent)
+        // Сохраняем данные разрешения, чтобы можно было восстановиться после сна/пробуждения на TV
+        saveProjectionData(resultCode, intent.extras)
+
+        val projectionDataIntent = buildProjectionDataIntent()
+        val projection = mMediaProjectionManager!!.getMediaProjection(
+            resultCode,
+            projectionDataIntent ?: intent
+        )
         val window = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         if (projection != null && window != null) {
@@ -438,6 +489,61 @@ class ScreenGrabberService : Service() {
             )
             mScreenEncoder!!.sendStatus()
         }
+    }
+
+    private fun saveProjectionData(resultCode: Int, extras: android.os.Bundle?) {
+        mProjectionResultCode = resultCode
+        if (extras != null) {
+            val copy = android.os.Bundle(extras)
+            copy.remove(EXTRA_RESULT_CODE)
+            mProjectionDataExtras = copy
+        }
+    }
+
+    private fun buildProjectionDataIntent(): Intent? {
+        val extras = mProjectionDataExtras ?: return null
+        return Intent().apply { replaceExtras(extras) }
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun restartEncoderFromSavedProjection() {
+        val resultCode = mProjectionResultCode ?: return
+        val projectionIntent = buildProjectionDataIntent() ?: return
+        if (mMediaProjectionManager == null) return
+        if (mHyperionThread == null) return
+
+        // Закрываем старый энкодер без разрыва соединения (важно для WLED keepalive)
+        try {
+            mScreenEncoder?.stopRecordingNoDisconnect()
+        } catch (e: Exception) {
+            // no-op
+        }
+        mScreenEncoder = null
+
+        // Останавливаем старый projection, если он есть
+        releaseResource()
+
+        val projection = mMediaProjectionManager!!.getMediaProjection(resultCode, projectionIntent)
+        val window = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        if (projection == null || window == null) return
+
+        sMediaProjection = projection
+        val metrics = DisplayMetrics()
+        window.defaultDisplay.getRealMetrics(metrics)
+
+        val options = AppOptions(
+            mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality
+        )
+
+        mScreenEncoder = ScreenEncoder(
+            mHyperionThread!!.receiver,
+            projection,
+            metrics.widthPixels,
+            metrics.heightPixels,
+            metrics.densityDpi,
+            options
+        )
+        mScreenEncoder!!.sendStatus()
     }
 
     private fun stopScreenRecord() {

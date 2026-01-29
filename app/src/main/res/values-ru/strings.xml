@@ -103,6 +103,7 @@
   <string name="pref_summary_framerate">Кадров в секунду для отправки на контроллер</string>
   <string name="pref_title_capture_quality">Качество захвата</string>
   <string name="pref_summary_capture_quality">Разрешение захвата экрана (влияет на производительность)</string>
+  <string name="battery_optimization_prompt">Чтобы захват/подсветка стабильнее работали в фоне (особенно на TV), рекомендуем отключить оптимизацию батареи для приложения.</string>
   <string-array name="pref_list_capture_quality">
     <item>Низкое (64px)</item>
     <item>Среднее (128px)</item>
@@ -297,4 +298,5 @@
   <string name="quick_tile_label">Universal Ambient Light</string>
   <string name="quick_tile_toast_setup_required">Сначала выполните настройку в приложении</string>
   <string name="status_grabber_running">Сервис подсветки запущен</string>
+  <string name="foreground_service_media_projection_justification">Это приложение использует сервис MediaProjection для захвата содержимого экрана в реальном времени и отправки цветовых данных на LED контроллеры для создания эффектов подсветки.</string>
 </resources>
