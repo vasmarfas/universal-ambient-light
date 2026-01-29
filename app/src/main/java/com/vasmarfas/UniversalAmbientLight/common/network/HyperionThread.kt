@@ -5,6 +5,7 @@ import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -155,6 +156,8 @@ class HyperionThread(
                 if (client != null && client.isConnected()) {
                     mClient.set(client)
                     mConnected.set(true)
+                    // Логируем запуск конкретного протокола
+                    AnalyticsHelper.logProtocolStarted(mContext, mConnectionType)
                     mCallback.onConnected()
                     Log.i(TAG, "Connected to $mConnectionType at $mHost:$mPort")
                     return

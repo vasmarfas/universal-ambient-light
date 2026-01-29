@@ -37,6 +37,7 @@ import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import android.content.Context
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +100,15 @@ fun LedLayoutScreen(
     var showEditDialog by remember { mutableStateOf(false) }
 
     val isPortrait = configuration.screenHeightDp > configuration.screenWidthDp
+
+    // Логируем изменения LED конфигурации
+    androidx.compose.runtime.LaunchedEffect(topLed, rightLed, bottomLed, leftLed) {
+        val totalHorizontal = topLed + bottomLed
+        val totalVertical = rightLed + leftLed
+        if (totalHorizontal > 0 || totalVertical > 0) {
+            AnalyticsHelper.logLedConfigChanged(context, totalHorizontal, totalVertical)
+        }
+    }
 
     Scaffold(
         topBar = {

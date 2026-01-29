@@ -22,11 +22,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +41,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -53,6 +58,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import kotlin.math.sqrt
@@ -96,6 +102,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Логируем запуск приложения
+        AnalyticsHelper.logAppLaunched(this)
+
         mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
         // Initialize Play In-App Updates
@@ -125,7 +134,10 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         isRunning = mRecorderRunning,
                         onToggleClick = { toggleScreenCapture() },
-                        onEffectsClick = { currentEffect = currentEffect.next() },
+                        onEffectsClick = { 
+                            currentEffect = currentEffect.next()
+                            AnalyticsHelper.logEffectChanged(this@MainActivity, currentEffect.name.lowercase())
+                        },
                         effectMode = currentEffect
                     )
                 }
@@ -197,6 +209,7 @@ class MainActivity : ComponentActivity() {
         } else {
             stopScreenRecorder()
             mRecorderRunning = false
+            AnalyticsHelper.logScreenCaptureStopped(this)
         }
     }
 
@@ -213,6 +226,7 @@ class MainActivity : ComponentActivity() {
         // Check overlay permission on first attempt
         if (mPermissionDeniedCount == 0 && !PermissionHelper.canDrawOverlays(this)) {
             Log.d(TAG, "Requesting overlay permission first")
+            AnalyticsHelper.logPermissionRequested(this, "SYSTEM_ALERT_WINDOW")
             PermissionHelper.requestOverlayPermission(this, REQUEST_OVERLAY_PERMISSION)
             return
         }
@@ -337,11 +351,22 @@ class MainActivity : ComponentActivity() {
             mTclWarningShown = false
             Log.i(TAG, "Starting screen capture")
             if (data != null) {
+                // Логируем запуск протокола перед стартом
+                val prefs = Preferences(this)
+                val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+                AnalyticsHelper.logProtocolStarted(this, protocol)
+                
                 startScreenRecorder(resultCode, (data.clone() as Intent))
                 mRecorderRunning = true
             }
         }
         if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+            // Проверяем результат разрешения overlay
+            if (PermissionHelper.canDrawOverlays(this)) {
+                AnalyticsHelper.logPermissionGranted(this, "SYSTEM_ALERT_WINDOW")
+            } else {
+                AnalyticsHelper.logPermissionDenied(this, "SYSTEM_ALERT_WINDOW")
+            }
             // Small delay before requesting capture - helps on some devices
             window.decorView.postDelayed({ requestScreenCapture() }, 500)
         }
@@ -350,8 +375,13 @@ class MainActivity : ComponentActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
-            if (grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Notification permission is needed for the foreground service", Toast.LENGTH_LONG).show()
+            if (grantResults.isNotEmpty()) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    AnalyticsHelper.logPermissionGranted(this, "POST_NOTIFICATIONS")
+                } else {
+                    AnalyticsHelper.logPermissionDenied(this, "POST_NOTIFICATIONS")
+                    Toast.makeText(this, "Notification permission is needed for the foreground service", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -452,6 +482,8 @@ fun MainScreen(
     onSettingsClick: () -> Unit,
     onEffectsClick: () -> Unit,
     effectMode: EffectMode,
+    onHelpClick: () -> Unit = {},
+    onSupportClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Rainbow Background
@@ -790,6 +822,101 @@ fun MainScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Help and Support buttons column
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                var helpFocused by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = onHelpClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { helpFocused = it.isFocused }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Help,
+                        contentDescription = stringResource(R.string.help),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.help))
+                }
+
+                 var supportFocused by remember { mutableStateOf(false) }
+                 OutlinedButton(
+                     onClick = onSupportClick,
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .onFocusChanged { supportFocused = it.isFocused }
+                 ) {
+                     Icon(
+                         imageVector = Icons.Default.Favorite,
+                         contentDescription = stringResource(R.string.support_project),
+                         modifier = Modifier.size(20.dp),
+                         tint = MaterialTheme.colorScheme.error
+                     )
+                     Spacer(modifier = Modifier.width(8.dp))
+                     Text(stringResource(R.string.support_project))
+                 }
+            }
         }
     }
 }
+
+@Composable
+fun HelpDialog(
+    onDismiss: () -> Unit,
+    onOpenGitHub: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.help_title))
+        },
+        text = {
+            Text(stringResource(R.string.help_message))
+        },
+        confirmButton = {
+            TextButton(onClick = onOpenGitHub) {
+                Text(stringResource(R.string.help_open_github))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.help_close))
+            }
+        }
+    )
+}
+
+@Composable
+fun SupportDialog(
+    onDismiss: () -> Unit,
+    onOpenSupport: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.support_project_title))
+        },
+        text = {
+            Text(stringResource(R.string.support_project_message))
+        },
+        confirmButton = {
+            TextButton(onClick = onOpenSupport) {
+                Text(stringResource(R.string.support_open_details))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.help_close))
+            }
+        }
+    )
+}
+

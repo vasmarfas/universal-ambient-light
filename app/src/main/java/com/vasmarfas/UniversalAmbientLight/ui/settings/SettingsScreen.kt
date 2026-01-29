@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import android.app.Activity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +35,11 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
+    
+    // Логируем открытие настроек
+    LaunchedEffect(Unit) {
+        AnalyticsHelper.logSettingsOpened(context)
+    }
     
     // State for dependencies
     var connectionType by remember {
@@ -73,7 +79,11 @@ fun SettingsScreen(
                     entriesRes = R.array.pref_list_connection_type,
                     entryValuesRes = R.array.pref_list_connection_type_values,
                     onValueChange = { newType ->
+                        val oldType = connectionType
                         connectionType = newType
+                        // Логируем изменение протокола
+                        AnalyticsHelper.logProtocolChanged(context, oldType, newType)
+                        AnalyticsHelper.logSettingChanged(context, "connection_type", newType)
                         // Auto-set port when connection type changes
                         val defaultPort = when (newType) {
                             "hyperion" -> "19400"
@@ -108,7 +118,9 @@ fun SettingsScreen(
                             entriesRes = R.array.pref_list_wled_protocol,
                             entryValuesRes = R.array.pref_list_wled_protocol_values,
                             onValueChange = { newProtocol ->
+                                val oldProtocol = wledProtocol
                                 wledProtocol = newProtocol
+                                AnalyticsHelper.logSettingChanged(context, "wled_protocol", newProtocol)
                                 // Auto-set port when WLED protocol changes
                                 val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
                                 prefs.putString(R.string.pref_key_port, defaultPort)
@@ -138,7 +150,11 @@ fun SettingsScreen(
                             prefs = prefs,
                             keyRes = R.string.pref_key_reconnect,
                             title = stringResource(R.string.pref_title_reconnect),
-                            onValueChange = { reconnectEnabled = it }
+                            onValueChange = { enabled ->
+                                reconnectEnabled = enabled
+                                AnalyticsHelper.logAutoReconnectEnabled(context, enabled)
+                                AnalyticsHelper.logSettingChanged(context, "reconnect", enabled.toString())
+                            }
                         )
                         if (reconnectEnabled) {
                             EditTextPreference(
@@ -190,7 +206,10 @@ fun SettingsScreen(
                 ClickablePreference(
                     title = stringResource(R.string.pref_title_led_layout),
                     summary = stringResource(R.string.pref_summary_led_layout),
-                    onClick = onLedLayoutClick
+                    onClick = {
+                        AnalyticsHelper.logLedLayoutOpened(context)
+                        onLedLayoutClick()
+                    }
                 )
                 ListPreference(
                     prefs = prefs,
@@ -218,14 +237,24 @@ fun SettingsScreen(
                 CheckBoxPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_smoothing_enabled,
-                    title = stringResource(R.string.pref_title_smoothing_enabled)
+                    title = stringResource(R.string.pref_title_smoothing_enabled),
+                    onValueChange = { enabled ->
+                        val preset = prefs.getString(R.string.pref_key_smoothing_preset, "balanced")
+                        AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
+                        AnalyticsHelper.logSettingChanged(context, "smoothing_enabled", enabled.toString())
+                    }
                 )
                 ListPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_smoothing_preset,
                     title = stringResource(R.string.pref_title_smoothing_preset),
                     entriesRes = R.array.pref_list_smoothing_preset,
-                    entryValuesRes = R.array.pref_list_smoothing_preset_values
+                    entryValuesRes = R.array.pref_list_smoothing_preset_values,
+                    onValueChange = { preset ->
+                        val enabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
+                        AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
+                        AnalyticsHelper.logSettingChanged(context, "smoothing_preset", preset)
+                    }
                 )
                 EditTextPreference(
                     prefs = prefs,
@@ -255,7 +284,11 @@ fun SettingsScreen(
                 CheckBoxPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_boot,
-                    title = stringResource(R.string.pref_title_boot)
+                    title = stringResource(R.string.pref_title_boot),
+                    onValueChange = { enabled ->
+                        AnalyticsHelper.logBootStartEnabled(context, enabled)
+                        AnalyticsHelper.logSettingChanged(context, "boot_start", enabled.toString())
+                    }
                 )
                 ListPreference(
                     prefs = prefs,
@@ -264,6 +297,8 @@ fun SettingsScreen(
                     entriesRes = R.array.pref_list_language,
                     entryValuesRes = R.array.pref_list_language_values,
                     onValueChange = { language ->
+                        AnalyticsHelper.logLanguageChanged(context, language)
+                        AnalyticsHelper.logSettingChanged(context, "language", language)
                         LocaleHelper.setLocale(context, language)
                         (context as? Activity)?.recreate()
                     }

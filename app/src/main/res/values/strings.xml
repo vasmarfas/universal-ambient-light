@@ -299,4 +299,13 @@
   <string name="quick_tile_toast_setup_required">Please complete the setup in the app first</string>
   <string name="status_grabber_running">Ambient light service is running</string>
   <string name="foreground_service_media_projection_justification">This app uses MediaProjection foreground service to capture screen content in real-time and send color data to LED controllers for ambient lighting effects.</string>
+  <string name="help">Help</string>
+  <string name="support_project">Support Project</string>
+  <string name="help_title">How to use</string>
+  <string name="help_message">Before using this app, you need to set up your LED controller:\n\n• WLED: Configure WLED firmware on your ESP8266/ESP32 device\n• Adalight: Connect Arduino with Adalight firmware via USB\n• Hyperion: Install and configure Hyperion server\n\nFor detailed setup instructions, please visit the GitHub repository.</string>
+  <string name="help_open_github">Open GitHub</string>
+  <string name="help_close">Close</string>
+  <string name="support_project_title">Support Project</string>
+  <string name="support_project_message">Thank you for your interest in supporting this project!\n\nYou can support the development through:\n• Boosty\n• Cryptocurrency (TON)\n• Leave a review on Google Play\n\nClick below to see all available options.</string>
+  <string name="support_open_details">View Details</string>
 </resources>

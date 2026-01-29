@@ -27,6 +27,7 @@ import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.R
 import java.util.Objects
 
@@ -58,11 +59,17 @@ class ScreenGrabberService : Service() {
         override fun onConnected() {
             if (DEBUG) Log.d(TAG, "Connected to Hyperion server")
             mHasConnected = true
+            // Логируем успешное подключение
+            val prefs = Preferences(baseContext)
+            val host = prefs.getString(R.string.pref_key_host, null)
+            AnalyticsHelper.logConnectionSuccess(baseContext, mConnectionType, host)
             notifyActivity()
         }
 
         override fun onConnectionError(errorID: Int, error: String?) {
             Log.e(TAG, "Connection error: " + (error ?: "unknown"))
+            // Логируем ошибку подключения
+            AnalyticsHelper.logConnectionError(baseContext, mConnectionType, error)
             if (!mHasConnected) {
                 // Use appropriate error message based on connection type
                 if ("adalight".equals(mConnectionType, ignoreCase = true)) {
@@ -139,7 +146,7 @@ class ScreenGrabberService : Service() {
     }
 
     override fun onCreate() {
-        mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
         mHandler = Handler(Looper.getMainLooper())
 
         // Try shell bypass on startup for TCL devices
@@ -205,7 +212,11 @@ class ScreenGrabberService : Service() {
             mStartError = resources.getString(R.string.error_invalid_led_counts)
             return false
         }
-        mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+        if (mMediaProjectionManager == null) {
+            mStartError = resources.getString(R.string.error_media_projection_denied)
+            return false
+        }
         val priorityValue = Integer.parseInt(priority)
 
         // Use default values for host/port if not set (for Adalight)
@@ -449,7 +460,12 @@ class ScreenGrabberService : Service() {
 
     val notification: Notification
         get() {
-            val notification = AppNotification(this, mNotificationManager!!)
+            val mgr = mNotificationManager ?: (getSystemService(NOTIFICATION_SERVICE) as? NotificationManager)
+            if (mgr == null) {
+                // Пусть tryStartForeground() поймает и обработает как "foreground blocked/failed"
+                throw IllegalStateException("NotificationManager is null")
+            }
+            val notification = AppNotification(this, mgr)
             val label = getString(R.string.notification_exit_button)
             notification.setAction(NOTIFICATION_EXIT_INTENT_ID, label, buildExitButton())
             return notification.buildNotification()
@@ -458,12 +474,26 @@ class ScreenGrabberService : Service() {
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private fun startScreenRecord(intent: Intent) {
         if (DEBUG) Log.v(TAG, "Starting screen recorder")
+        val projectionManager = mMediaProjectionManager
+        if (projectionManager == null) {
+            Log.e(TAG, "MediaProjectionManager is null; cannot start screen recording")
+            mStartError = resources.getString(R.string.error_media_projection_denied)
+            haltStartup()
+            return
+        }
+        val thread = mHyperionThread
+        if (thread == null) {
+            Log.e(TAG, "HyperionThread is null; cannot start screen recording")
+            mStartError = resources.getString(R.string.error_server_unreachable)
+            haltStartup()
+            return
+        }
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
         // Сохраняем данные разрешения, чтобы можно было восстановиться после сна/пробуждения на TV
         saveProjectionData(resultCode, intent.extras)
 
         val projectionDataIntent = buildProjectionDataIntent()
-        val projection = mMediaProjectionManager!!.getMediaProjection(
+        val projection = projectionManager.getMediaProjection(
             resultCode,
             projectionDataIntent ?: intent
         )
@@ -480,7 +510,7 @@ class ScreenGrabberService : Service() {
 
             if (DEBUG) Log.v(TAG, "Creating encoder: " + metrics.widthPixels + "x" + metrics.heightPixels)
             mScreenEncoder = ScreenEncoder(
-                mHyperionThread!!.receiver,
+                thread.receiver,
                 projection,
                 metrics.widthPixels,
                 metrics.heightPixels,
@@ -488,6 +518,12 @@ class ScreenGrabberService : Service() {
                 options
             )
             mScreenEncoder!!.sendStatus()
+        } else {
+            if (projection == null) {
+                Log.e(TAG, "MediaProjection is null (resultCode=$resultCode). Permission likely missing/invalid.")
+                mStartError = resources.getString(R.string.error_media_projection_denied)
+                haltStartup()
+            }
         }
     }
 
@@ -549,7 +585,7 @@ class ScreenGrabberService : Service() {
     private fun stopScreenRecord() {
         if (DEBUG) Log.v(TAG, "Stopping screen recorder")
         mReconnectEnabled = false
-        mNotificationManager!!.cancel(NOTIFICATION_ID)
+        mNotificationManager?.cancel(NOTIFICATION_ID)
 
         if (mScreenEncoder != null) {
             if (DEBUG) Log.v(TAG, "Stopping encoder")

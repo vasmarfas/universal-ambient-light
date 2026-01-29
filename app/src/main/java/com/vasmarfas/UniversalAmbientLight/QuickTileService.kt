@@ -18,6 +18,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.vasmarfas.UniversalAmbientLight.common.BootActivity
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.R
 
 @RequiresApi(api = Build.VERSION_CODES.N)
@@ -83,10 +84,12 @@ class QuickTileService : TileService() {
             tile.updateTile()
             val tileState = tile.state
             if (tileState == Tile.STATE_ACTIVE) {
+                AnalyticsHelper.logQuickTileUsed(this)
                 val intent = Intent(this, ScreenGrabberService::class.java)
                 intent.action = ScreenGrabberService.ACTION_EXIT
                 startService(intent)
             } else {
+                AnalyticsHelper.logQuickTileUsed(this)
                 val runner = Runnable {
                     val setupStarted = startSetupIfNeeded()
 
