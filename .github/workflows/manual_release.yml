@@ -274,20 +274,30 @@ jobs:
           
           echo "RuStore upload response (HTTP $HTTP_CODE): $BODY"
           
-          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+          # Проверяем, не является ли ошибка "APK already uploaded"
+          MESSAGE=$(echo "$BODY" | jq -r '.message // ""')
+          CODE=$(echo "$BODY" | jq -r '.code // empty')
+          
+          if [ "$HTTP_CODE" = "400" ] && echo "$MESSAGE" | grep -qi "already uploaded"; then
+            echo "APK file is already uploaded to this version, skipping upload"
+            echo "This is not an error - the APK was uploaded in a previous run"
+          elif [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
             echo "RuStore upload failed with HTTP $HTTP_CODE"
             echo "$BODY" | jq '.' || echo "$BODY"
             exit 1
+          elif [ "$CODE" != "OK" ] && [ -n "$CODE" ]; then
+            # Проверяем, не является ли это ошибкой "already uploaded"
+            if echo "$MESSAGE" | grep -qi "already uploaded"; then
+              echo "APK file is already uploaded to this version, skipping upload"
+              echo "This is not an error - the APK was uploaded in a previous run"
+            else
+              echo "RuStore upload failed, code=$CODE"
+              echo "$BODY" | jq '.' || echo "$BODY"
+              exit 1
+            fi
+          else
+            echo "RuStore APK uploaded successfully"
           fi
-          
-          CODE=$(echo "$BODY" | jq -r '.code // empty')
-          if [ "$CODE" != "OK" ] && [ -n "$CODE" ]; then
-            echo "RuStore upload failed, code=$CODE"
-            echo "$BODY" | jq '.' || echo "$BODY"
-            exit 1
-          fi
-          
-          echo "RuStore APK uploaded successfully"
 
       - name: Commit RuStore version (send to moderation)
         env:
