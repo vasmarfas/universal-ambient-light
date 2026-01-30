@@ -51,6 +51,9 @@ fun SettingsScreen(
     var wledProtocol by remember {
         mutableStateOf(prefs.getString(R.string.pref_key_wled_protocol) ?: "ddp")
     }
+    var smoothingPreset by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_smoothing_preset) ?: "balanced")
+    }
 
     Scaffold(
         topBar = {
@@ -251,32 +254,63 @@ fun SettingsScreen(
                     entriesRes = R.array.pref_list_smoothing_preset,
                     entryValuesRes = R.array.pref_list_smoothing_preset_values,
                     onValueChange = { preset ->
+                        smoothingPreset = preset
                         val enabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
                         AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
                         AnalyticsHelper.logSettingChanged(context, "smoothing_preset", preset)
+                        
+                        // Обновляем значения настроек в соответствии с пресетом
+                        val presetValues = when (preset.lowercase()) {
+                            "off" -> Triple(50, 0, 60)
+                            "responsive" -> Triple(50, 0, 60)
+                            "balanced" -> Triple(200, 80, 25)
+                            "smooth" -> Triple(500, 200, 20)
+                            else -> Triple(200, 80, 25) // balanced по умолчанию
+                        }
+                        
+                        prefs.putInt(R.string.pref_key_settling_time, presetValues.first)
+                        prefs.putInt(R.string.pref_key_output_delay, presetValues.second)
+                        prefs.putInt(R.string.pref_key_update_frequency, presetValues.third)
+                        
+                        // Если пресет "off", выключаем сглаживание
+                        if (preset.lowercase() == "off") {
+                            prefs.putBoolean(R.string.pref_key_smoothing_enabled, false)
+                        }
                     }
                 )
-                EditTextPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_settling_time,
-                    title = stringResource(R.string.pref_title_settling_time),
-                    summaryProvider = { it },
-                    keyboardType = KeyboardType.Number
-                )
-                EditTextPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_output_delay,
-                    title = stringResource(R.string.pref_title_output_delay),
-                    summaryProvider = { it },
-                    keyboardType = KeyboardType.Number
-                )
-                ListPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_update_frequency,
-                    title = stringResource(R.string.pref_title_update_frequency),
-                    entriesRes = R.array.pref_list_update_frequency,
-                    entryValuesRes = R.array.pref_list_update_frequency_values
-                )
+                // Используем key для принудительной перекомпозиции при изменении пресета
+                key(smoothingPreset) {
+                    EditTextPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_settling_time,
+                        title = stringResource(R.string.pref_title_settling_time),
+                        summaryProvider = { value -> 
+                            val ms = value?.toIntOrNull() ?: 200
+                            "$ms мс"
+                        },
+                        keyboardType = KeyboardType.Number,
+                        recomposeKey = smoothingPreset
+                    )
+                    EditTextPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_output_delay,
+                        title = stringResource(R.string.pref_title_output_delay),
+                        summaryProvider = { value -> 
+                            val ms = value?.toIntOrNull() ?: 80
+                            "$ms мс"
+                        },
+                        keyboardType = KeyboardType.Number,
+                        recomposeKey = smoothingPreset
+                    )
+                    ListPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_update_frequency,
+                        title = stringResource(R.string.pref_title_update_frequency),
+                        entriesRes = R.array.pref_list_update_frequency,
+                        entryValuesRes = R.array.pref_list_update_frequency_values,
+                        recomposeKey = smoothingPreset
+                    )
+                }
             }
 
             // General Group
@@ -363,14 +397,17 @@ fun EditTextPreference(
     summaryProvider: (String) -> String = { it },
     keyboardType: KeyboardType = KeyboardType.Text,
     externalValue: String? = null,
-    onValueChange: ((String) -> Unit)? = null
+    onValueChange: ((String) -> Unit)? = null,
+    recomposeKey: Any? = null
 ) {
     // Read value from prefs, but allow it to be overridden during composition
-    var value by remember(keyRes) { mutableStateOf(prefs.getString(keyRes) ?: "") }
+    var value by remember(keyRes, recomposeKey) { mutableStateOf(prefs.getString(keyRes) ?: "") }
     
-    // Update value when external value changes (only if provided)
-    LaunchedEffect(externalValue) {
+    // Update value when external value changes (only if provided) or when recomposeKey changes
+    LaunchedEffect(externalValue, recomposeKey) {
         externalValue?.let { value = it }
+        // Перечитываем значение из preferences при изменении recomposeKey
+        recomposeKey?.let { value = prefs.getString(keyRes) ?: "" }
     }
     
     var showDialog by remember { mutableStateOf(false) }
@@ -434,12 +471,18 @@ fun ListPreference(
     title: String,
     entriesRes: Int,
     entryValuesRes: Int,
-    onValueChange: ((String) -> Unit)? = null
+    onValueChange: ((String) -> Unit)? = null,
+    recomposeKey: Any? = null
 ) {
     val entries = stringArrayResource(entriesRes)
     val entryValues = stringArrayResource(entryValuesRes)
     
-    var value by remember { mutableStateOf(prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "") }
+    var value by remember(keyRes, recomposeKey) { mutableStateOf(prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "") }
+    
+    // Обновляем значение при изменении recomposeKey
+    LaunchedEffect(recomposeKey) {
+        recomposeKey?.let { value = prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "" }
+    }
     var showDialog by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 

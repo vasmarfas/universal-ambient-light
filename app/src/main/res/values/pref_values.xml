@@ -73,7 +73,7 @@
     <integer name="pref_default_settling_time" translatable="false">200</integer>
 
     <string name="pref_key_output_delay" translatable="false">pref_key_output_delay</string>
-    <integer name="pref_default_output_delay" translatable="false">2</integer>
+    <integer name="pref_default_output_delay" translatable="false">80</integer>
 
     <string name="pref_key_update_frequency" translatable="false">pref_key_update_frequency</string>
     <integer name="pref_default_update_frequency" translatable="false">25</integer>

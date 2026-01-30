@@ -31,7 +31,7 @@ class HyperionThread(
     private val mSmoothingEnabled: Boolean = true,
     private val mSmoothingPreset: String = "balanced",
     private val mSettlingTime: Int = 200,
-    private val mOutputDelay: Int = 2,
+    private val mOutputDelayMs: Long = 80L,
     private val mUpdateFrequency: Int = 25
 ) : Thread(TAG) {
 
@@ -176,11 +176,13 @@ class HyperionThread(
     private fun createClient(): HyperionClient? {
         val host = mHost ?: "localhost"
         return if ("wled".equals(mConnectionType, ignoreCase = true)) {
-            // WLEDClient (context, host, port, priority, colorOrder)
-            WLEDClient(mContext, host, mPort, mPriority, mWledColorOrder)
+            // WLEDClient (context, host, port, priority, colorOrder, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
+            WLEDClient(mContext, host, mPort, mPriority, mWledColorOrder,
+                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
         } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
-            // AdalightClient (context, priority, baudrate)
-            AdalightClient(mContext, mPriority, mBaudRate)
+            // AdalightClient (context, priority, baudrate, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
+            AdalightClient(mContext, mPriority, mBaudRate,
+                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
         } else {
             // Default to Hyperion
             HyperionFlatBuffers(host, mPort, mPriority)
@@ -250,14 +252,14 @@ class HyperionThread(
             val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
             val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "balanced") ?: "balanced"
             val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 200)
-            val outputDelay = prefs.getInt(R.string.pref_key_output_delay, 2)
+            val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 80).toLong() // Теперь в миллисекундах
             val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 25)
 
             return HyperionThread(
                 callback, host, port, priority, reconnect, reconnectDelay,
                 connectionType, context, baudRate, wledColorOrder,
                 wledProtocol, wledRgbw, wledBrightness, adalightProtocol,
-                smoothingEnabled, smoothingPreset, settlingTime, outputDelay, updateFrequency
+                smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency
             )
         }
     }

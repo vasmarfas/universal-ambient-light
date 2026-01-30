@@ -18,7 +18,12 @@ class WLEDClient(
     private val mHost: String,
     port: Int,
     private val mPriority: Int,
-    colorOrder: String?
+    colorOrder: String?,
+    smoothingEnabled: Boolean = true,
+    smoothingPreset: String = "balanced",
+    settlingTime: Int = 200,
+    outputDelayMs: Long = 80L,
+    updateFrequency: Int = 25
 ) : HyperionClient {
 
     enum class Protocol {
@@ -54,10 +59,23 @@ class WLEDClient(
         }
 
         mSmoothing = ColorSmoothing { leds -> sendLedData(leds) }
-        // Configure smoothing for Ambilight (Low Latency)
-        mSmoothing.setSettlingTime(100) // Fast transition (100ms)
-        mSmoothing.setOutputDelay(0)    // No buffering delay
-        mSmoothing.setUpdateFrequency(40) // 40Hz update rate
+        // Применить настройки сглаживания из preferences
+        // Сначала применяем пресет как базовые значения
+        mSmoothing.applyPreset(smoothingPreset)
+        // Затем переопределяем настройками из preferences только если они отличаются от значений пресета
+        // Это позволяет пресету работать, но пользователь может переопределить настройки вручную
+        val presetValues = getPresetValues(smoothingPreset)
+        if (settlingTime != presetValues.settlingTime) {
+            mSmoothing.setSettlingTime(settlingTime)
+        }
+        if (outputDelayMs != presetValues.outputDelayMs) {
+            mSmoothing.setOutputDelay(outputDelayMs)
+        }
+        if (updateFrequency != presetValues.updateFrequency) {
+            mSmoothing.setUpdateFrequency(updateFrequency)
+        }
+        // enabled всегда переопределяем, так как это отдельная настройка
+        mSmoothing.setEnabled(smoothingEnabled)
 
         connect()
         startKeepAlive()
@@ -381,6 +399,22 @@ class WLEDClient(
             } // rgb
         }
         return result
+    }
+
+    private data class PresetValues(
+        val settlingTime: Int,
+        val outputDelayMs: Long,
+        val updateFrequency: Int
+    )
+
+    private fun getPresetValues(preset: String): PresetValues {
+        return when (preset.lowercase()) {
+            "off" -> PresetValues(50, 0L, 60)
+            "responsive" -> PresetValues(50, 0L, 60)
+            "balanced" -> PresetValues(200, 80L, 25)
+            "smooth" -> PresetValues(500, 200L, 20)
+            else -> PresetValues(200, 80L, 25) // balanced по умолчанию
+        }
     }
 
     companion object {

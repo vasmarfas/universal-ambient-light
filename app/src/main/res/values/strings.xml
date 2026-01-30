@@ -223,10 +223,10 @@
     <item>balanced</item>
     <item>smooth</item>
   </string-array>
-  <string name="pref_title_settling_time">Settling Time</string>
-  <string name="pref_summary_settling_time">Transition time between colors in ms (50-500)</string>
-  <string name="pref_title_output_delay">Output Delay</string>
-  <string name="pref_summary_output_delay">Number of buffered frames (0-10)</string>
+  <string name="pref_title_settling_time">Settling Time (ms)</string>
+  <string name="pref_summary_settling_time">Transition time between colors in milliseconds (50-500)</string>
+  <string name="pref_title_output_delay">Output Delay (ms)</string>
+  <string name="pref_summary_output_delay">Delay in milliseconds for video sync (0-1000). Increase for Jellyfin if LEDs are ahead of picture</string>
   <string name="pref_title_update_frequency">Update Frequency</string>
   <string name="pref_summary_update_frequency">Data send frequency to LEDs (Hz)</string>
   <string-array name="pref_list_update_frequency">

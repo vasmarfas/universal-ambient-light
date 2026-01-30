@@ -19,14 +19,14 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
         private const val DEBUG = false
         private const val DEFAULT_UPDATE_FREQUENCY_HZ = 25
         private const val DEFAULT_SETTLING_TIME_MS = 200
-        private const val DEFAULT_OUTPUT_DELAY = 2
+        private const val DEFAULT_OUTPUT_DELAY_MS = 80L // ~2 кадра при 25 FPS
         private const val MIN_UPDATE_INTERVAL_MS = 1L
     }
 
     // Конфигурация
     private var mUpdateFrequencyHz = DEFAULT_UPDATE_FREQUENCY_HZ
     private var mSettlingTimeMs = DEFAULT_SETTLING_TIME_MS
-    private var mOutputDelay = DEFAULT_OUTPUT_DELAY
+    private var mOutputDelayMs: Long = DEFAULT_OUTPUT_DELAY_MS
     private var mEnabled = true
 
     // Состояние
@@ -34,8 +34,9 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     private var mTargetValues: Array<ColorRgb>? = null
     private var mTargetTime: Long = 0
 
-    // Очередь вывода (Output Delay)
-    private val mOutputQueue = ArrayDeque<Array<ColorRgb>>()
+    // Очередь вывода (Output Delay) - хранит пары (время добавления, кадр)
+    private data class TimedFrame(val timestamp: Long, val colors: Array<ColorRgb>)
+    private val mOutputQueue = ArrayDeque<TimedFrame>()
 
     // Таймер
     private var mHandlerThread: HandlerThread? = null
@@ -90,13 +91,22 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
                     mPreviousValues!![i].set(targetColors[i])
                 }
 
-                start()
+                // Запускаем таймер только если сглаживание включено
+                if (mEnabled) {
+                    start()
+                }
             } else {
                 // GC-free update: copy values
                 for (i in targetColors.indices) {
                     mTargetValues!![i].set(targetColors[i])
                 }
             }
+        }
+
+        // Если сглаживание выключено, отправляем данные напрямую (клонируем для безопасности)
+        if (!mEnabled) {
+            val colorsCopy = Array(targetColors.size) { i -> targetColors[i].clone() }
+            sendToDevice(colorsCopy)
         }
     }
 
@@ -119,12 +129,12 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
         val now = System.currentTimeMillis()
         val deltaTime = mTargetTime - now
 
-        if (deltaTime <= 0) {
+            if (deltaTime <= 0) {
             // Время истекло, использовать целевые значения
             // Update mPreviousValues in-place
             for (i in mTargetValues!!.indices) mPreviousValues!![i].set(mTargetValues!![i])
 
-            if (mOutputDelay == 0) return mPreviousValues
+            if (mOutputDelayMs == 0L) return mPreviousValues
 
             // Clone only if queueing
             return Array(mPreviousValues!!.size) { i -> mPreviousValues!![i].clone() }
@@ -147,20 +157,30 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
             mPreviousValues!![i].set(r, g, b)
         }
 
-        if (mOutputDelay == 0) return mPreviousValues
+        if (mOutputDelayMs == 0L) return mPreviousValues
 
         return Array(mPreviousValues!!.size) { i -> mPreviousValues!![i].clone() }
     }
 
     private fun queueColors(ledColors: Array<ColorRgb>) {
-        if (mOutputDelay == 0) {
+        if (mOutputDelayMs == 0L) {
             sendToDevice(ledColors)
         } else {
+            val now = System.currentTimeMillis()
             synchronized(mOutputQueue) {
-                mOutputQueue.addLast(ledColors)
-                if (mOutputQueue.size > mOutputDelay) {
-                    val frameToSend = mOutputQueue.removeFirst()
-                    sendToDevice(frameToSend)
+                // Добавляем кадр с текущим временем
+                mOutputQueue.addLast(TimedFrame(now, ledColors))
+                
+                // Проверяем, прошло ли достаточно времени с момента добавления самого старого кадра
+                while (mOutputQueue.isNotEmpty()) {
+                    val oldestFrame = mOutputQueue.first
+                    val elapsed = now - oldestFrame.timestamp
+                    if (elapsed >= mOutputDelayMs) {
+                        val frameToSend = mOutputQueue.removeFirst()
+                        sendToDevice(frameToSend.colors)
+                    } else {
+                        break // Самый старый кадр еще не готов к отправке
+                    }
                 }
             }
         }
@@ -205,11 +225,81 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
         mSettlingTimeMs = max(0, min(1000, ms))
     }
 
-    fun setOutputDelay(frames: Int) {
-        mOutputDelay = max(0, min(10, frames))
+    fun setOutputDelay(ms: Long) {
+        mOutputDelayMs = max(0L, min(1000L, ms)) // Задержка в миллисекундах (0-1000 мс)
     }
 
     fun setUpdateFrequency(hz: Int) {
         mUpdateFrequencyHz = max(1, min(60, hz))
+        // Обновить интервал, если уже запущено
+        if (mRunning && mHandler != null) {
+            mHandler!!.removeCallbacksAndMessages(null)
+            val intervalMs = 1000L / mUpdateFrequencyHz
+            mHandler!!.postDelayed(mUpdateRunnable, intervalMs)
+        }
+    }
+
+    fun setEnabled(enabled: Boolean) {
+        val wasEnabled = mEnabled
+        mEnabled = enabled
+        
+        // Если сглаживание выключено, останавливаем таймер
+        if (!enabled && wasEnabled && mRunning) {
+            stop()
+        }
+        // Если сглаживание включено и таймер не запущен, запускаем его
+        else if (enabled && !wasEnabled && mTargetValues != null && !mRunning) {
+            start()
+        }
+    }
+
+    fun isEnabled(): Boolean {
+        return mEnabled
+    }
+
+    /**
+     * Применяет пресет сглаживания
+     * @param preset "off", "responsive", "balanced", "smooth"
+     */
+    fun applyPreset(preset: String) {
+        when (preset.lowercase()) {
+            "off" -> {
+                mEnabled = false
+                mSettlingTimeMs = 50
+                mOutputDelayMs = 0L
+                mUpdateFrequencyHz = 60
+            }
+            "responsive" -> {
+                mEnabled = true
+                mSettlingTimeMs = 50
+                mOutputDelayMs = 0L
+                mUpdateFrequencyHz = 60
+            }
+            "balanced" -> {
+                mEnabled = true
+                mSettlingTimeMs = 200
+                mOutputDelayMs = 80L // ~2 кадра при 25 FPS
+                mUpdateFrequencyHz = 25
+            }
+            "smooth" -> {
+                mEnabled = true
+                mSettlingTimeMs = 500
+                mOutputDelayMs = 200L // ~5 кадров при 25 FPS
+                mUpdateFrequencyHz = 20
+            }
+            else -> {
+                // По умолчанию "balanced"
+                mEnabled = true
+                mSettlingTimeMs = 200
+                mOutputDelayMs = 80L // ~2 кадра при 25 FPS
+                mUpdateFrequencyHz = 25
+            }
+        }
+        // Обновить интервал, если уже запущено
+        if (mRunning && mHandler != null) {
+            mHandler!!.removeCallbacksAndMessages(null)
+            val intervalMs = 1000L / mUpdateFrequencyHz
+            mHandler!!.postDelayed(mUpdateRunnable, intervalMs)
+        }
     }
 }

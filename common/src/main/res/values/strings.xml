@@ -134,10 +134,10 @@
     <item>balanced</item>
     <item>smooth</item>
   </string-array>
-  <string name="pref_title_settling_time">Время сглаживания</string>
+  <string name="pref_title_settling_time">Время сглаживания (мс)</string>
   <string name="pref_summary_settling_time">Время перехода между цветами в миллисекундах (50-500)</string>
-  <string name="pref_title_output_delay">Задержка вывода</string>
-  <string name="pref_summary_output_delay">Количество буферизованных кадров (0-10)</string>
+  <string name="pref_title_output_delay">Задержка вывода (мс)</string>
+  <string name="pref_summary_output_delay">Задержка в миллисекундах для синхронизации с видео (0-1000). Увеличьте для Jellyfin, если лента опережает картинку</string>
   <string name="pref_title_update_frequency">Частота обновления</string>
   <string name="pref_summary_update_frequency">Частота отправки данных на LED (Hz)</string>
   <string-array name="pref_list_update_frequency">
