@@ -47,8 +47,15 @@ fun AppTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Color.Transparent.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            
+            // Для Android 15+ (API 35+) setStatusBarColor не поддерживается
+            // Используем только WindowInsetsController
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                window.statusBarColor = Color.Transparent.toArgb()
+            }
+            
+            insetsController.isAppearanceLightStatusBars = !darkTheme
         }
     }
 

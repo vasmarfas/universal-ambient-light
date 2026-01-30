@@ -124,7 +124,7 @@ jobs:
         releaseFiles: dist/bundle/release/app-release.aab
         track: ${{ inputs.track }}
         status: ${{ inputs.status }}
-        changesNotSentForReview: true
+        changesNotSentForReview: ${{ inputs.track != 'production' }}
 
   rustore:
     runs-on: ubuntu-latest
@@ -242,9 +242,52 @@ jobs:
           PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
           RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
         run: |
-          curl --fail -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
+          # Ищем APK файл в разных возможных местах
+          APK_PATH=""
+          for path in "dist/apk/release/app-release.apk" "dist/app/build/outputs/apk/release/app-release.apk" "dist/app-release.apk"; do
+            if [ -f "$path" ]; then
+              APK_PATH="$path"
+              break
+            fi
+          done
+          
+          # Если не нашли, ищем любой APK файл
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find dist -name "*.apk" -type f | head -n1)
+          fi
+          
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "APK file not found"
+            echo "Available files in dist:"
+            find dist -type f || true
+            exit 1
+          fi
+          
+          echo "Uploading APK: $APK_PATH ($(du -h "$APK_PATH" | cut -f1))"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/apk?servicesType=Unknown&isMainApk=true" \
             -H "Public-Token: ${RUSTORE_JWE}" \
-            -F "file=@dist/apk/release/app-release.apk"
+            -F "file=@${APK_PATH}")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "RuStore upload response (HTTP $HTTP_CODE): $BODY"
+          
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "RuStore upload failed with HTTP $HTTP_CODE"
+            echo "$BODY" | jq '.' || echo "$BODY"
+            exit 1
+          fi
+          
+          CODE=$(echo "$BODY" | jq -r '.code // empty')
+          if [ "$CODE" != "OK" ] && [ -n "$CODE" ]; then
+            echo "RuStore upload failed, code=$CODE"
+            echo "$BODY" | jq '.' || echo "$BODY"
+            exit 1
+          fi
+          
+          echo "RuStore APK uploaded successfully"
 
       - name: Commit RuStore version (send to moderation)
         env:
