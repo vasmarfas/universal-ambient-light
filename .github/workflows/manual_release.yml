@@ -124,7 +124,7 @@ jobs:
         releaseFiles: dist/bundle/release/app-release.aab
         track: ${{ inputs.track }}
         status: ${{ inputs.status }}
-        changesNotSentForReview: ${{ inputs.track != 'production' }}
+#        changesNotSentForReview: ${{ inputs.track != 'production' }}
 
   rustore:
     runs-on: ubuntu-latest
