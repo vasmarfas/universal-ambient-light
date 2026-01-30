@@ -76,13 +76,23 @@ class MainActivity : ComponentActivity() {
     private var mTclWarningShown = false
     private lateinit var appUpdateManager: AppUpdateManager
     private var currentEffect by mutableStateOf(EffectMode.RAINBOW)
+    private var mSessionStartTime: Long? = null
 
     private var usbPermissionReceiverRegistered = false
 
     private val mMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val checked = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TAG, false)
+            val wasRunning = mRecorderRunning
             mRecorderRunning = checked
+            
+            // Если сессия остановилась извне (через сервис), сбрасываем время начала
+            if (wasRunning && !checked && mSessionStartTime != null) {
+                val durationSeconds = ((System.currentTimeMillis() - mSessionStartTime!!) / 1000).coerceAtLeast(0)
+                AnalyticsHelper.logScreenCaptureStopped(this@MainActivity, durationSeconds)
+                mSessionStartTime = null
+            }
+            
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
             val tclBlocked = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
 
@@ -158,6 +168,9 @@ class MainActivity : ComponentActivity() {
 
         prefs.edit { putLong(keyLastAttempt, now) }
 
+        // Логируем запрос оптимизации батареи
+        AnalyticsHelper.logBatteryOptimizationRequested(this)
+
         // Без собственного UI: сразу открываем системный запрос/настройку
         PermissionHelper.requestIgnoreBatteryOptimizations(this)
     }
@@ -209,7 +222,12 @@ class MainActivity : ComponentActivity() {
         } else {
             stopScreenRecorder()
             mRecorderRunning = false
-            AnalyticsHelper.logScreenCaptureStopped(this)
+            // Отслеживание длительности сессии при остановке
+            val durationSeconds = mSessionStartTime?.let { startTime ->
+                ((System.currentTimeMillis() - startTime) / 1000).coerceAtLeast(0)
+            }
+            AnalyticsHelper.logScreenCaptureStopped(this, durationSeconds)
+            mSessionStartTime = null
         }
     }
 
@@ -281,6 +299,9 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // Логируем запрос USB разрешения
+        AnalyticsHelper.logUsbPermissionRequested(this)
+
         // Запросить разрешение через системный диалог
         val permissionIntent = android.app.PendingIntent.getBroadcast(
             this,
@@ -298,8 +319,10 @@ class MainActivity : ComponentActivity() {
                     usbPermissionReceiverRegistered = false
 
                     if (granted) {
+                        AnalyticsHelper.logUsbPermissionGranted(this@MainActivity)
                         onReady()
                     } else {
+                        AnalyticsHelper.logUsbPermissionDenied(this@MainActivity)
                         Toast.makeText(
                             this@MainActivity,
                             "USB device permission denied. Please allow USB access or grant it in Android Settings > Apps > Hyperion Grabber > Permissions",
@@ -326,8 +349,11 @@ class MainActivity : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_UPDATE_CODE) {
-            if (resultCode != Activity.RESULT_OK) {
+            if (resultCode == Activity.RESULT_OK) {
+                AnalyticsHelper.logAppUpdateCompleted(this)
+            } else {
                 Log.e(TAG, "Update flow failed! Result code: $resultCode")
+                AnalyticsHelper.logAppUpdateCancelled(this)
                 // If the update is cancelled or fails,
                 // you can request to start the update again.
             }
@@ -355,9 +381,11 @@ class MainActivity : ComponentActivity() {
                 val prefs = Preferences(this)
                 val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
                 AnalyticsHelper.logProtocolStarted(this, protocol)
+                AnalyticsHelper.logScreenCaptureStarted(this, protocol)
                 
                 startScreenRecorder(resultCode, (data.clone() as Intent))
                 mRecorderRunning = true
+                mSessionStartTime = System.currentTimeMillis()
             }
         }
         if (requestCode == REQUEST_OVERLAY_PERMISSION) {
@@ -409,13 +437,14 @@ class MainActivity : ComponentActivity() {
     private fun checkForUpdates() {
         val appUpdateInfoTask = appUpdateManager.appUpdateInfo
         appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
-            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
                 // This example applies an immediate update. To apply a flexible update
                 // instead, pass in AppUpdateType.FLEXIBLE
                 && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
             ) {
                 // Request the update
                 try {
+                    AnalyticsHelper.logAppUpdateRequested(this, "immediate")
                     appUpdateManager.startUpdateFlowForResult(
                         appUpdateInfo,
                         AppUpdateType.IMMEDIATE,

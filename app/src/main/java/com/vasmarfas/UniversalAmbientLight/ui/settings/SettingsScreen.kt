@@ -87,6 +87,7 @@ fun SettingsScreen(
                         // Логируем изменение протокола
                         AnalyticsHelper.logProtocolChanged(context, oldType, newType)
                         AnalyticsHelper.logSettingChanged(context, "connection_type", newType)
+                        AnalyticsHelper.updateProtocolProperty(context, newType)
                         // Auto-set port when connection type changes
                         val defaultPort = when (newType) {
                             "hyperion" -> "19400"
@@ -109,7 +110,11 @@ fun SettingsScreen(
                         prefs = prefs,
                         keyRes = R.string.pref_key_host,
                         title = stringResource(R.string.pref_title_host),
-                        summaryProvider = { it }
+                        summaryProvider = { it },
+                        onValueChange = { newHost ->
+                            AnalyticsHelper.logHostChanged(context, newHost)
+                            AnalyticsHelper.logSettingChanged(context, "host", newHost)
+                        }
                     )
 
                     // Show WLED protocol selector between host and port for WLED connections
@@ -138,7 +143,12 @@ fun SettingsScreen(
                             keyRes = R.string.pref_key_port,
                             title = stringResource(R.string.pref_title_port),
                             summaryProvider = { it },
-                            keyboardType = KeyboardType.Number
+                            keyboardType = KeyboardType.Number,
+                            onValueChange = { newPort ->
+                                val portInt = newPort.toIntOrNull() ?: 0
+                                AnalyticsHelper.logPortChanged(context, portInt)
+                                AnalyticsHelper.logSettingChanged(context, "port", newPort)
+                            }
                         )
                     }
                     if (isHyperion) {
@@ -147,7 +157,12 @@ fun SettingsScreen(
                             keyRes = R.string.pref_key_priority,
                             title = stringResource(R.string.pref_title_priority),
                             summaryProvider = { it },
-                            keyboardType = KeyboardType.Number
+                            keyboardType = KeyboardType.Number,
+                            onValueChange = { newPriority ->
+                                val priorityInt = newPriority.toIntOrNull() ?: 100
+                                AnalyticsHelper.logPriorityChanged(context, priorityInt)
+                                AnalyticsHelper.logSettingChanged(context, "priority", newPriority)
+                            }
                         )
                         CheckBoxPreference(
                             prefs = prefs,
@@ -155,8 +170,9 @@ fun SettingsScreen(
                             title = stringResource(R.string.pref_title_reconnect),
                             onValueChange = { enabled ->
                                 reconnectEnabled = enabled
-                                AnalyticsHelper.logAutoReconnectEnabled(context, enabled)
-                                AnalyticsHelper.logSettingChanged(context, "reconnect", enabled.toString())
+                        AnalyticsHelper.logAutoReconnectEnabled(context, enabled)
+                        AnalyticsHelper.logSettingChanged(context, "reconnect", enabled.toString())
+                        AnalyticsHelper.updateAutoReconnectProperty(context, enabled)
                             }
                         )
                         if (reconnectEnabled) {
@@ -165,7 +181,12 @@ fun SettingsScreen(
                                 keyRes = R.string.pref_key_reconnect_delay,
                                 title = stringResource(R.string.pref_title_reconnect_delay),
                                 summaryProvider = { it },
-                                keyboardType = KeyboardType.Number
+                                keyboardType = KeyboardType.Number,
+                                onValueChange = { newDelay ->
+                                    val delayInt = newDelay.toIntOrNull() ?: 0
+                                    AnalyticsHelper.logReconnectDelayChanged(context, delayInt)
+                                    AnalyticsHelper.logSettingChanged(context, "reconnect_delay", newDelay)
+                                }
                             )
                         }
                     }
@@ -177,14 +198,23 @@ fun SettingsScreen(
                         keyRes = R.string.pref_key_adalight_baudrate,
                         title = stringResource(R.string.pref_title_adalight_baudrate),
                         entriesRes = R.array.pref_list_adalight_baudrate,
-                        entryValuesRes = R.array.pref_list_adalight_baudrate_values
+                        entryValuesRes = R.array.pref_list_adalight_baudrate_values,
+                        onValueChange = { newBaudrate ->
+                            val baudrateInt = newBaudrate.toIntOrNull() ?: 115200
+                            AnalyticsHelper.logBaudrateChanged(context, baudrateInt)
+                            AnalyticsHelper.logSettingChanged(context, "adalight_baudrate", newBaudrate)
+                        }
                     )
                     ListPreference(
                         prefs = prefs,
                         keyRes = R.string.pref_key_adalight_protocol,
                         title = stringResource(R.string.pref_title_adalight_protocol),
                         entriesRes = R.array.pref_list_adalight_protocol,
-                        entryValuesRes = R.array.pref_list_adalight_protocol_values
+                        entryValuesRes = R.array.pref_list_adalight_protocol_values,
+                        onValueChange = { newProtocol ->
+                            AnalyticsHelper.logAdalightProtocolChanged(context, newProtocol)
+                            AnalyticsHelper.logSettingChanged(context, "adalight_protocol", newProtocol)
+                        }
                     )
                 }
 
@@ -194,12 +224,20 @@ fun SettingsScreen(
                         keyRes = R.string.pref_key_wled_color_order,
                         title = stringResource(R.string.pref_title_wled_color_order),
                         entriesRes = R.array.pref_list_wled_color_order,
-                        entryValuesRes = R.array.pref_list_wled_color_order_values
+                        entryValuesRes = R.array.pref_list_wled_color_order_values,
+                        onValueChange = { newColorOrder ->
+                            AnalyticsHelper.logColorOrderChanged(context, newColorOrder)
+                            AnalyticsHelper.logSettingChanged(context, "wled_color_order", newColorOrder)
+                        }
                     )
                     CheckBoxPreference(
                         prefs = prefs,
                         keyRes = R.string.pref_key_wled_rgbw,
-                        title = stringResource(R.string.pref_title_wled_rgbw)
+                        title = stringResource(R.string.pref_title_wled_rgbw),
+                        onValueChange = { enabled ->
+                            AnalyticsHelper.logRgbwChanged(context, enabled)
+                            AnalyticsHelper.logSettingChanged(context, "wled_rgbw", enabled.toString())
+                        }
                     )
                 }
             }
@@ -219,19 +257,33 @@ fun SettingsScreen(
                     keyRes = R.string.pref_key_framerate,
                     title = stringResource(R.string.pref_title_framerate),
                     entriesRes = R.array.pref_list_framerate,
-                    entryValuesRes = R.array.pref_list_framerate_values
+                    entryValuesRes = R.array.pref_list_framerate_values,
+                    onValueChange = { newFramerate ->
+                        val framerateInt = newFramerate.toIntOrNull() ?: 10
+                        AnalyticsHelper.logFramerateChanged(context, framerateInt)
+                        AnalyticsHelper.logSettingChanged(context, "framerate", newFramerate)
+                    }
                 )
                 ListPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_capture_quality,
                     title = stringResource(R.string.pref_title_capture_quality),
                     entriesRes = R.array.pref_list_capture_quality,
-                    entryValuesRes = R.array.pref_list_capture_quality_values
+                    entryValuesRes = R.array.pref_list_capture_quality_values,
+                    onValueChange = { newQuality ->
+                        val qualityInt = newQuality.toIntOrNull() ?: 128
+                        AnalyticsHelper.logCaptureQualityChanged(context, qualityInt)
+                        AnalyticsHelper.logSettingChanged(context, "capture_quality", newQuality)
+                    }
                 )
                 CheckBoxPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_use_avg_color,
-                    title = stringResource(R.string.pref_title_use_avg_color)
+                    title = stringResource(R.string.pref_title_use_avg_color),
+                    onValueChange = { enabled ->
+                        AnalyticsHelper.logUseAvgColorChanged(context, enabled)
+                        AnalyticsHelper.logSettingChanged(context, "use_avg_color", enabled.toString())
+                    }
                 )
             }
 
@@ -245,6 +297,7 @@ fun SettingsScreen(
                         val preset = prefs.getString(R.string.pref_key_smoothing_preset, "balanced")
                         AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
                         AnalyticsHelper.logSettingChanged(context, "smoothing_enabled", enabled.toString())
+                        AnalyticsHelper.updateSmoothingProperty(context, enabled)
                     }
                 )
                 ListPreference(
@@ -333,6 +386,7 @@ fun SettingsScreen(
                     onValueChange = { language ->
                         AnalyticsHelper.logLanguageChanged(context, language)
                         AnalyticsHelper.logSettingChanged(context, "language", language)
+                        AnalyticsHelper.updateLanguageProperty(context, language)
                         LocaleHelper.setLocale(context, language)
                         (context as? Activity)?.recreate()
                     }

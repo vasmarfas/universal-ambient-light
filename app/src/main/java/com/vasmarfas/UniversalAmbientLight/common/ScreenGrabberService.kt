@@ -105,6 +105,12 @@ class ScreenGrabberService : Service() {
                     // Если держали CPU wakelock для keepalive во время сна — отпускаем при пробуждении.
                     releaseWakeLock()
                     releaseWifiLock()
+                    
+                    // Сбрасываем блокировку отправки данных для WLED клиента после ошибки EPERM
+                    // Это позволяет возобновить отправку данных при включении экрана
+                    // resetBlocked() сам выполняет все операции в фоновом потоке
+                    mHyperionThread?.resetBlockedIfWLED()
+                    
                     if (mScreenEncoder != null && !isCapturing) {
                         if (DEBUG) Log.v(TAG, "Encoder not grabbing, attempting to resume")
                         mScreenEncoder!!.resumeRecording()
@@ -200,21 +206,25 @@ class ScreenGrabberService : Service() {
         if (!"adalight".equals(mConnectionType, ignoreCase = true)) {
             if (host == null || host == "0.0.0.0" || host == "") {
                 mStartError = resources.getString(R.string.error_empty_host)
+                AnalyticsHelper.logServiceError(baseContext, "empty_host", null)
                 return false
             }
             if (port == -1) {
                 mStartError = resources.getString(R.string.error_empty_port)
+                AnalyticsHelper.logServiceError(baseContext, "empty_port", null)
                 return false
             }
         }
 
         if (mHorizontalLEDCount <= 0 || mVerticalLEDCount <= 0) {
             mStartError = resources.getString(R.string.error_invalid_led_counts)
+            AnalyticsHelper.logServiceError(baseContext, "invalid_led_counts", "horizontal: $mHorizontalLEDCount, vertical: $mVerticalLEDCount")
             return false
         }
         mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         if (mMediaProjectionManager == null) {
             mStartError = resources.getString(R.string.error_media_projection_denied)
+            AnalyticsHelper.logServiceError(baseContext, "media_projection_manager_null", null)
             return false
         }
         val priorityValue = Integer.parseInt(priority)
@@ -260,6 +270,7 @@ class ScreenGrabberService : Service() {
                         } catch (e: SecurityException) {
                             Log.e(TAG, "Failed to start screen recording: " + e.message)
                             mStartError = resources.getString(R.string.error_media_projection_denied)
+                            AnalyticsHelper.logServiceError(baseContext, "security_exception", e.message)
                             haltStartup()
                             return START_STICKY
                         }
@@ -522,6 +533,7 @@ class ScreenGrabberService : Service() {
             if (projection == null) {
                 Log.e(TAG, "MediaProjection is null (resultCode=$resultCode). Permission likely missing/invalid.")
                 mStartError = resources.getString(R.string.error_media_projection_denied)
+                AnalyticsHelper.logServiceError(baseContext, "media_projection_null", "resultCode: $resultCode")
                 haltStartup()
             }
         }

@@ -35,20 +35,32 @@ fun AppNavHost(
             var showHelpDialog by remember { mutableStateOf(false) }
             var showSupportDialog by remember { mutableStateOf(false) }
 
+            // Логируем screen view для главного экрана
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "home", "MainScreen")
+            }
+
             MainScreen(
                 isRunning = isRunning,
                 onToggleClick = onToggleClick,
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onEffectsClick = onEffectsClick,
                 effectMode = effectMode,
-                onHelpClick = { showHelpDialog = true },
-                onSupportClick = { showSupportDialog = true }
+                onHelpClick = { 
+                    showHelpDialog = true
+                    AnalyticsHelper.logHelpDialogOpened(context)
+                },
+                onSupportClick = { 
+                    showSupportDialog = true
+                    AnalyticsHelper.logSupportDialogOpened(context)
+                }
             )
             
             if (showHelpDialog) {
                 HelpDialog(
                     onDismiss = { showHelpDialog = false },
                     onOpenGitHub = {
+                        AnalyticsHelper.logHelpLinkOpened(context)
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/vasmarfas/universal-ambient-light/blob/master/README.md"))
                         context.startActivity(intent)
                         showHelpDialog = false
@@ -60,6 +72,7 @@ fun AppNavHost(
                 SupportDialog(
                     onDismiss = { showSupportDialog = false },
                     onOpenSupport = {
+                        AnalyticsHelper.logSupportLinkOpened(context)
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/vasmarfas/universal-ambient-light/blob/master/SUPPORT.md"))
                         context.startActivity(intent)
                         showSupportDialog = false
@@ -69,6 +82,11 @@ fun AppNavHost(
             
         }
         composable(Screen.Settings.route) {
+            val context = LocalContext.current
+            // Логируем screen view для экрана настроек
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "settings", "SettingsScreen")
+            }
             SettingsScreen(
                 onBackClick = { navController.popBackStack() },
                 onLedLayoutClick = { navController.navigate(Screen.LedLayout.route) }
@@ -77,6 +95,7 @@ fun AppNavHost(
         composable(Screen.LedLayout.route) {
             val context = LocalContext.current
             LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "led_layout", "LedLayoutScreen")
                 AnalyticsHelper.logLedLayoutOpened(context)
             }
             LedLayoutScreen(

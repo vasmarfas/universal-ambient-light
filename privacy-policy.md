@@ -32,7 +32,14 @@ To function correctly, the app requires specific permissions:
 
 ## 3. Third-Party Services
 
-This Service does not use third-party analytics or advertising frameworks (like Google AdMob or Firebase Analytics) that track your behavior.
+### Firebase Analytics and Crashlytics
+This Service uses **Firebase Analytics** and **Firebase Crashlytics** (provided by Google) to:
+*   **Analytics:** Collect anonymous usage statistics (e.g., which features are used, app version, Android version, connection protocol type). This helps us understand how the app is used and improve it.
+*   **Crashlytics:** Automatically collect crash reports and error logs to help us fix bugs and improve stability.
+*   **Data Collected:** We collect anonymous technical data (app version, Android version, device model, connection protocol preferences, feature usage). We do **not** collect personal information, IP addresses, or any data that can identify you personally.
+*   **Privacy:** All data is anonymized and aggregated. You cannot be identified from this data. Firebase Analytics respects your device's advertising ID opt-out settings.
+*   **Opt-out:** You can opt out of analytics by disabling "Share usage & diagnostics" in your device settings (Android Settings > Google > Ads > Reset advertising ID / Opt out of Ads Personalization).
+
 The app is open-source, and its code is available for audit.
 
 ## 4. Children’s Privacy

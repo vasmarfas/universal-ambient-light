@@ -144,6 +144,17 @@ class HyperionThread(
     val receiver: HyperionThreadListener
         get() = mListener
 
+    /**
+     * Сбрасывает блокировку отправки данных для WLED клиента.
+     * Вызывается при включении экрана, чтобы возобновить отправку после ошибки EPERM.
+     */
+    fun resetBlockedIfWLED() {
+        val client = mClient.get()
+        if (client is WLEDClient) {
+            client.resetBlocked()
+        }
+    }
+
     override fun run() {
         connect()
     }

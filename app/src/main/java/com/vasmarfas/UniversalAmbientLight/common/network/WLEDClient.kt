@@ -121,6 +121,8 @@ class WLEDClient(
 
             // Переоткрыть
             connect()
+            // Сбрасываем блокировку после успешного переподключения
+            mBlockedUntilMs.set(0L)
         } catch (e: Exception) {
             // Если сеть реально запрещена (например, во сне) — просто молча ждём следующей попытки
             if (logsEnabled) Log.w(TAG, "Reconnect failed", e)
@@ -129,6 +131,65 @@ class WLEDClient(
 
     override fun isConnected(): Boolean {
         return mConnected && mSocket != null && !mSocket!!.isClosed
+    }
+
+    /**
+     * Сбрасывает блокировку отправки данных после ошибки EPERM.
+     * Вызывается при включении экрана, чтобы возобновить отправку данных.
+     * Также переподключается, если соединение было потеряно, и отправляет последний кадр.
+     * Сбрасывает блокировку СРАЗУ (синхронно), чтобы отправка возобновилась мгновенно.
+     * Сетевые операции выполняются в фоновом потоке, чтобы избежать NetworkOnMainThreadException.
+     */
+    fun resetBlocked() {
+        // Сбрасываем блокировку СРАЗУ (синхронно) - это безопасная операция и позволяет
+        // немедленно возобновить отправку данных без задержки на запуск фонового потока
+        val wasBlocked = mBlockedUntilMs.get() > System.currentTimeMillis()
+        mBlockedUntilMs.set(0L)
+        
+        if (logsEnabled) {
+            Log.d(TAG, "resetBlocked: wasBlocked=$wasBlocked, connection=${isConnected()}, mLastLeds=${mLastLeds != null}")
+        }
+        
+        // Если соединение есть и был последний кадр, сразу пробуем отправить его
+        // Это позволяет возобновить отправку мгновенно, как до коммита 5a42e72
+        if (isConnected() && wasBlocked && mLastLeds != null) {
+            val lastLedsCopy = Array(mLastLeds!!.size) { i -> mLastLeds!![i].clone() }
+            // Отправляем в фоновом потоке, чтобы избежать NetworkOnMainThreadException
+            Thread {
+                try {
+                    if (logsEnabled) Log.d(TAG, "Immediately resending last frame after unblock (${lastLedsCopy.size} LEDs)")
+                    sendLedData(lastLedsCopy)
+                } catch (e: Exception) {
+                    if (logsEnabled) Log.w(TAG, "Error sending frame after unblock", e)
+                }
+            }.start()
+        }
+        
+        // Остальные операции (переподключение и т.д.) выполняем в фоновом потоке
+        val hadConnection = isConnected()
+        val lastLedsCopy = mLastLeds?.let { Array(it.size) { i -> it[i].clone() } }
+        
+        Thread {
+            try {
+                // Если соединение потеряно, пытаемся переподключиться
+                if (!hadConnection) {
+                    if (logsEnabled) Log.d(TAG, "Connection lost, attempting reconnect after screen on")
+                    reconnectIfNeeded()
+                    // После переподключения отправляем последний кадр
+                    if (isConnected() && lastLedsCopy != null) {
+                        if (logsEnabled) Log.d(TAG, "Reconnected successfully, restoring frame")
+                        mSmoothing.setTargetColors(lastLedsCopy)
+                        sendLedData(lastLedsCopy)
+                    }
+                } else if (wasBlocked && lastLedsCopy != null) {
+                    // Если соединение есть, но была блокировка, восстанавливаем в ColorSmoothing
+                    if (logsEnabled) Log.d(TAG, "Restoring last frame in ColorSmoothing after unblock")
+                    mSmoothing.setTargetColors(lastLedsCopy)
+                }
+            } catch (e: Exception) {
+                if (logsEnabled) Log.w(TAG, "Error in resetBlocked background thread", e)
+            }
+        }.start()
     }
 
     @Throws(IOException::class)
@@ -220,11 +281,17 @@ class WLEDClient(
                 // Fallback to UDP Raw
                 sendUdpRaw(leds)
             }
+
+            // ВАЖНО: если отправка прошла успешно, считаем, что устройство "проснулось"
+            // и гарантированно сбрасываем блокировку. Это защищает от редких случаев,
+            // когда ACTION_SCREEN_ON не дошёл, но сеть уже снова доступна.
+            mBlockedUntilMs.set(0L)
         } catch (e: IOException) {
             val msg = e.message ?: ""
             if (msg.contains("EPERM", ignoreCase = true) || msg.contains("Operation not permitted", ignoreCase = true)) {
                 // Блокируем попытки на короткое время (обычно период сна), затем попробуем снова.
-                mBlockedUntilMs.set(System.currentTimeMillis() + 15_000L)
+                // Уменьшено с 15 до 3 секунд для более быстрого возобновления после включения экрана
+                mBlockedUntilMs.set(System.currentTimeMillis() + 3_000L)
             }
 
             // Rate-limit логов, иначе при SCREEN_OFF будет забивать logcat.
@@ -419,7 +486,7 @@ class WLEDClient(
 
     companion object {
         private const val TAG = "WLEDClient"
-        private val logsEnabled = false
+        private val logsEnabled = true // Временно включено для отладки
         private const val DEFAULT_PORT_DDP = 4048
         private const val DEFAULT_PORT_DRGB = 19446
 
