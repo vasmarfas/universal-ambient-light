@@ -40,8 +40,23 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import android.graphics.Bitmap
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -949,3 +964,87 @@ fun SupportDialog(
     )
 }
 
+@Composable
+fun UrlDialog(
+    url: String,
+    onDismiss: () -> Unit,
+    onOpenLink: (() -> Unit)? = null
+) {
+    val qrBitmap = remember(url) { generateQRCode(url, 400) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.url_dialog_title))
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.url_dialog_message),
+                    textAlign = TextAlign.Center
+                )
+                
+                if (qrBitmap != null) {
+                    Image(
+                        bitmap = qrBitmap,
+                        contentDescription = stringResource(R.string.url_dialog_qr_description),
+                        modifier = Modifier.size(250.dp)
+                    )
+                }
+                
+                SelectionContainer {
+                    Text(
+                        text = url,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (onOpenLink != null) {
+                TextButton(onClick = onOpenLink) {
+                    Text(stringResource(R.string.url_dialog_open_link))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.help_close))
+            }
+        }
+    )
+}
+
+private fun generateQRCode(content: String, size: Int): ImageBitmap? {
+    return try {
+        val hints = hashMapOf<EncodeHintType, Any>().apply {
+            put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H)
+            put(EncodeHintType.CHARACTER_SET, "UTF-8")
+            put(EncodeHintType.MARGIN, 1)
+        }
+        
+        val writer = QRCodeWriter()
+        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+        
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.Black.toArgb() else Color.White.toArgb())
+            }
+        }
+        
+        bitmap.asImageBitmap()
+    } catch (e: Exception) {
+        Log.e("UrlDialog", "Failed to generate QR code", e)
+        null
+    }
+}

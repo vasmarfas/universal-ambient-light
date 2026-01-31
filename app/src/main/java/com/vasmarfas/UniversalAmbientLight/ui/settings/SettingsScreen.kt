@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,9 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
@@ -486,7 +489,24 @@ fun EditTextPreference(
     }
 
     if (showDialog) {
-        var tempValue by remember { mutableStateOf(value) }
+        var tempValue by remember(showDialog) { mutableStateOf(value) }
+        val keyboardController = LocalSoftwareKeyboardController.current
+        
+        // Обновляем tempValue при открытии диалога
+        LaunchedEffect(showDialog) {
+            if (showDialog) {
+                tempValue = value
+            }
+        }
+        
+        fun applyValue() {
+            value = tempValue
+            prefs.putString(keyRes, value)
+            onValueChange?.invoke(value)
+            keyboardController?.hide()
+            showDialog = false
+        }
+        
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text(title) },
@@ -494,23 +514,26 @@ fun EditTextPreference(
                 OutlinedTextField(
                     value = tempValue,
                     onValueChange = { tempValue = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = keyboardType,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { applyValue() }
+                    ),
                     singleLine = true
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        value = tempValue
-                        onValueChange?.invoke(value) ?: prefs.putString(keyRes, value)
-                        showDialog = false
-                    }
-                ) {
+                TextButton(onClick = { applyValue() }) {
                     Text("OK")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
+                TextButton(onClick = { 
+                    keyboardController?.hide()
+                    showDialog = false 
+                }) {
                     Text("Cancel")
                 }
             }

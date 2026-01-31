@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -27,8 +28,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -512,13 +515,21 @@ private fun LedLayoutSettingsContent(
     direction: String,
     onShowDialog: () -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    
     // LED count inputs per side
     OutlinedTextField(
         value = topLedText,
         onValueChange = onTopLedTextChange,
         label = { Text(stringResource(R.string.led_layout_top_count_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         isError = topLedText.isNotEmpty() && topLedText.toIntOrNull() == null
     )
 
@@ -529,7 +540,13 @@ private fun LedLayoutSettingsContent(
         onValueChange = onRightLedTextChange,
         label = { Text(stringResource(R.string.led_layout_right_count_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         isError = rightLedText.isNotEmpty() && rightLedText.toIntOrNull() == null
     )
 
@@ -540,7 +557,13 @@ private fun LedLayoutSettingsContent(
         onValueChange = onBottomLedTextChange,
         label = { Text(stringResource(R.string.led_layout_bottom_count_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         isError = bottomLedText.isNotEmpty() && bottomLedText.toIntOrNull() == null
     )
 
@@ -551,7 +574,13 @@ private fun LedLayoutSettingsContent(
         onValueChange = onLeftLedTextChange,
         label = { Text(stringResource(R.string.led_layout_left_count_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
     )
 
@@ -604,7 +633,13 @@ private fun LedLayoutSettingsContent(
         onValueChange = onBottomGapTextChange,
         label = { Text(stringResource(R.string.led_layout_bottom_gap_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         isError = bottomGapText.isNotEmpty() && bottomGapText.toIntOrNull() == null
     )
 
@@ -616,7 +651,13 @@ private fun LedLayoutSettingsContent(
         onValueChange = onCaptureMarginTextChange,
         label = { Text(stringResource(R.string.led_layout_capture_margin_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         supportingText = {
             Text(
                 text = stringResource(R.string.led_layout_capture_margin_help),
@@ -634,7 +675,13 @@ private fun LedLayoutSettingsContent(
         onValueChange = onLedOffsetTextChange,
         label = { Text(stringResource(R.string.led_layout_offset_label)) },
         modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
         supportingText = {
             Text(
                 text = stringResource(R.string.led_layout_offset_help),

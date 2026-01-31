@@ -2,8 +2,8 @@
 agp = "8.13.2"
 appUpdateKtx = "2.1.0"
 firebaseBom = "34.8.0"
-firebaseCrashlyticsPlugin = "3.0.2"
-firebasePerfPlugin = "1.4.2"
+firebaseCrashlyticsPlugin = "3.0.6"
+firebasePerfPlugin = "2.0.2"
 kotlin = "2.3.0"
 coreKtx = "1.17.0"
 appcompat = "1.7.1"
@@ -14,13 +14,14 @@ flatbuffers = "25.2.10"
 usbSerial = "3.7.0"
 leanback = "1.2.0"
 konfetti = "2.0.5"
-composeBom = "2024.01.00"
+composeBom = "2026.01.01"
 materialIconsExtended = "1.7.8"
 tvFoundation = "1.0.0-alpha12"
 tvMaterial = "1.0.1"
-activityCompose = "1.12.2"
-lifecycleViewModelCompose = "2.7.0"
-navigationCompose = "2.9.6"
+activityCompose = "1.12.3"
+lifecycleViewModelCompose = "2.10.0"
+navigationCompose = "2.9.7"
+zxing = "3.5.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,6 +52,7 @@ androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.re
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewModelCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

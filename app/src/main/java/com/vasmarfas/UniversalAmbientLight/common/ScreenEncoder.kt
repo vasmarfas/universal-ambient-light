@@ -68,7 +68,11 @@ class ScreenEncoder(
 
         override fun onResumed() {
             if (DEBUG) Log.d(TAG, "Display resumed")
-            if (!mRunning) startCapture()
+            if (!mRunning && mCaptureHandler != null) {
+                startCapture()
+            } else if (mCaptureHandler == null) {
+                Log.w(TAG, "Cannot resume capture: mCaptureHandler is null")
+            }
         }
 
         override fun onStopped() {
@@ -123,7 +127,13 @@ class ScreenEncoder(
     private fun init() {
         mCaptureThread = HandlerThread(TAG, android.os.Process.THREAD_PRIORITY_BACKGROUND)
         mCaptureThread!!.start()
-        mCaptureHandler = Handler(mCaptureThread!!.looper)
+        // Ждем, пока looper будет готов
+        val looper = mCaptureThread!!.looper
+        if (looper == null) {
+            Log.e(TAG, "Failed to get looper from capture thread")
+            throw IllegalStateException("Capture thread looper is null")
+        }
+        mCaptureHandler = Handler(looper)
 
         mImageReader = ImageReader.newInstance(
             mCaptureWidth, mCaptureHeight,
@@ -154,6 +164,10 @@ class ScreenEncoder(
     }
 
     private fun startCapture() {
+        if (mCaptureHandler == null) {
+            Log.e(TAG, "Cannot start capture: mCaptureHandler is null")
+            return
+        }
         mRunning = true
         setCapturing(true)
         mFrameCount = 0
@@ -397,8 +411,10 @@ class ScreenEncoder(
 
     override fun resumeRecording() {
         if (DEBUG) Log.i(TAG, "Resuming")
-        if (!isCapturing() && mImageReader != null) {
+        if (!isCapturing() && mImageReader != null && mCaptureHandler != null) {
             startCapture()
+        } else if (mCaptureHandler == null) {
+            Log.w(TAG, "Cannot resume recording: mCaptureHandler is null")
         }
     }
 

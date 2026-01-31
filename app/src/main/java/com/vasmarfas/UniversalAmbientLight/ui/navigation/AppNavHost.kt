@@ -12,13 +12,20 @@ import com.vasmarfas.UniversalAmbientLight.EffectMode
 import com.vasmarfas.UniversalAmbientLight.MainScreen
 import com.vasmarfas.UniversalAmbientLight.HelpDialog
 import com.vasmarfas.UniversalAmbientLight.SupportDialog
+import com.vasmarfas.UniversalAmbientLight.UrlDialog
 import com.vasmarfas.UniversalAmbientLight.ui.led.LedLayoutScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.content.pm.PackageManager
+import android.content.ActivityNotFoundException
+import android.content.res.Configuration
+import android.app.UiModeManager
+import com.vasmarfas.UniversalAmbientLight.R
 
 @Composable
 fun AppNavHost(
@@ -34,6 +41,14 @@ fun AppNavHost(
             val context = LocalContext.current
             var showHelpDialog by remember { mutableStateOf(false) }
             var showSupportDialog by remember { mutableStateOf(false) }
+            var showUrlDialog by remember { mutableStateOf<String?>(null) }
+            
+            // Проверяем, является ли устройство TV
+            val isTv = remember {
+                val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+                uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+                context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+            }
 
             // Логируем screen view для главного экрана
             LaunchedEffect(Unit) {
@@ -61,9 +76,25 @@ fun AppNavHost(
                     onDismiss = { showHelpDialog = false },
                     onOpenGitHub = {
                         AnalyticsHelper.logHelpLinkOpened(context)
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/vasmarfas/universal-ambient-light/blob/master/README.md"))
-                        context.startActivity(intent)
+                        val url = context.getString(R.string.help_readme_url)
                         showHelpDialog = false
+                        
+                        if (isTv) {
+                            // На TV сразу показываем диалог с QR-кодом
+                            showUrlDialog = url
+                        } else {
+                            // На обычном устройстве пытаемся открыть ссылку
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                // Показываем наш диалог с QR-кодом
+                                showUrlDialog = url
+                            } catch (e: Exception) {
+                                // На всякий случай перехватываем все исключения
+                                showUrlDialog = url
+                            }
+                        }
                     }
                 )
             }
@@ -73,9 +104,46 @@ fun AppNavHost(
                     onDismiss = { showSupportDialog = false },
                     onOpenSupport = {
                         AnalyticsHelper.logSupportLinkOpened(context)
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/vasmarfas/universal-ambient-light/blob/master/SUPPORT.md"))
-                        context.startActivity(intent)
+                        val url = context.getString(R.string.support_url)
                         showSupportDialog = false
+                        
+                        if (isTv) {
+                            // На TV сразу показываем диалог с QR-кодом
+                            showUrlDialog = url
+                        } else {
+                            // На обычном устройстве пытаемся открыть ссылку
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                // Показываем наш диалог с QR-кодом
+                                showUrlDialog = url
+                            } catch (e: Exception) {
+                                // На всякий случай перехватываем все исключения
+                                showUrlDialog = url
+                            }
+                        }
+                    }
+                )
+            }
+            
+            // Показываем UrlDialog только если предыдущие диалоги закрыты
+            val urlToShow = showUrlDialog
+            if (urlToShow != null && !showHelpDialog && !showSupportDialog) {
+                UrlDialog(
+                    url = urlToShow,
+                    onDismiss = { 
+                        showUrlDialog = null
+                    },
+                    onOpenLink = {
+                        // Пытаемся открыть ссылку при нажатии на кнопку
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlToShow))
+                        try {
+                            context.startActivity(intent)
+                            showUrlDialog = null
+                        } catch (e: Exception) {
+                            // Оставляем диалог открытым, если не удалось открыть
+                        }
                     }
                 )
             }
