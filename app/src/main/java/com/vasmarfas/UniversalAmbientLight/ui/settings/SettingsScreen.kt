@@ -57,6 +57,9 @@ fun SettingsScreen(
     var smoothingPreset by remember {
         mutableStateOf(prefs.getString(R.string.pref_key_smoothing_preset) ?: "balanced")
     }
+    
+    // State for device scan dialog
+    var showScanDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -78,65 +81,81 @@ fun SettingsScreen(
             // Connection Group
             SettingsGroup(title = stringResource(R.string.pref_group_connection)) {
                 
-                ListPreference(
-                    prefs = prefs,
-                    keyRes = R.string.pref_key_connection_type,
-                    title = stringResource(R.string.pref_title_connection_type),
-                    entriesRes = R.array.pref_list_connection_type,
-                    entryValuesRes = R.array.pref_list_connection_type_values,
-                    onValueChange = { newType ->
-                        val oldType = connectionType
-                        connectionType = newType
-                        // Логируем изменение протокола
-                        AnalyticsHelper.logProtocolChanged(context, oldType, newType)
-                        AnalyticsHelper.logSettingChanged(context, "connection_type", newType)
-                        AnalyticsHelper.updateProtocolProperty(context, newType)
-                        // Auto-set port when connection type changes
-                        val defaultPort = when (newType) {
-                            "hyperion" -> "19400"
-                            "wled" -> if (wledProtocol == "ddp") "4048" else "19446"
-                            else -> null
+                // Используем key для принудительного обновления при изменении connectionType
+                key(connectionType) {
+                    ListPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_connection_type,
+                        title = stringResource(R.string.pref_title_connection_type),
+                        entriesRes = R.array.pref_list_connection_type,
+                        entryValuesRes = R.array.pref_list_connection_type_values,
+                        recomposeKey = connectionType,
+                        onValueChange = { newType ->
+                            val oldType = connectionType
+                            connectionType = newType
+                            // Логируем изменение протокола
+                            AnalyticsHelper.logProtocolChanged(context, oldType, newType)
+                            AnalyticsHelper.logSettingChanged(context, "connection_type", newType)
+                            AnalyticsHelper.updateProtocolProperty(context, newType)
+                            // Auto-set port when connection type changes
+                            val defaultPort = when (newType) {
+                                "hyperion" -> "19400"
+                                "wled" -> if (wledProtocol == "ddp") "4048" else "19446"
+                                else -> null
+                            }
+                            if (defaultPort != null) {
+                                prefs.putString(R.string.pref_key_port, defaultPort)
+                            }
                         }
-                        if (defaultPort != null) {
-                            prefs.putString(R.string.pref_key_port, defaultPort)
-                        }
-                    }
-                )
+                    )
+                }
 
                 val isNetwork = connectionType == "hyperion" || connectionType == "wled"
                 val isAdalight = connectionType == "adalight"
                 val isWled = connectionType == "wled"
                 val isHyperion = connectionType == "hyperion"
 
+                // Кнопка сканирования устройств (только для сетевых подключений)
                 if (isNetwork) {
-                    EditTextPreference(
-                        prefs = prefs,
-                        keyRes = R.string.pref_key_host,
-                        title = stringResource(R.string.pref_title_host),
-                        summaryProvider = { it },
-                        onValueChange = { newHost ->
-                            AnalyticsHelper.logHostChanged(context, newHost)
-                            AnalyticsHelper.logSettingChanged(context, "host", newHost)
-                        }
+                    ClickablePreference(
+                        title = stringResource(R.string.scanner_scan_devices),
+                        summary = stringResource(R.string.scanner_description),
+                        onClick = { showScanDialog = true }
                     )
+                    
+                    // Используем key для принудительного обновления при изменении connectionType
+                    key(connectionType) {
+                        EditTextPreference(
+                            prefs = prefs,
+                            keyRes = R.string.pref_key_host,
+                            title = stringResource(R.string.pref_title_host),
+                            summaryProvider = { it },
+                            onValueChange = { newHost ->
+                                AnalyticsHelper.logHostChanged(context, newHost)
+                                AnalyticsHelper.logSettingChanged(context, "host", newHost)
+                            }
+                        )
+                    }
 
                     // Show WLED protocol selector between host and port for WLED connections
                     if (isWled) {
-                        ListPreference(
-                            prefs = prefs,
-                            keyRes = R.string.pref_key_wled_protocol,
-                            title = stringResource(R.string.pref_title_wled_protocol),
-                            entriesRes = R.array.pref_list_wled_protocol,
-                            entryValuesRes = R.array.pref_list_wled_protocol_values,
-                            onValueChange = { newProtocol ->
-                                val oldProtocol = wledProtocol
-                                wledProtocol = newProtocol
-                                AnalyticsHelper.logSettingChanged(context, "wled_protocol", newProtocol)
-                                // Auto-set port when WLED protocol changes
-                                val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
-                                prefs.putString(R.string.pref_key_port, defaultPort)
-                            }
-                        )
+                        key(wledProtocol) {
+                            ListPreference(
+                                prefs = prefs,
+                                keyRes = R.string.pref_key_wled_protocol,
+                                title = stringResource(R.string.pref_title_wled_protocol),
+                                entriesRes = R.array.pref_list_wled_protocol,
+                                entryValuesRes = R.array.pref_list_wled_protocol_values,
+                                onValueChange = { newProtocol ->
+                                    val oldProtocol = wledProtocol
+                                    wledProtocol = newProtocol
+                                    AnalyticsHelper.logSettingChanged(context, "wled_protocol", newProtocol)
+                                    // Auto-set port when WLED protocol changes
+                                    val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
+                                    prefs.putString(R.string.pref_key_port, defaultPort)
+                                }
+                            )
+                        }
                     }
 
                     // Use key to force recomposition when connection type or WLED protocol changes
@@ -396,6 +415,54 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+    
+    // Device scan dialog (вне основного Column для правильной работы)
+    if (showScanDialog) {
+        DeviceScanDialog(
+            onDismiss = { showScanDialog = false },
+                            onDeviceSelected = { device ->
+                                val oldConnectionType = connectionType
+                                
+                                // Устанавливаем тип подключения ПЕРВЫМ, чтобы UI обновился
+                                when (device.type) {
+                                    com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.WLED -> {
+                                        val newConnectionType = "wled"
+                                        prefs.putString(R.string.pref_key_connection_type, newConnectionType)
+                                        connectionType = newConnectionType
+                                        
+                                        // Устанавливаем протокол WLED
+                                        val protocol = when (device.protocol) {
+                                            "ddp" -> "ddp"
+                                            "udp_raw" -> "udp_raw"
+                                            else -> "ddp"
+                                        }
+                                        wledProtocol = protocol
+                                        prefs.putString(R.string.pref_key_wled_protocol, protocol)
+                                        
+                                        AnalyticsHelper.logProtocolChanged(context, oldConnectionType, newConnectionType)
+                                        AnalyticsHelper.updateProtocolProperty(context, newConnectionType)
+                                    }
+                                    com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.HYPERION -> {
+                                        val newConnectionType = "hyperion"
+                                        prefs.putString(R.string.pref_key_connection_type, newConnectionType)
+                                        connectionType = newConnectionType
+                                        
+                                        AnalyticsHelper.logProtocolChanged(context, oldConnectionType, newConnectionType)
+                                        AnalyticsHelper.updateProtocolProperty(context, newConnectionType)
+                                    }
+                                    else -> {}
+                                }
+                                
+                                // Устанавливаем найденное устройство ПОСЛЕ установки типа подключения
+                                prefs.putString(R.string.pref_key_host, device.host)
+                                prefs.putString(R.string.pref_key_port, device.port.toString())
+                                
+                                AnalyticsHelper.logHostChanged(context, device.host)
+                                AnalyticsHelper.logPortChanged(context, device.port)
+                                AnalyticsHelper.logSettingChanged(context, "device_scanned", "${device.type}:${device.host}:${device.port}")
+                            }
+        )
     }
 }
 

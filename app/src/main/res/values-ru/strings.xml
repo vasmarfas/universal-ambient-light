@@ -15,13 +15,23 @@
   <string name="notification_exit_button">Выход</string>
   <!-- Network scanner -->
   <string name="scanner_title">Привет!</string>
-  <string name="scanner_description">Universal Ambient Light может просканировать вашу сеть для поиска серверов, чтобы вам не пришлось вводить IP-адрес вручную.</string>
+  <string name="scanner_description">Автоматически найти WLED и Hyperion устройства в сети</string>
   <string name="scanner_start_scan_button">Начать сканирование</string>
   <string name="scanner_scan_in_progress_text">Сканирование локальной сети на наличие серверов Hyperion %s</string>
   <string name="scanner_scan_in_progress_button">Сканирование…</string>
   <string name="scanner_no_results">Ничего не найдено %s</string>
   <string name="scanner_retry_button">Повторить</string>
   <string name="scanner_manual_setup_button">Ручная настройка</string>
+  <string name="scanner_scan_devices">Сканировать устройства</string>
+  <string name="scanner_scanning">Сканирование сети…</string>
+  <string name="scanner_found_devices">Найденные устройства:</string>
+  <string name="scanner_no_devices_found">Устройства не найдены</string>
+  <string name="scanner_device_wled">WLED</string>
+  <string name="scanner_device_hyperion">Hyperion</string>
+  <string name="scanner_device_unknown">Неизвестно</string>
+  <string name="scanner_select_device">Выбрать устройство</string>
+  <string name="scanner_device_info">%1$s на %2$s:%3$d</string>
+  <string name="scanner_cancel">Отмена</string>
   <!-- Network Scanner result -->
   <string name="scan_result_title">И победитель…</string>
   <string name="scan_result_description">В честь этого мы включили фиолетовую подсветку %s</string>
