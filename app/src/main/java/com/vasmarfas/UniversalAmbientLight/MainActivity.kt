@@ -16,7 +16,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
+import android.view.WindowManager
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -126,7 +127,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        
+        // Включаем режим Edge-to-Edge вручную, чтобы избежать использования
+        // устаревшего параметра LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES,
+        // на который ругается Google Play в Android 15.
+        // Для Android 15 (API 35+) по умолчанию требуется LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS.
+        // Этот режим доступен с Android 11 (API 30).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // Для Android 9 и 10 используем SHORT_EDGES
+            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
 
         // Логируем запуск приложения
         AnalyticsHelper.logAppLaunched(this)
