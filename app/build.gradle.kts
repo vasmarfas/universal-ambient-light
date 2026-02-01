@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.firebase.perf)
 }
 
-val defaultVersionName = "1.0.3"
+val defaultVersionName = "1.0.4"
 
 val appVersionName: String = System.getenv("APP_VERSION_NAME") ?: defaultVersionName
 
@@ -120,6 +120,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.app.update)
     implementation(libs.app.update.ktx)
+    implementation(libs.play.review)
+    implementation(libs.play.review.ktx)
     implementation(libs.zxing.core)
 
     implementation(platform(libs.firebase.bom))

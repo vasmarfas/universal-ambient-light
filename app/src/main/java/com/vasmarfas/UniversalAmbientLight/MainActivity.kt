@@ -74,6 +74,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import kotlin.math.sqrt
@@ -401,6 +402,9 @@ class MainActivity : ComponentActivity() {
                 startScreenRecorder(resultCode, (data.clone() as Intent))
                 mRecorderRunning = true
                 mSessionStartTime = System.currentTimeMillis()
+                
+                // Предлагаем оценить приложение после успешного запуска подсветки
+                ReviewHelper.onLightingStarted(this)
             }
         }
         if (requestCode == REQUEST_OVERLAY_PERMISSION) {
