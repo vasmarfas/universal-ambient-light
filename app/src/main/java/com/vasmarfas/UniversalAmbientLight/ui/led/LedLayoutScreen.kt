@@ -77,7 +77,50 @@ fun LedLayoutScreen(
         )
     }
     var bottomGapText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_bottom_gap, 0).toString()) }
-    var captureMarginText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_capture_margin, 0).toString()) }
+    // Читаем отступы с обратной совместимостью:
+    // 1. Старый общий ключ (применяется ко всем сторонам)
+    // 2. Горизонтальный/вертикальный (top/bottom = vertical, left/right = horizontal)
+    // 3. Новые раздельные ключи для каждой стороны
+    val legacyMargin = prefs.getInt(R.string.pref_key_capture_margin, -1)
+    val marginH = prefs.getInt(R.string.pref_key_capture_margin_horizontal, -1)
+    val marginV = prefs.getInt(R.string.pref_key_capture_margin_vertical, -1)
+    
+    var captureMarginTopText by remember {
+        mutableStateOf(
+            when {
+                legacyMargin >= 0 -> legacyMargin.toString()
+                marginV >= 0 -> marginV.toString()
+                else -> prefs.getInt(R.string.pref_key_capture_margin_top, 0).toString()
+            }
+        )
+    }
+    var captureMarginRightText by remember {
+        mutableStateOf(
+            when {
+                legacyMargin >= 0 -> legacyMargin.toString()
+                marginH >= 0 -> marginH.toString()
+                else -> prefs.getInt(R.string.pref_key_capture_margin_right, 0).toString()
+            }
+        )
+    }
+    var captureMarginBottomText by remember {
+        mutableStateOf(
+            when {
+                legacyMargin >= 0 -> legacyMargin.toString()
+                marginV >= 0 -> marginV.toString()
+                else -> prefs.getInt(R.string.pref_key_capture_margin_bottom, 0).toString()
+            }
+        )
+    }
+    var captureMarginLeftText by remember {
+        mutableStateOf(
+            when {
+                legacyMargin >= 0 -> legacyMargin.toString()
+                marginH >= 0 -> marginH.toString()
+                else -> prefs.getInt(R.string.pref_key_capture_margin_left, 0).toString()
+            }
+        )
+    }
     var ledOffsetText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_led_offset, 0).toString()) }
     
     val topLed = topLedText.toIntOrNull() ?: 0
@@ -85,11 +128,14 @@ fun LedLayoutScreen(
     val bottomLed = bottomLedText.toIntOrNull() ?: 0
     val leftLed = leftLedText.toIntOrNull() ?: 0
     val bottomGap = bottomGapText.toIntOrNull() ?: 0
-    val captureMargin = captureMarginText.toIntOrNull() ?: 0
+    val captureMarginTop = captureMarginTopText.toIntOrNull() ?: 0
+    val captureMarginRight = captureMarginRightText.toIntOrNull() ?: 0
+    val captureMarginBottom = captureMarginBottomText.toIntOrNull() ?: 0
+    val captureMarginLeft = captureMarginLeftText.toIntOrNull() ?: 0
     val ledOffset = ledOffsetText.toIntOrNull() ?: 0
     
     var startCorner by remember { 
-        mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "top_left") ?: "top_left") 
+        mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left") 
     }
     var direction by remember { 
         mutableStateOf(prefs.getString(R.string.pref_key_led_direction, "clockwise") ?: "clockwise") 
@@ -99,8 +145,6 @@ fun LedLayoutScreen(
     var sideRight by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_right, "enabled") ?: "enabled") }
     var sideBottom by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_bottom, "enabled") ?: "enabled") }
     var sideLeft by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_left, "enabled") ?: "enabled") }
-    
-    var showEditDialog by remember { mutableStateOf(false) }
 
     val isPortrait = configuration.screenHeightDp > configuration.screenWidthDp
 
@@ -188,7 +232,10 @@ fun LedLayoutScreen(
                         sideBottom = sideBottom,
                         sideLeft = sideLeft,
                         bottomGap = bottomGap,
-                        captureMarginPercent = captureMargin.coerceIn(0, 40),
+                        captureMarginTop = captureMarginTop.coerceIn(0, 40),
+                        captureMarginRight = captureMarginRight.coerceIn(0, 40),
+                        captureMarginBottom = captureMarginBottom.coerceIn(0, 40),
+                        captureMarginLeft = captureMarginLeft.coerceIn(0, 40),
                         ledOffset = ledOffset,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -250,12 +297,36 @@ fun LedLayoutScreen(
                                 }
                             }
                         },
-                        captureMarginText = captureMarginText,
-                        onCaptureMarginTextChange = { newText ->
-                            captureMarginText = newText
+                        captureMarginTopText = captureMarginTopText,
+                        onCaptureMarginTopTextChange = { newText ->
+                            captureMarginTopText = newText
                             newText.toIntOrNull()?.let { value ->
                                 val clamped = value.coerceIn(0, 40)
-                                prefs.putInt(R.string.pref_key_capture_margin, clamped)
+                                prefs.putInt(R.string.pref_key_capture_margin_top, clamped)
+                            }
+                        },
+                        captureMarginRightText = captureMarginRightText,
+                        onCaptureMarginRightTextChange = { newText ->
+                            captureMarginRightText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin_right, clamped)
+                            }
+                        },
+                        captureMarginBottomText = captureMarginBottomText,
+                        onCaptureMarginBottomTextChange = { newText ->
+                            captureMarginBottomText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin_bottom, clamped)
+                            }
+                        },
+                        captureMarginLeftText = captureMarginLeftText,
+                        onCaptureMarginLeftTextChange = { newText ->
+                            captureMarginLeftText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin_left, clamped)
                             }
                         },
                         ledOffsetText = ledOffsetText,
@@ -290,8 +361,15 @@ fun LedLayoutScreen(
                             sendClearOnce(context)
                         },
                         startCorner = startCorner,
+                        onStartCornerChange = { newCorner ->
+                            startCorner = newCorner
+                            prefs.putString(R.string.pref_key_led_start_corner, newCorner)
+                        },
                         direction = direction,
-                        onShowDialog = { showEditDialog = true }
+                        onDirectionChange = { newDir ->
+                            direction = newDir
+                            prefs.putString(R.string.pref_key_led_direction, newDir)
+                        }
                     )
                 }
             }
@@ -357,7 +435,10 @@ fun LedLayoutScreen(
                         sideBottom = sideBottom,
                         sideLeft = sideLeft,
                         bottomGap = bottomGap,
-                        captureMarginPercent = captureMargin.coerceIn(0, 40),
+                        captureMarginTop = captureMarginTop.coerceIn(0, 40),
+                        captureMarginRight = captureMarginRight.coerceIn(0, 40),
+                        captureMarginBottom = captureMarginBottom.coerceIn(0, 40),
+                        captureMarginLeft = captureMarginLeft.coerceIn(0, 40),
                         ledOffset = ledOffset,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -421,12 +502,36 @@ fun LedLayoutScreen(
                                 }
                             }
                         },
-                        captureMarginText = captureMarginText,
-                        onCaptureMarginTextChange = { newText ->
-                            captureMarginText = newText
+                        captureMarginTopText = captureMarginTopText,
+                        onCaptureMarginTopTextChange = { newText ->
+                            captureMarginTopText = newText
                             newText.toIntOrNull()?.let { value ->
                                 val clamped = value.coerceIn(0, 40)
-                                prefs.putInt(R.string.pref_key_capture_margin, clamped)
+                                prefs.putInt(R.string.pref_key_capture_margin_top, clamped)
+                            }
+                        },
+                        captureMarginRightText = captureMarginRightText,
+                        onCaptureMarginRightTextChange = { newText ->
+                            captureMarginRightText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin_right, clamped)
+                            }
+                        },
+                        captureMarginBottomText = captureMarginBottomText,
+                        onCaptureMarginBottomTextChange = { newText ->
+                            captureMarginBottomText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin_bottom, clamped)
+                            }
+                        },
+                        captureMarginLeftText = captureMarginLeftText,
+                        onCaptureMarginLeftTextChange = { newText ->
+                            captureMarginLeftText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(0, 40)
+                                prefs.putInt(R.string.pref_key_capture_margin_left, clamped)
                             }
                         },
                         ledOffsetText = ledOffsetText,
@@ -461,29 +566,19 @@ fun LedLayoutScreen(
                             sendClearOnce(context)
                         },
                         startCorner = startCorner,
+                        onStartCornerChange = { newCorner ->
+                            startCorner = newCorner
+                            prefs.putString(R.string.pref_key_led_start_corner, newCorner)
+                        },
                         direction = direction,
-                        onShowDialog = { showEditDialog = true }
+                        onDirectionChange = { newDir ->
+                            direction = newDir
+                            prefs.putString(R.string.pref_key_led_direction, newDir)
+                        }
                     )
                 }
             }
         }
-    }
-    
-    if (showEditDialog) {
-        EditLayoutDialog(
-            startCorner = startCorner,
-            direction = direction,
-            onDismiss = { showEditDialog = false },
-            onSave = { newCorner, newDir ->
-                startCorner = newCorner
-                direction = newDir
-
-                prefs.putString(R.string.pref_key_led_start_corner, newCorner)
-                prefs.putString(R.string.pref_key_led_direction, newDir)
-                
-                showEditDialog = false
-            }
-        )
     }
 }
 
@@ -499,8 +594,14 @@ private fun LedLayoutSettingsContent(
     onLeftLedTextChange: (String) -> Unit,
     bottomGapText: String,
     onBottomGapTextChange: (String) -> Unit,
-    captureMarginText: String,
-    onCaptureMarginTextChange: (String) -> Unit,
+    captureMarginTopText: String,
+    onCaptureMarginTopTextChange: (String) -> Unit,
+    captureMarginRightText: String,
+    onCaptureMarginRightTextChange: (String) -> Unit,
+    captureMarginBottomText: String,
+    onCaptureMarginBottomTextChange: (String) -> Unit,
+    captureMarginLeftText: String,
+    onCaptureMarginLeftTextChange: (String) -> Unit,
     ledOffsetText: String,
     onLedOffsetTextChange: (String) -> Unit,
     sideTop: String,
@@ -512,12 +613,30 @@ private fun LedLayoutSettingsContent(
     sideLeft: String,
     onSideLeftChange: (String) -> Unit,
     startCorner: String,
+    onStartCornerChange: (String) -> Unit,
     direction: String,
-    onShowDialog: () -> Unit
+    onDirectionChange: (String) -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     
-    // LED count inputs per side
+    // LED count inputs per side (order: left, top, right, bottom)
+    OutlinedTextField(
+        value = leftLedText,
+        onValueChange = onLeftLedTextChange,
+        label = { Text(stringResource(R.string.led_layout_left_count_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
+        isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
     OutlinedTextField(
         value = topLedText,
         onValueChange = onTopLedTextChange,
@@ -567,23 +686,6 @@ private fun LedLayoutSettingsContent(
         isError = bottomLedText.isNotEmpty() && bottomLedText.toIntOrNull() == null
     )
 
-    Spacer(modifier = Modifier.height(12.dp))
-
-    OutlinedTextField(
-        value = leftLedText,
-        onValueChange = onLeftLedTextChange,
-        label = { Text(stringResource(R.string.led_layout_left_count_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
-    )
-
     Spacer(modifier = Modifier.height(24.dp))
 
     // LED sides configuration
@@ -594,6 +696,15 @@ private fun LedLayoutSettingsContent(
     )
 
     Spacer(modifier = Modifier.height(12.dp))
+
+    // Order: left, top, right, bottom
+    SideSelectorCard(
+        title = stringResource(R.string.led_layout_side_left),
+        selectedMode = sideLeft,
+        onModeSelected = onSideLeftChange
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
 
     SideSelectorCard(
         title = stringResource(R.string.led_layout_side_top),
@@ -617,14 +728,6 @@ private fun LedLayoutSettingsContent(
         onModeSelected = onSideBottomChange
     )
 
-    Spacer(modifier = Modifier.height(8.dp))
-
-    SideSelectorCard(
-        title = stringResource(R.string.led_layout_side_left),
-        selectedMode = sideLeft,
-        onModeSelected = onSideLeftChange
-    )
-
     Spacer(modifier = Modifier.height(16.dp))
 
     // Bottom gap
@@ -645,11 +748,20 @@ private fun LedLayoutSettingsContent(
 
     Spacer(modifier = Modifier.height(16.dp))
 
-    // Capture margin
+    // Capture margins - separate for each side (order: left, top, right, bottom)
+    Text(
+        text = stringResource(R.string.led_layout_capture_margin_label),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Capture margin - left
     OutlinedTextField(
-        value = captureMarginText,
-        onValueChange = onCaptureMarginTextChange,
-        label = { Text(stringResource(R.string.led_layout_capture_margin_label)) },
+        value = captureMarginLeftText,
+        onValueChange = onCaptureMarginLeftTextChange,
+        label = { Text(stringResource(R.string.led_layout_capture_margin_left_label)) },
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
@@ -660,11 +772,83 @@ private fun LedLayoutSettingsContent(
         ),
         supportingText = {
             Text(
-                text = stringResource(R.string.led_layout_capture_margin_help),
+                text = stringResource(R.string.led_layout_capture_margin_left_help),
                 fontSize = 12.sp
             )
         },
-        isError = captureMarginText.isNotEmpty() && captureMarginText.toIntOrNull() == null
+        isError = captureMarginLeftText.isNotEmpty() && captureMarginLeftText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Capture margin - top
+    OutlinedTextField(
+        value = captureMarginTopText,
+        onValueChange = onCaptureMarginTopTextChange,
+        label = { Text(stringResource(R.string.led_layout_capture_margin_top_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
+        supportingText = {
+            Text(
+                text = stringResource(R.string.led_layout_capture_margin_top_help),
+                fontSize = 12.sp
+            )
+        },
+        isError = captureMarginTopText.isNotEmpty() && captureMarginTopText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Capture margin - right
+    OutlinedTextField(
+        value = captureMarginRightText,
+        onValueChange = onCaptureMarginRightTextChange,
+        label = { Text(stringResource(R.string.led_layout_capture_margin_right_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
+        supportingText = {
+            Text(
+                text = stringResource(R.string.led_layout_capture_margin_right_help),
+                fontSize = 12.sp
+            )
+        },
+        isError = captureMarginRightText.isNotEmpty() && captureMarginRightText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Capture margin - bottom
+    OutlinedTextField(
+        value = captureMarginBottomText,
+        onValueChange = onCaptureMarginBottomTextChange,
+        label = { Text(stringResource(R.string.led_layout_capture_margin_bottom_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
+        supportingText = {
+            Text(
+                text = stringResource(R.string.led_layout_capture_margin_bottom_help),
+                fontSize = 12.sp
+            )
+        },
+        isError = captureMarginBottomText.isNotEmpty() && captureMarginBottomText.toIntOrNull() == null
     )
 
     Spacer(modifier = Modifier.height(16.dp))
@@ -693,20 +877,53 @@ private fun LedLayoutSettingsContent(
 
     Spacer(modifier = Modifier.height(24.dp))
 
-    // Settings cards
-    SettingCard(
-        title = stringResource(R.string.pref_title_led_start_corner),
-        value = getCornerName(startCorner),
-        onClick = onShowDialog
+    // Start corner selection
+    Text(
+        text = stringResource(R.string.pref_title_led_start_corner),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    SettingCard(
-        title = stringResource(R.string.pref_title_led_direction),
-        value = getDirectionName(direction),
-        onClick = onShowDialog
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        listOf("bottom_left", "top_left", "top_right", "bottom_right").forEach { corner ->
+            FilterChip(
+                selected = startCorner == corner,
+                onClick = { onStartCornerChange(corner) },
+                label = { Text(getCornerName(corner), fontSize = 12.sp) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // Direction selection
+    Text(
+        text = stringResource(R.string.pref_title_led_direction),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
     )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        listOf("clockwise", "counterclockwise").forEach { dir ->
+            FilterChip(
+                selected = direction == dir,
+                onClick = { onDirectionChange(dir) },
+                label = { Text(getDirectionName(dir), fontSize = 12.sp) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
 
     Spacer(modifier = Modifier.height(24.dp))
 
@@ -743,14 +960,6 @@ private fun LedLayoutSettingsContent(
         }
     }
 
-    Spacer(modifier = Modifier.height(16.dp))
-
-    Button(
-        onClick = onShowDialog,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(stringResource(R.string.led_layout_change_button))
-    }
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -812,7 +1021,10 @@ fun LedVisualization(
     sideBottom: String,
     sideLeft: String,
     bottomGap: Int,
-    captureMarginPercent: Int,
+    captureMarginTop: Int,
+    captureMarginRight: Int,
+    captureMarginBottom: Int,
+    captureMarginLeft: Int,
     ledOffset: Int,
     modifier: Modifier = Modifier
 ) {
@@ -844,13 +1056,18 @@ fun LedVisualization(
                     style = Stroke(width = 2f)
                 )
 
-                // Draw capture area with margin (as inner rectangle)
-                val margin = captureMarginPercent.coerceIn(0, 40)
-                if (margin > 0) {
-                    val innerLeft = screenPadding + (width - screenPadding * 2) * margin / 100f
-                    val innerTop = screenPadding + (height - screenPadding * 2) * margin / 100f
-                    val innerRight = width - screenPadding - (width - screenPadding * 2) * margin / 100f
-                    val innerBottom = height - screenPadding - (height - screenPadding * 2) * margin / 100f
+                // Draw capture area with separate margins for each side (as inner rectangle)
+                val marginTop = captureMarginTop.coerceIn(0, 40)
+                val marginRight = captureMarginRight.coerceIn(0, 40)
+                val marginBottom = captureMarginBottom.coerceIn(0, 40)
+                val marginLeft = captureMarginLeft.coerceIn(0, 40)
+                if (marginTop > 0 || marginRight > 0 || marginBottom > 0 || marginLeft > 0) {
+                    val screenWidth = width - screenPadding * 2
+                    val screenHeight = height - screenPadding * 2
+                    val innerLeft = screenPadding + screenWidth * marginLeft / 100f
+                    val innerTop = screenPadding + screenHeight * marginTop / 100f
+                    val innerRight = width - screenPadding - screenWidth * marginRight / 100f
+                    val innerBottom = height - screenPadding - screenHeight * marginBottom / 100f
 
                     drawRect(
                         color = Color.Yellow.copy(alpha = 0.35f),
@@ -911,7 +1128,7 @@ fun LedVisualization(
                     }
                     val firstLedPaint = android.graphics.Paint().apply {
                         color = android.graphics.Color.WHITE
-                        textSize = 24f
+                        textSize = 28f
                         textAlign = android.graphics.Paint.Align.CENTER
                         isFakeBoldText = true
                     }
@@ -926,7 +1143,7 @@ fun LedVisualization(
                         // Draw LED circle
                         drawCircle(
                             color = color,
-                            radius = if (index == 0) 12f else 8f,
+                            radius = if (index == 0) 18f else 8f,
                             center = ledData.position
                         )
 
@@ -939,7 +1156,7 @@ fun LedVisualization(
                             nativeCanvas.drawText(
                                 "${index + 1}",
                                 ledData.position.x,
-                                ledData.position.y + if (index == 0) 8f else 7f,
+                                ledData.position.y + if (index == 0) 10f else 7f,
                                 paint
                             )
                         }
@@ -1233,84 +1450,6 @@ fun LegendItem(color: Color, text: String) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EditLayoutDialog(
-    startCorner: String,
-    direction: String,
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    var newStartCorner by remember { mutableStateOf(startCorner) }
-    var newDirection by remember { mutableStateOf(direction) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.led_layout_dialog_title)) },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(R.string.pref_title_led_start_corner),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("top_left", "top_right", "bottom_right", "bottom_left").forEach { corner ->
-                        FilterChip(
-                            selected = newStartCorner == corner,
-                            onClick = { newStartCorner = corner },
-                            label = { Text(getCornerName(corner), fontSize = 12.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = stringResource(R.string.pref_title_led_direction),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("clockwise", "counterclockwise").forEach { dir ->
-                        FilterChip(
-                            selected = newDirection == dir,
-                            onClick = { newDirection = dir },
-                            label = { Text(getDirectionName(dir), fontSize = 12.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onSave(newStartCorner, newDirection)
-                }
-            ) {
-                Text(stringResource(R.string.guidedstep_save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.guidedstep_cancel))
-            }
-        }
-    )
 }
 
 @Composable

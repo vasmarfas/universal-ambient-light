@@ -95,7 +95,7 @@
 
     <!-- LED layout settings -->
     <string name="pref_key_led_start_corner" translatable="false">pref_key_led_start_corner</string>
-    <string name="pref_default_led_start_corner" translatable="false">top_left</string>
+    <string name="pref_default_led_start_corner" translatable="false">bottom_left</string>
     <string-array name="pref_list_led_start_corner_values" translatable="false">
         <item>top_left</item>
         <item>top_right</item>
@@ -130,7 +130,27 @@
     <string name="pref_key_led_offset" translatable="false">pref_key_led_offset</string>
     <integer name="pref_default_led_offset" translatable="false">0</integer>
 
-    <!-- Capture margin (in percent of screen size) -->
+    <!-- Capture margin (in percent of screen size) - legacy, kept for backward compatibility -->
     <string name="pref_key_capture_margin" translatable="false">pref_key_capture_margin</string>
     <integer name="pref_default_capture_margin" translatable="false">0</integer>
+
+    <!-- Separate capture margins for horizontal and vertical - legacy, kept for backward compatibility -->
+    <string name="pref_key_capture_margin_horizontal" translatable="false">pref_key_capture_margin_horizontal</string>
+    <integer name="pref_default_capture_margin_horizontal" translatable="false">0</integer>
+
+    <string name="pref_key_capture_margin_vertical" translatable="false">pref_key_capture_margin_vertical</string>
+    <integer name="pref_default_capture_margin_vertical" translatable="false">0</integer>
+
+    <!-- Separate capture margins for each side -->
+    <string name="pref_key_capture_margin_top" translatable="false">pref_key_capture_margin_top</string>
+    <integer name="pref_default_capture_margin_top" translatable="false">0</integer>
+
+    <string name="pref_key_capture_margin_right" translatable="false">pref_key_capture_margin_right</string>
+    <integer name="pref_default_capture_margin_right" translatable="false">0</integer>
+
+    <string name="pref_key_capture_margin_bottom" translatable="false">pref_key_capture_margin_bottom</string>
+    <integer name="pref_default_capture_margin_bottom" translatable="false">0</integer>
+
+    <string name="pref_key_capture_margin_left" translatable="false">pref_key_capture_margin_left</string>
+    <integer name="pref_default_capture_margin_left" translatable="false">0</integer>
 </resources>
