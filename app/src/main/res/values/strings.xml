@@ -337,4 +337,15 @@
   <string name="support_project_title">Support Project</string>
   <string name="support_project_message">Thank you for your interest in supporting this project!\n\nYou can support the development through:\n• Boosty\n• Cryptocurrency (TON)\n• Leave a review on Google Play\n\nClick below to see all available options.</string>
   <string name="support_open_details">View Details</string>
+  <string name="report_issue">Report Issue</string>
+  <string name="report_issue_summary">Report a bug or suggest a feature</string>
+  <string name="leave_review">Leave Review</string>
+  <string name="leave_review_summary">Rate the app on Google Play</string>
+  <string name="rating_dialog_title">Rate Universal Ambient Light</string>
+  <string name="rating_dialog_message">How would you rate your experience?</string>
+  <string name="rating_dialog_low_rating_title">We\'re sorry to hear that</string>
+  <string name="rating_dialog_low_rating_message">If you encountered any issues, please let us know by reporting them on GitHub. Your feedback helps us improve the app.</string>
+  <string name="rating_dialog_report_issue">Report Issue</string>
+  <string name="rating_dialog_cancel">Cancel</string>
+  <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
 </resources>

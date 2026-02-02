@@ -34,28 +34,23 @@ class DeviceDetector {
     
     companion object {
         private const val TAG = "DeviceDetector"
-        private const val CONNECTION_TIMEOUT_MS = 1500 // Оптимизированный таймаут
+        private const val CONNECTION_TIMEOUT_MS = 1500
         private const val READ_TIMEOUT_MS = 1500
         
-        // Порты для проверки
-        private val WLED_PORTS = listOf(80, 4048, 19446) // HTTP, DDP, UDP Raw
-        private val HYPERION_PORTS = listOf(19400) // FlatBuffers
+        private val WLED_PORTS = listOf(80, 4048, 19446)
+        private val HYPERION_PORTS = listOf(19400)
         
         /**
-         * Определяет тип устройства по IP адресу
-         * Пробует все возможные комбинации портов и протоколов
+         * Detects device type by IP address
+         * Tries all possible port and protocol combinations
          */
         @JvmStatic
         fun detectDevice(host: String): DeviceInfo? {
-            // Пробуем WLED и Hyperion параллельно, так как они используют разные порты
-            // Сначала пробуем WLED через HTTP API
             val wledHttpInfo = detectWLED(host, 80)
             if (wledHttpInfo != null) {
                 return wledHttpInfo
             }
             
-            // Всегда проверяем Hyperion, даже если WLED не найден
-            // (устройство может быть Hyperion, а не WLED)
             for (port in HYPERION_PORTS) {
                 val info = detectHyperion(host, port)
                 if (info != null) {
@@ -67,12 +62,11 @@ class DeviceDetector {
         }
         
         /**
-         * Проверяет, является ли устройство WLED
+         * Checks if device is WLED
          */
         private fun detectWLED(host: String, port: Int): DeviceInfo? {
             return when (port) {
                 80 -> {
-                    // HTTP API для WLED
                     try {
                         val url = URL("http://$host/json/info")
                         val connection = url.openConnection() as HttpURLConnection
@@ -93,13 +87,11 @@ class DeviceDetector {
                             val json = JSONObject(response)
                             val name = json.optString("name", null)
                             
-                            // Проверяем, что это действительно WLED
-                            // WLED API возвращает поля: ver, leds, name, и т.д.
                             if (json.has("ver") || json.has("leds") || json.has("info")) {
                                 Log.d(TAG, "WLED detected at $host via HTTP API")
                                 return DeviceInfo(
                                     host = host,
-                                    port = 4048, // Используем DDP порт по умолчанию
+                                    port = 4048,
                                     type = DeviceType.WLED,
                                     protocol = "ddp",
                                     name = name ?: "WLED"
@@ -109,7 +101,6 @@ class DeviceDetector {
                             }
                         } else {
                             Log.d(TAG, "HTTP response code $responseCode at $host:80")
-                            // Пробуем альтернативный endpoint
                             try {
                                 val altUrl = URL("http://$host/json")
                                 val altConnection = altUrl.openConnection() as HttpURLConnection
@@ -138,22 +129,18 @@ class DeviceDetector {
                                     }
                                 }
                             } catch (e: Exception) {
-                                // Игнорируем
                             }
                         }
                     } catch (e: Exception) {
-                        // Обрабатываем различные ошибки HTTP
                         val errorMsg = e.message ?: "Unknown error"
                         when {
                             errorMsg.contains("Cleartext HTTP traffic") -> {
                                 Log.w(TAG, "Cleartext HTTP not permitted for $host:80 - check AndroidManifest.xml")
                             }
                             errorMsg.contains("unexpected end of stream") -> {
-                                // Сервер закрыл соединение - возможно не WLED или временная ошибка
                                 Log.d(TAG, "HTTP connection closed unexpectedly at $host:80 - might not be WLED")
                             }
                             errorMsg.contains("Failed to connect") -> {
-                                // Не удалось подключиться - порт может быть закрыт
                                 Log.d(TAG, "Failed to connect to $host:80 - port might be closed")
                             }
                             else -> {
@@ -164,9 +151,6 @@ class DeviceDetector {
                     null
                 }
                 4048, 19446 -> {
-                    // UDP порты нельзя надежно проверить без ответа от устройства
-                    // Поэтому проверяем только через HTTP API, а порт используем из настроек
-                    // Этот метод вызывается только если HTTP API уже проверили и не нашли
                     null
                 }
                 else -> null
@@ -174,7 +158,7 @@ class DeviceDetector {
         }
         
         /**
-         * Проверяет, является ли устройство Hyperion
+         * Checks if device is Hyperion
          */
         private fun detectHyperion(host: String, port: Int): DeviceInfo? {
             try {
@@ -193,7 +177,6 @@ class DeviceDetector {
                     )
                 }
             } catch (e: Exception) {
-                // Порт закрыт или недоступен
             }
             return null
         }

@@ -45,7 +45,6 @@ object LedDataExtractor {
             val prefs = Preferences(context)
             xLed = prefs.getInt(R.string.pref_key_x_led)
             yLed = prefs.getInt(R.string.pref_key_y_led)
-            // Новые отдельные значения для каждой стороны. Если их ещё нет – используем старые x/y.
             topLed = prefs.getInt(R.string.pref_key_led_count_top, xLed)
             rightLed = prefs.getInt(R.string.pref_key_led_count_right, yLed)
             bottomLed = prefs.getInt(R.string.pref_key_led_count_bottom, xLed)
@@ -57,13 +56,8 @@ object LedDataExtractor {
             sideBottom = prefs.getString(R.string.pref_key_led_side_bottom, "enabled") ?: "enabled"
             sideLeft = prefs.getString(R.string.pref_key_led_side_left, "enabled") ?: "enabled"
             bottomGap = prefs.getInt(R.string.pref_key_bottom_gap, 0)
-            // Читаем отступы с обратной совместимостью:
-            // 1. Старый общий ключ (применяется ко всем сторонам)
-            // 2. Горизонтальный/вертикальный (top/bottom = vertical, left/right = horizontal)
-            // 3. Новые раздельные ключи для каждой стороны
             val legacyMargin = prefs.getInt(R.string.pref_key_capture_margin, -1)
             if (legacyMargin >= 0) {
-                // Если есть старый общий ключ, используем его для всех сторон
                 captureMarginTop = legacyMargin
                 captureMarginRight = legacyMargin
                 captureMarginBottom = legacyMargin
@@ -72,7 +66,6 @@ object LedDataExtractor {
                 val marginH = prefs.getInt(R.string.pref_key_capture_margin_horizontal, -1)
                 val marginV = prefs.getInt(R.string.pref_key_capture_margin_vertical, -1)
                 if (marginH >= 0 || marginV >= 0) {
-                    // Если есть горизонтальный/вертикальный ключи, используем их
                     val h = if (marginH >= 0) marginH else 0
                     val v = if (marginV >= 0) marginV else 0
                     captureMarginTop = v
@@ -80,7 +73,6 @@ object LedDataExtractor {
                     captureMarginBottom = v
                     captureMarginLeft = h
                 } else {
-                    // Используем новые раздельные ключи для каждой стороны
                     captureMarginTop = prefs.getInt(R.string.pref_key_capture_margin_top, 0)
                     captureMarginRight = prefs.getInt(R.string.pref_key_capture_margin_right, 0)
                     captureMarginBottom = prefs.getInt(R.string.pref_key_capture_margin_bottom, 0)
@@ -122,10 +114,8 @@ object LedDataExtractor {
             val bottomLed = prefs.getInt(R.string.pref_key_led_count_bottom, xLed)
             val leftLed = prefs.getInt(R.string.pref_key_led_count_left, yLed)
 
-            // Если заданы явные значения для сторон – используем их.
             var totalLEDs = topLed + rightLed + bottomLed + leftLed
             if (totalLEDs <= 0) {
-                // Фолбэк на старую схему 2 * (x + y)
                 totalLEDs = 2 * (xLed + yLed)
             }
             max(totalLEDs, 1)
@@ -194,7 +184,7 @@ object LedDataExtractor {
         var ledIdx = 0
 
         // Calculate capture area with separate margins for each side
-        val marginTop = captureMarginTop.coerceIn(0, 40) // не даём вырезать слишком много
+        val marginTop = captureMarginTop.coerceIn(0, 40)
         val marginRight = captureMarginRight.coerceIn(0, 40)
         val marginBottom = captureMarginBottom.coerceIn(0, 40)
         val marginLeft = captureMarginLeft.coerceIn(0, 40)
@@ -212,7 +202,6 @@ object LedDataExtractor {
         val captureWidth = (captureRight - captureLeft).coerceAtLeast(1f)
         val captureHeight = (captureBottom - captureTop).coerceAtLeast(1f)
 
-        // Calculate step sizes по области захвата для каждой стороны отдельно
         fun sideStep(length: Float, count: Int): Float {
             return if (count <= 0) 0f else length / count
         }

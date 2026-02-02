@@ -13,6 +13,10 @@ import com.vasmarfas.UniversalAmbientLight.MainScreen
 import com.vasmarfas.UniversalAmbientLight.HelpDialog
 import com.vasmarfas.UniversalAmbientLight.SupportDialog
 import com.vasmarfas.UniversalAmbientLight.UrlDialog
+import com.vasmarfas.UniversalAmbientLight.RatingDialog
+import com.vasmarfas.UniversalAmbientLight.LowRatingDialog
+import com.vasmarfas.UniversalAmbientLight.openGitHubIssues
+import com.vasmarfas.UniversalAmbientLight.openGooglePlayReview
 import com.vasmarfas.UniversalAmbientLight.ui.led.LedLayoutScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -42,15 +46,15 @@ fun AppNavHost(
             var showHelpDialog by remember { mutableStateOf(false) }
             var showSupportDialog by remember { mutableStateOf(false) }
             var showUrlDialog by remember { mutableStateOf<String?>(null) }
+            var showRatingDialog by remember { mutableStateOf(false) }
+            var showLowRatingDialog by remember { mutableStateOf(false) }
             
-            // Проверяем, является ли устройство TV
             val isTv = remember {
                 val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
                 uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
                 context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             }
 
-            // Логируем screen view для главного экрана
             LaunchedEffect(Unit) {
                 AnalyticsHelper.logScreenView(context, "home", "MainScreen")
             }
@@ -68,6 +72,14 @@ fun AppNavHost(
                 onSupportClick = { 
                     showSupportDialog = true
                     AnalyticsHelper.logSupportDialogOpened(context)
+                },
+                onReportIssueClick = {
+                    AnalyticsHelper.logSettingChanged(context, "report_issue_clicked", "true")
+                    openGitHubIssues(context)
+                },
+                onLeaveReviewClick = {
+                    AnalyticsHelper.logSettingChanged(context, "leave_review_clicked", "true")
+                    showRatingDialog = true
                 }
             )
             
@@ -80,18 +92,14 @@ fun AppNavHost(
                         showHelpDialog = false
                         
                         if (isTv) {
-                            // На TV сразу показываем диалог с QR-кодом
                             showUrlDialog = url
                         } else {
-                            // На обычном устройстве пытаемся открыть ссылку
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                             try {
                                 context.startActivity(intent)
                             } catch (e: ActivityNotFoundException) {
-                                // Показываем наш диалог с QR-кодом
                                 showUrlDialog = url
                             } catch (e: Exception) {
-                                // На всякий случай перехватываем все исключения
                                 showUrlDialog = url
                             }
                         }
@@ -108,18 +116,14 @@ fun AppNavHost(
                         showSupportDialog = false
                         
                         if (isTv) {
-                            // На TV сразу показываем диалог с QR-кодом
                             showUrlDialog = url
                         } else {
-                            // На обычном устройстве пытаемся открыть ссылку
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                             try {
                                 context.startActivity(intent)
                             } catch (e: ActivityNotFoundException) {
-                                // Показываем наш диалог с QR-кодом
                                 showUrlDialog = url
                             } catch (e: Exception) {
-                                // На всякий случай перехватываем все исключения
                                 showUrlDialog = url
                             }
                         }
@@ -127,22 +131,47 @@ fun AppNavHost(
                 )
             }
             
-            // Показываем UrlDialog только если предыдущие диалоги закрыты
+            // Rating dialog
+            if (showRatingDialog) {
+                RatingDialog(
+                    onDismiss = { showRatingDialog = false },
+                    onRatingSelected = { rating ->
+                        showRatingDialog = false
+                        AnalyticsHelper.logSettingChanged(context, "rating_selected", rating.toString())
+                        if (rating >= 4) {
+                            openGooglePlayReview(context)
+                        } else {
+                            showLowRatingDialog = true
+                        }
+                    }
+                )
+            }
+            
+            if (showLowRatingDialog) {
+                LowRatingDialog(
+                    onDismiss = { showLowRatingDialog = false },
+                    onReportIssue = {
+                        showLowRatingDialog = false
+                        AnalyticsHelper.logSettingChanged(context, "low_rating_report_issue", "true")
+                        openGitHubIssues(context)
+                    }
+                )
+            }
+            
             val urlToShow = showUrlDialog
-            if (urlToShow != null && !showHelpDialog && !showSupportDialog) {
+            if (urlToShow != null && !showHelpDialog && !showSupportDialog && !showRatingDialog && !showLowRatingDialog) {
                 UrlDialog(
                     url = urlToShow,
                     onDismiss = { 
                         showUrlDialog = null
                     },
                     onOpenLink = {
-                        // Пытаемся открыть ссылку при нажатии на кнопку
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlToShow))
                         try {
                             context.startActivity(intent)
                             showUrlDialog = null
                         } catch (e: Exception) {
-                            // Оставляем диалог открытым, если не удалось открыть
+                            // Keep dialog open if link couldn't be opened
                         }
                     }
                 )
@@ -151,7 +180,6 @@ fun AppNavHost(
         }
         composable(Screen.Settings.route) {
             val context = LocalContext.current
-            // Логируем screen view для экрана настроек
             LaunchedEffect(Unit) {
                 AnalyticsHelper.logScreenView(context, "settings", "SettingsScreen")
             }

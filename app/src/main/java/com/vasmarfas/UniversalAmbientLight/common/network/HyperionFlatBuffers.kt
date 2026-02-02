@@ -19,10 +19,8 @@ class HyperionFlatBuffers(
     port: Int,
     private val mPriority: Int
 ) : HyperionClient {
-
     private val TIMEOUT = 1000
     private var mSocket: Socket? = null
-    private val mBuilder: FlatBufferBuilder = FlatBufferBuilder(1024)
 
     init {
         mSocket = Socket()
@@ -34,14 +32,16 @@ class HyperionFlatBuffers(
         register()
     }
 
+    private fun newBuilder(): FlatBufferBuilder = FlatBufferBuilder(1024)
+
     @Throws(IOException::class)
     private fun register() {
-        mBuilder.clear()
-        val originOffset = mBuilder.createString("HyperionAndroidGrabber")
-        val registerOffset = Register.createRegister(mBuilder, originOffset, mPriority)
-        val requestOffset = Request.createRequest(mBuilder, Command.Register, registerOffset)
-        Request.finishRequestBuffer(mBuilder, requestOffset)
-        sendRequest(mBuilder.dataBuffer())
+        val builder = newBuilder()
+        val originOffset = builder.createString("HyperionAndroidGrabber")
+        val registerOffset = Register.createRegister(builder, originOffset, mPriority)
+        val requestOffset = Request.createRequest(builder, Command.Register, registerOffset)
+        Request.finishRequestBuffer(builder, requestOffset)
+        sendRequest(builder.dataBuffer())
     }
 
     override fun isConnected(): Boolean {
@@ -57,11 +57,13 @@ class HyperionFlatBuffers(
 
     @Throws(IOException::class)
     override fun clear(priority: Int) {
-        mBuilder.clear()
-        val clearOffset = Clear.createClear(mBuilder, priority)
-        val requestOffset = Request.createRequest(mBuilder, Command.Clear, clearOffset)
-        Request.finishRequestBuffer(mBuilder, requestOffset)
-        sendRequest(mBuilder.dataBuffer())
+        // Use separate FlatBufferBuilder for each message to avoid
+        // FlatBuffers "object serialization must not be nested" errors on concurrent calls
+        val builder = newBuilder()
+        val clearOffset = Clear.createClear(builder, priority)
+        val requestOffset = Request.createRequest(builder, Command.Clear, clearOffset)
+        Request.finishRequestBuffer(builder, requestOffset)
+        sendRequest(builder.dataBuffer())
     }
 
     @Throws(IOException::class)
@@ -76,11 +78,11 @@ class HyperionFlatBuffers(
 
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
-        mBuilder.clear()
-        val colorOffset = Color.createColor(mBuilder, color, duration_ms)
-        val requestOffset = Request.createRequest(mBuilder, Command.Color, colorOffset)
-        Request.finishRequestBuffer(mBuilder, requestOffset)
-        sendRequest(mBuilder.dataBuffer())
+        val builder = newBuilder()
+        val colorOffset = Color.createColor(builder, color, duration_ms)
+        val requestOffset = Request.createRequest(builder, Command.Color, colorOffset)
+        Request.finishRequestBuffer(builder, requestOffset)
+        sendRequest(builder.dataBuffer())
     }
 
     @Throws(IOException::class)
@@ -90,13 +92,13 @@ class HyperionFlatBuffers(
 
     @Throws(IOException::class)
     override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
-        mBuilder.clear()
-        val dataOffset = RawImage.createDataVector(mBuilder, data)
-        val rawImageOffset = RawImage.createRawImage(mBuilder, dataOffset, width, height)
-        val imageOffset = Image.createImage(mBuilder, ImageType.RawImage, rawImageOffset, duration_ms)
-        val requestOffset = Request.createRequest(mBuilder, Command.Image, imageOffset)
-        Request.finishRequestBuffer(mBuilder, requestOffset)
-        sendRequest(mBuilder.dataBuffer())
+        val builder = newBuilder()
+        val dataOffset = RawImage.createDataVector(builder, data)
+        val rawImageOffset = RawImage.createRawImage(builder, dataOffset, width, height)
+        val imageOffset = Image.createImage(builder, ImageType.RawImage, rawImageOffset, duration_ms)
+        val requestOffset = Request.createRequest(builder, Command.Image, imageOffset)
+        Request.finishRequestBuffer(builder, requestOffset)
+        sendRequest(builder.dataBuffer())
     }
 
     @Throws(IOException::class)

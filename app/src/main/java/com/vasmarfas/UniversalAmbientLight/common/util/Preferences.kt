@@ -42,7 +42,9 @@ class Preferences(context: Context) {
     }
 
     fun getInt(@StringRes keyResourceId: Int, default: Int = 0): Int {
-        return getString(keyResourceId)?.let { Integer.parseInt(it) } ?: default
+        val raw = getString(keyResourceId)?.trim()
+        // Safely parse number: return default instead of crashing on empty/invalid string
+        return raw?.toIntOrNull() ?: default
     }
 
     fun putInt(@StringRes keyResourceId: Int, value: Int){

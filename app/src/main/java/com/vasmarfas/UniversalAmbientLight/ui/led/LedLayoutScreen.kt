@@ -52,7 +52,6 @@ fun LedLayoutScreen(
     val configuration = LocalConfiguration.current
     val prefs = remember { Preferences(context) }
     
-    // Старые общие значения оставляем для обратной совместимости и начальной инициализации
     val legacyX = prefs.getInt(R.string.pref_key_x_led)
     val legacyY = prefs.getInt(R.string.pref_key_y_led)
 
@@ -77,10 +76,6 @@ fun LedLayoutScreen(
         )
     }
     var bottomGapText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_bottom_gap, 0).toString()) }
-    // Читаем отступы с обратной совместимостью:
-    // 1. Старый общий ключ (применяется ко всем сторонам)
-    // 2. Горизонтальный/вертикальный (top/bottom = vertical, left/right = horizontal)
-    // 3. Новые раздельные ключи для каждой стороны
     val legacyMargin = prefs.getInt(R.string.pref_key_capture_margin, -1)
     val marginH = prefs.getInt(R.string.pref_key_capture_margin_horizontal, -1)
     val marginV = prefs.getInt(R.string.pref_key_capture_margin_vertical, -1)

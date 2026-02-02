@@ -43,12 +43,9 @@ fun DeviceScanDialog(
         
         scope.launch {
             withContext(Dispatchers.IO) {
-                // Создаем сканер с callback для обновления в реальном времени
                 var scannerRef: DeviceScanner? = null
                 val newScanner = DeviceScanner { device ->
-                    // Обновляем список найденных устройств в реальном времени сразу при находке
                     scope.launch(Dispatchers.Main) {
-                        // Получаем актуальный список устройств
                         scannerRef?.let {
                             foundDevices = it.getFoundDevices()
                         }
@@ -57,24 +54,20 @@ fun DeviceScanDialog(
                 scannerRef = newScanner
                 scanner = newScanner
                 
-                // Получаем информацию о диапазоне сканирования
                 val scannerInfo = newScanner.getScanInfo()
                 withContext(Dispatchers.Main) {
                     totalIps = scannerInfo.totalIps
                 }
                 
                 while (newScanner.hasNextAttempt()) {
-                    // Обновляем текущий IP перед каждой проверкой
                     val currentIp = newScanner.getCurrentIp()
                     withContext(Dispatchers.Main) {
                         currentScanIp = currentIp
                         progress = newScanner.progress
                     }
                     
-                    // Пробуем следующий IP
                     val device = newScanner.tryNext()
                     
-                    // Обновляем прогресс и список устройств после каждой проверки
                     withContext(Dispatchers.Main) {
                         progress = newScanner.progress
                         if (device != null) {
@@ -82,21 +75,18 @@ fun DeviceScanDialog(
                         }
                     }
                     
-                    // Минимальная задержка для неблокирующего сканирования
                     kotlinx.coroutines.delay(1)
                 }
                 
                 withContext(Dispatchers.Main) {
                     isScanning = false
                     progress = 1f
-                    // Финальное обновление списка
                     foundDevices = newScanner.getFoundDevices()
                 }
             }
         }
     }
     
-    // Автоматически запускаем сканирование при открытии диалога
     LaunchedEffect(Unit) {
         startScan()
     }
@@ -112,7 +102,6 @@ fun DeviceScanDialog(
                     .fillMaxWidth()
                     .heightIn(max = 400.dp)
             ) {
-                // Показываем прогресс и найденные устройства одновременно
                 if (isScanning || foundDevices.isNotEmpty()) {
                     Row(
                         modifier = Modifier
@@ -157,7 +146,6 @@ fun DeviceScanDialog(
                     }
                 }
                 
-                // Список найденных устройств (обновляется в реальном времени)
                 if (foundDevices.isNotEmpty()) {
                     Text(
                         text = stringResource(R.string.scanner_found_devices),

@@ -59,11 +59,7 @@ class WLEDClient(
         }
 
         mSmoothing = ColorSmoothing { leds -> sendLedData(leds) }
-        // Применить настройки сглаживания из preferences
-        // Сначала применяем пресет как базовые значения
         mSmoothing.applyPreset(smoothingPreset)
-        // Затем переопределяем настройками из preferences только если они отличаются от значений пресета
-        // Это позволяет пресету работать, но пользователь может переопределить настройки вручную
         val presetValues = getPresetValues(smoothingPreset)
         if (settlingTime != presetValues.settlingTime) {
             mSmoothing.setSettlingTime(settlingTime)
@@ -74,7 +70,6 @@ class WLEDClient(
         if (updateFrequency != presetValues.updateFrequency) {
             mSmoothing.setUpdateFrequency(updateFrequency)
         }
-        // enabled всегда переопределяем, так как это отдельная настройка
         mSmoothing.setEnabled(smoothingEnabled)
 
         connect()
@@ -108,23 +103,19 @@ class WLEDClient(
     private fun reconnectIfNeeded() {
         val now = System.currentTimeMillis()
         val last = mLastReconnectAttemptMs.get()
-        if (now - last < 2000) return // простой rate-limit, чтобы не спамить
+        if (now - last < 2000) return
         mLastReconnectAttemptMs.set(now)
 
         try {
-            // Закрыть старый сокет
             try {
                 mSocket?.close()
             } catch (ignored: Exception) {}
             mSocket = null
             mConnected = false
 
-            // Переоткрыть
             connect()
-            // Сбрасываем блокировку после успешного переподключения
             mBlockedUntilMs.set(0L)
         } catch (e: Exception) {
-            // Если сеть реально запрещена (например, во сне) — просто молча ждём следующей попытки
             if (logsEnabled) Log.w(TAG, "Reconnect failed", e)
         }
     }
@@ -134,15 +125,13 @@ class WLEDClient(
     }
 
     /**
-     * Сбрасывает блокировку отправки данных после ошибки EPERM.
-     * Вызывается при включении экрана, чтобы возобновить отправку данных.
-     * Также переподключается, если соединение было потеряно, и отправляет последний кадр.
-     * Сбрасывает блокировку СРАЗУ (синхронно), чтобы отправка возобновилась мгновенно.
-     * Сетевые операции выполняются в фоновом потоке, чтобы избежать NetworkOnMainThreadException.
+     * Resets data send block after EPERM error.
+     * Called on screen wake to resume data sending.
+     * Also reconnects if connection was lost and sends last frame.
+     * Resets block immediately (synchronously) for instant resume.
+     * Network operations run in background thread to avoid NetworkOnMainThreadException.
      */
     fun resetBlocked() {
-        // Сбрасываем блокировку СРАЗУ (синхронно) - это безопасная операция и позволяет
-        // немедленно возобновить отправку данных без задержки на запуск фонового потока
         val wasBlocked = mBlockedUntilMs.get() > System.currentTimeMillis()
         mBlockedUntilMs.set(0L)
         
@@ -150,11 +139,8 @@ class WLEDClient(
             Log.d(TAG, "resetBlocked: wasBlocked=$wasBlocked, connection=${isConnected()}, mLastLeds=${mLastLeds != null}")
         }
         
-        // Если соединение есть и был последний кадр, сразу пробуем отправить его
-        // Это позволяет возобновить отправку мгновенно, как до коммита 5a42e72
         if (isConnected() && wasBlocked && mLastLeds != null) {
             val lastLedsCopy = Array(mLastLeds!!.size) { i -> mLastLeds!![i].clone() }
-            // Отправляем в фоновом потоке, чтобы избежать NetworkOnMainThreadException
             Thread {
                 try {
                     if (logsEnabled) Log.d(TAG, "Immediately resending last frame after unblock (${lastLedsCopy.size} LEDs)")
@@ -165,24 +151,20 @@ class WLEDClient(
             }.start()
         }
         
-        // Остальные операции (переподключение и т.д.) выполняем в фоновом потоке
         val hadConnection = isConnected()
         val lastLedsCopy = mLastLeds?.let { Array(it.size) { i -> it[i].clone() } }
         
         Thread {
             try {
-                // Если соединение потеряно, пытаемся переподключиться
                 if (!hadConnection) {
                     if (logsEnabled) Log.d(TAG, "Connection lost, attempting reconnect after screen on")
                     reconnectIfNeeded()
-                    // После переподключения отправляем последний кадр
                     if (isConnected() && lastLedsCopy != null) {
                         if (logsEnabled) Log.d(TAG, "Reconnected successfully, restoring frame")
                         mSmoothing.setTargetColors(lastLedsCopy)
                         sendLedData(lastLedsCopy)
                     }
                 } else if (wasBlocked && lastLedsCopy != null) {
-                    // Если соединение есть, но была блокировка, восстанавливаем в ColorSmoothing
                     if (logsEnabled) Log.d(TAG, "Restoring last frame in ColorSmoothing after unblock")
                     mSmoothing.setTargetColors(lastLedsCopy)
                 }
@@ -253,8 +235,8 @@ class WLEDClient(
         if (!isConnected()) return
         mLastLeds = leds // Save for keepalive
 
-        // На некоторых Android TV при SCREEN_OFF прошивка режет UDP отправку (sendto EPERM).
-        // В это время не пытаемся слать каждую итерацию, чтобы не спамить лог и не жечь CPU.
+        // On some Android TV firmware cuts UDP sending (sendto EPERM) during SCREEN_OFF.
+        // Don't try sending every iteration to avoid log spam and CPU waste.
         val now = System.currentTimeMillis()
         val blockedUntil = mBlockedUntilMs.get()
         if (now < blockedUntil) return
@@ -282,19 +264,15 @@ class WLEDClient(
                 sendUdpRaw(leds)
             }
 
-            // ВАЖНО: если отправка прошла успешно, считаем, что устройство "проснулось"
-            // и гарантированно сбрасываем блокировку. Это защищает от редких случаев,
-            // когда ACTION_SCREEN_ON не дошёл, но сеть уже снова доступна.
+            // If send succeeded, consider device "awake" and reset block.
+            // This protects against rare cases when ACTION_SCREEN_ON didn't arrive but network is available.
             mBlockedUntilMs.set(0L)
         } catch (e: IOException) {
             val msg = e.message ?: ""
             if (msg.contains("EPERM", ignoreCase = true) || msg.contains("Operation not permitted", ignoreCase = true)) {
-                // Блокируем попытки на короткое время (обычно период сна), затем попробуем снова.
-                // Уменьшено с 15 до 3 секунд для более быстрого возобновления после включения экрана
                 mBlockedUntilMs.set(System.currentTimeMillis() + 3_000L)
             }
 
-            // Rate-limit логов, иначе при SCREEN_OFF будет забивать logcat.
             val lastLog = mLastErrorLogMs.get()
             if (System.currentTimeMillis() - lastLog > 5_000L) {
                 mLastErrorLogMs.set(System.currentTimeMillis())
@@ -310,8 +288,8 @@ class WLEDClient(
         try {
             mSocket!!.send(datagramPacket)
         } catch (e: IOException) {
-            // На Android TV в режиме сна может прилетать EPERM на sendto.
-            // Пробуем пересоздать сокет — после пробуждения это позволяет самовосстановиться.
+            // On Android TV during sleep EPERM may occur on sendto.
+            // Try recreating socket - allows self-recovery after wake.
             reconnectIfNeeded()
             throw e
         }
@@ -480,13 +458,13 @@ class WLEDClient(
             "responsive" -> PresetValues(50, 0L, 60)
             "balanced" -> PresetValues(200, 80L, 25)
             "smooth" -> PresetValues(500, 200L, 20)
-            else -> PresetValues(200, 80L, 25) // balanced по умолчанию
+            else -> PresetValues(200, 80L, 25)
         }
     }
 
     companion object {
         private const val TAG = "WLEDClient"
-        private val logsEnabled = true // Временно включено для отладки
+        private val logsEnabled = true
         private const val DEFAULT_PORT_DDP = 4048
         private const val DEFAULT_PORT_DRGB = 19446
 

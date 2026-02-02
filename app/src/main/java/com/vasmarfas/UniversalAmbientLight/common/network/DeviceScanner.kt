@@ -57,32 +57,26 @@ class DeviceScanner(
         var hasHyperionPort = false
         var hasWledPort = false
         
-        // Проверяем TCP порт 19400 для Hyperion
         try {
             val socket = Socket()
             socket.connect(InetSocketAddress(host, 19400), PORT_CHECK_TIMEOUT_MS)
             hasHyperionPort = socket.isConnected
             socket.close()
         } catch (e: Exception) {
-            // Порт закрыт или недоступен
         }
         
-        // Проверяем UDP порты для WLED (4048 DDP, 19446 UDP Raw)
-        // Для UDP просто проверяем доступность через DatagramSocket
         try {
             val datagramSocket = DatagramSocket()
             datagramSocket.connect(InetAddress.getByName(host), 4048)
             datagramSocket.close()
             hasWledPort = true
         } catch (e: Exception) {
-            // Пробуем второй UDP порт
             try {
                 val datagramSocket = DatagramSocket()
                 datagramSocket.connect(InetAddress.getByName(host), 19446)
                 datagramSocket.close()
                 hasWledPort = true
             } catch (e: Exception) {
-                // Оба UDP порта недоступны
             }
         }
         
@@ -97,7 +91,6 @@ class DeviceScanner(
         return try {
             val address = InetAddress.getByName(ip)
             val hostname = address.hostName
-            // Если hostname совпадает с IP, значит reverse DNS не дал результата
             if (hostname == ip || hostname.isEmpty()) {
                 null
             } else {
@@ -120,46 +113,37 @@ class DeviceScanner(
 
         val ip = ipsToTry[++lastTriedIndex]
         
-        // Логируем каждые 50 IP для отладки
         if (lastTriedIndex % 50 == 0) {
             Log.d(TAG, "Scanning IP $ip (${lastTriedIndex + 1}/${ipsToTry.size}, ${(progress * 100).toInt()}%)")
         }
         
-        // Шаг 1: Быстрый пинг (проверка доступности)
         if (!isHostResponsive(ip)) {
-            return null // Хост не отвечает, пропускаем
+            return null
         }
         
         Log.d(TAG, "Host $ip is responsive, checking ports...")
         responsiveHosts.add(ip)
         
-        // Шаг 2: Быстрая проверка портов для определения типа устройства
         val (hasHyperionPort, hasWledPort) = checkDevicePorts(ip)
         
-        // Если ни один порт не открыт, пропускаем
         if (!hasHyperionPort && !hasWledPort) {
             Log.d(TAG, "Host $ip is responsive but no device ports found")
             return null
         }
         
-        // Шаг 3: Определяем hostname для доступного хоста (асинхронно, не блокируем)
         val hostname = getHostname(ip)
         
-        // Шаг 4: Детальное определение типа устройства только если порты открыты
         val deviceInfo = DeviceDetector.detectDevice(ip)
         
         if (deviceInfo != null) {
-            // Проверяем, не нашли ли мы уже это устройство (по хосту, так как порт может отличаться)
             val alreadyFound = foundDevices.any { 
                 it.host == deviceInfo.host
             }
             
             if (!alreadyFound) {
-                // Добавляем hostname к информации об устройстве
                 val deviceInfoWithHostname = deviceInfo.copy(hostname = hostname)
                 foundDevices.add(deviceInfoWithHostname)
                 Log.d(TAG, "Found device: ${deviceInfoWithHostname.type} at ${deviceInfoWithHostname.host}:${deviceInfoWithHostname.port} (hostname: ${hostname ?: "N/A"})")
-                // Вызываем callback для обновления UI в реальном времени СРАЗУ
                 onDeviceFound?.invoke(deviceInfoWithHostname)
                 return deviceInfoWithHostname
             } else {
@@ -173,7 +157,7 @@ class DeviceScanner(
     }
 
     /**
-     * Получить все найденные устройства
+     * Get all found devices
      */
     fun getFoundDevices(): List<DeviceDetector.DeviceInfo> {
         return foundDevices.toList()
@@ -246,8 +230,8 @@ class DeviceScanner(
 
     companion object {
         private const val TAG = "DeviceScanner"
-        private const val PING_TIMEOUT_MS = 300 // Быстрый пинг для проверки доступности
-        private const val PORT_CHECK_TIMEOUT_MS = 500 // Быстрая проверка портов
+        private const val PING_TIMEOUT_MS = 300
+        private const val PORT_CHECK_TIMEOUT_MS = 500
 
         /**
          * Получить IP адреса для не-localhost интерфейсов
@@ -302,13 +286,10 @@ class DeviceScanner(
                     if (ipParts.size != 4) continue
 
                     val ipPrefix = "${ipParts[0]}.${ipParts[1]}.${ipParts[2]}."
-                    // Сканируем по порядку от 1 до 254
                     for (i in 1..254) {
                         ipsToTry[i - 1] = "$ipPrefix$i"
                     }
-                    // Не сортируем - сканируем строго по порядку
 
-                    // Просто добавляем IP адреса по порядку, без перемешивания
                     for (i in ipsToTry.indices) {
                         val baseIndex = localIpIdx * 254
                         if (baseIndex + i < allIpsToTry.size) {

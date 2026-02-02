@@ -91,6 +91,10 @@ class ScreenEncoder(
             init()
         } catch (e: MediaCodec.CodecException) {
             Log.e(TAG, "Init failed", e)
+        } catch (e: SecurityException) {
+            // MediaProjection token expired or revoked by system
+            Log.e(TAG, "Init failed: MediaProjection token invalid", e)
+            throw e // Re-throw so restartEncoderFromSavedProjection can handle it
         }
     }
 
@@ -127,7 +131,6 @@ class ScreenEncoder(
     private fun init() {
         mCaptureThread = HandlerThread(TAG, android.os.Process.THREAD_PRIORITY_BACKGROUND)
         mCaptureThread!!.start()
-        // Ждем, пока looper будет готов
         val looper = mCaptureThread!!.looper
         if (looper == null) {
             Log.e(TAG, "Failed to get looper from capture thread")
@@ -143,14 +146,15 @@ class ScreenEncoder(
 
         mMediaProjection.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
-                // Важно для Android/Google TV: при уходе экрана в сон MediaProjection может
-                // дернуть onStop(). В этом случае НЕ рвём соединение с WLED/Hyperion,
-                // иначе WLED быстро возвращается к дефолтному эффекту и потом не
-                // переподключается без ручного перезапуска.
+                // Important for Android/Google TV: MediaProjection may call onStop() when screen goes to sleep.
+                // Don't disconnect from WLED/Hyperion, otherwise WLED quickly returns to default effect
+                // and won't reconnect without manual restart.
                 stopInternal(disconnect = false)
             }
         }, mHandler)
 
+        // createVirtualDisplay may throw SecurityException if MediaProjection token expired or was revoked.
+        // Exception is re-thrown so restartEncoderFromSavedProjection can handle it and clear saved projection data.
         mVirtualDisplay = mMediaProjection.createVirtualDisplay(
             TAG,
             mCaptureWidth, mCaptureHeight, mDensity,
@@ -382,10 +386,9 @@ class ScreenEncoder(
         mBorderY = 0
         mFrameCount = 0
 
-        // Останавливаем callback-thread энкодера
         mHandler.looper.quit()
 
-        // Ключевой момент: при системном stop (сон) оставляем соединение живым.
+        // Keep connection alive on system stop (sleep) to prevent WLED from reverting to default effect
         if (disconnect) {
             clearAndDisconnect()
         } else {

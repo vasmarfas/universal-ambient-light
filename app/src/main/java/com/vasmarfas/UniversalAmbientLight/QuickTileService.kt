@@ -146,9 +146,6 @@ class QuickTileService : TileService() {
                 .addNextIntentWithParentStack(settingsIntent)
                 .startActivities()
 
-            val closeIntent = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-            sendBroadcast(closeIntent)
-
             return true
         }
 

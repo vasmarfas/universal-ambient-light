@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -76,6 +78,8 @@ import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
+import android.content.ActivityNotFoundException
+import android.net.Uri
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import kotlin.math.sqrt
@@ -103,7 +107,6 @@ class MainActivity : ComponentActivity() {
             val wasRunning = mRecorderRunning
             mRecorderRunning = checked
             
-            // Если сессия остановилась извне (через сервис), сбрасываем время начала
             if (wasRunning && !checked && mSessionStartTime != null) {
                 val durationSeconds = ((System.currentTimeMillis() - mSessionStartTime!!) / 1000).coerceAtLeast(0)
                 AnalyticsHelper.logScreenCaptureStopped(this@MainActivity, durationSeconds)
@@ -128,20 +131,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Включаем режим Edge-to-Edge вручную, чтобы избежать использования
-        // устаревшего параметра LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES,
-        // на который ругается Google Play в Android 15.
-        // Для Android 15 (API 35+) по умолчанию требуется LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS.
-        // Этот режим доступен с Android 11 (API 30).
+        // Enable Edge-to-Edge mode manually to avoid using deprecated LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        // which Google Play flags in Android 15. Android 15+ (API 35+) requires LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS by default.
+        // This mode is available from Android 11 (API 30).
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            // Для Android 9 и 10 используем SHORT_EDGES
             window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        // Логируем запуск приложения
         AnalyticsHelper.logAppLaunched(this)
 
         mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -188,7 +187,6 @@ class MainActivity : ComponentActivity() {
         if (PermissionHelper.isIgnoringBatteryOptimizations(this)) return
 
         val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
-        // Не спамим каждый запуск: если пользователь не подтвердил, повторим позже.
         val keyLastAttempt = "battery_opt_exemption_last_attempt_ms"
         val lastAttempt = prefs.getLong(keyLastAttempt, 0L)
         val now = System.currentTimeMillis()
@@ -197,10 +195,8 @@ class MainActivity : ComponentActivity() {
 
         prefs.edit { putLong(keyLastAttempt, now) }
 
-        // Логируем запрос оптимизации батареи
         AnalyticsHelper.logBatteryOptimizationRequested(this)
 
-        // Без собственного UI: сразу открываем системный запрос/настройку
         PermissionHelper.requestIgnoreBatteryOptimizations(this)
     }
 
@@ -251,7 +247,6 @@ class MainActivity : ComponentActivity() {
         } else {
             stopScreenRecorder()
             mRecorderRunning = false
-            // Отслеживание длительности сессии при остановке
             val durationSeconds = mSessionStartTime?.let { startTime ->
                 ((System.currentTimeMillis() - startTime) / 1000).coerceAtLeast(0)
             }
@@ -296,8 +291,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Перед началом захвата экрана для Adalight проверяем и запрашиваем USB‑разрешение.
-     * Для Hyperion/WLED просто выполняем [onReady].
+     * Before starting screen capture for Adalight, check and request USB permission.
+     * For Hyperion/WLED, just execute [onReady].
      */
     private fun ensureUsbPermissionForAdalight(onReady: () -> Unit) {
         val prefs = Preferences(this)
@@ -328,10 +323,8 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // Логируем запрос USB разрешения
         AnalyticsHelper.logUsbPermissionRequested(this)
 
-        // Запросить разрешение через системный диалог
         val permissionIntent = android.app.PendingIntent.getBroadcast(
             this,
             0,
@@ -406,7 +399,6 @@ class MainActivity : ComponentActivity() {
             mTclWarningShown = false
             Log.i(TAG, "Starting screen capture")
             if (data != null) {
-                // Логируем запуск протокола перед стартом
                 val prefs = Preferences(this)
                 val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
                 AnalyticsHelper.logProtocolStarted(this, protocol)
@@ -416,18 +408,15 @@ class MainActivity : ComponentActivity() {
                 mRecorderRunning = true
                 mSessionStartTime = System.currentTimeMillis()
                 
-                // Предлагаем оценить приложение после успешного запуска подсветки
                 ReviewHelper.onLightingStarted(this)
             }
         }
         if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-            // Проверяем результат разрешения overlay
             if (PermissionHelper.canDrawOverlays(this)) {
                 AnalyticsHelper.logPermissionGranted(this, "SYSTEM_ALERT_WINDOW")
             } else {
                 AnalyticsHelper.logPermissionDenied(this, "SYSTEM_ALERT_WINDOW")
             }
-            // Small delay before requesting capture - helps on some devices
             window.decorView.postDelayed({ requestScreenCapture() }, 500)
         }
     }
@@ -545,6 +534,8 @@ fun MainScreen(
     effectMode: EffectMode,
     onHelpClick: () -> Unit = {},
     onSupportClick: () -> Unit = {},
+    onReportIssueClick: () -> Unit = {},
+    onLeaveReviewClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Rainbow Background
@@ -924,6 +915,39 @@ fun MainScreen(
                      Spacer(modifier = Modifier.width(8.dp))
                      Text(stringResource(R.string.support_project))
                  }
+
+                var reportIssueFocused by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = onReportIssueClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { reportIssueFocused = it.isFocused }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BugReport,
+                        contentDescription = stringResource(R.string.report_issue),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.report_issue))
+                }
+
+                var leaveReviewFocused by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = onLeaveReviewClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { leaveReviewFocused = it.isFocused }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = stringResource(R.string.leave_review),
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.leave_review))
+                }
             }
         }
     }
@@ -950,6 +974,132 @@ fun HelpDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.help_close))
+            }
+        }
+    )
+}
+
+/**
+ * Opens GitHub issues/new page
+ */
+fun openGitHubIssues(context: Context) {
+    val url = context.getString(R.string.github_issues_url)
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    try {
+        context.startActivity(intent)
+    } catch (e: ActivityNotFoundException) {
+        // Fallback: try to open in browser
+        try {
+            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            browserIntent.addCategory(Intent.CATEGORY_BROWSABLE)
+            context.startActivity(browserIntent)
+        } catch (e2: Exception) {
+            // If all else fails, show toast or log
+            android.util.Log.e("MainActivity", "Failed to open GitHub issues: ${e2.message}")
+        }
+    }
+}
+
+/**
+ * Opens Google Play review dialog
+ */
+fun openGooglePlayReview(context: Context) {
+    if (context is Activity) {
+        ReviewHelper.forceShowReview(context)
+    }
+}
+
+/**
+ * Rating dialog with 1-5 stars
+ */
+@Composable
+fun RatingDialog(
+    onDismiss: () -> Unit,
+    onRatingSelected: (Int) -> Unit
+) {
+    var selectedRating by remember { mutableStateOf(0) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.rating_dialog_title))
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.rating_dialog_message),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                Row(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (i in 1..5) {
+                        IconButton(
+                            onClick = { selectedRating = i }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "$i stars",
+                                tint = if (i <= selectedRating) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                },
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (selectedRating > 0) {
+                        onRatingSelected(selectedRating)
+                    }
+                },
+                enabled = selectedRating > 0
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.rating_dialog_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Dialog shown after low rating (1-3 stars)
+ */
+@Composable
+fun LowRatingDialog(
+    onDismiss: () -> Unit,
+    onReportIssue: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.rating_dialog_low_rating_title))
+        },
+        text = {
+            Text(stringResource(R.string.rating_dialog_low_rating_message))
+        },
+        confirmButton = {
+            TextButton(onClick = onReportIssue) {
+                Text(stringResource(R.string.rating_dialog_report_issue))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.rating_dialog_cancel))
             }
         }
     )

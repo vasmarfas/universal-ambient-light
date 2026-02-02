@@ -39,7 +39,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
     
-    // Логируем открытие настроек
     LaunchedEffect(Unit) {
         AnalyticsHelper.logSettingsOpened(context)
     }
@@ -78,10 +77,8 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Connection Group
             SettingsGroup(title = stringResource(R.string.pref_group_connection)) {
                 
-                // Используем key для принудительного обновления при изменении connectionType
                 key(connectionType) {
                     ListPreference(
                         prefs = prefs,
@@ -93,11 +90,9 @@ fun SettingsScreen(
                         onValueChange = { newType ->
                             val oldType = connectionType
                             connectionType = newType
-                            // Логируем изменение протокола
                             AnalyticsHelper.logProtocolChanged(context, oldType, newType)
                             AnalyticsHelper.logSettingChanged(context, "connection_type", newType)
                             AnalyticsHelper.updateProtocolProperty(context, newType)
-                            // Auto-set port when connection type changes
                             val defaultPort = when (newType) {
                                 "hyperion" -> "19400"
                                 "wled" -> if (wledProtocol == "ddp") "4048" else "19446"
@@ -115,7 +110,6 @@ fun SettingsScreen(
                 val isWled = connectionType == "wled"
                 val isHyperion = connectionType == "hyperion"
 
-                // Кнопка сканирования устройств (только для сетевых подключений)
                 if (isNetwork) {
                     ClickablePreference(
                         title = stringResource(R.string.scanner_scan_devices),
@@ -123,7 +117,6 @@ fun SettingsScreen(
                         onClick = { showScanDialog = true }
                     )
                     
-                    // Используем key для принудительного обновления при изменении connectionType
                     key(connectionType) {
                         EditTextPreference(
                             prefs = prefs,
@@ -334,26 +327,23 @@ fun SettingsScreen(
                         AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
                         AnalyticsHelper.logSettingChanged(context, "smoothing_preset", preset)
                         
-                        // Обновляем значения настроек в соответствии с пресетом
                         val presetValues = when (preset.lowercase()) {
                             "off" -> Triple(50, 0, 60)
                             "responsive" -> Triple(50, 0, 60)
                             "balanced" -> Triple(200, 80, 25)
                             "smooth" -> Triple(500, 200, 20)
-                            else -> Triple(200, 80, 25) // balanced по умолчанию
+                            else -> Triple(200, 80, 25)
                         }
                         
                         prefs.putInt(R.string.pref_key_settling_time, presetValues.first)
                         prefs.putInt(R.string.pref_key_output_delay, presetValues.second)
                         prefs.putInt(R.string.pref_key_update_frequency, presetValues.third)
                         
-                        // Если пресет "off", выключаем сглаживание
                         if (preset.lowercase() == "off") {
                             prefs.putBoolean(R.string.pref_key_smoothing_enabled, false)
                         }
                     }
                 )
-                // Используем key для принудительной перекомпозиции при изменении пресета
                 key(smoothingPreset) {
                     EditTextPreference(
                         prefs = prefs,
@@ -417,21 +407,18 @@ fun SettingsScreen(
         }
     }
     
-    // Device scan dialog (вне основного Column для правильной работы)
     if (showScanDialog) {
         DeviceScanDialog(
             onDismiss = { showScanDialog = false },
                             onDeviceSelected = { device ->
                                 val oldConnectionType = connectionType
                                 
-                                // Устанавливаем тип подключения ПЕРВЫМ, чтобы UI обновился
                                 when (device.type) {
                                     com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.WLED -> {
                                         val newConnectionType = "wled"
                                         prefs.putString(R.string.pref_key_connection_type, newConnectionType)
                                         connectionType = newConnectionType
                                         
-                                        // Устанавливаем протокол WLED
                                         val protocol = when (device.protocol) {
                                             "ddp" -> "ddp"
                                             "udp_raw" -> "udp_raw"
@@ -454,7 +441,6 @@ fun SettingsScreen(
                                     else -> {}
                                 }
                                 
-                                // Устанавливаем найденное устройство ПОСЛЕ установки типа подключения
                                 prefs.putString(R.string.pref_key_host, device.host)
                                 prefs.putString(R.string.pref_key_port, device.port.toString())
                                 
@@ -527,10 +513,8 @@ fun EditTextPreference(
     // Read value from prefs, but allow it to be overridden during composition
     var value by remember(keyRes, recomposeKey) { mutableStateOf(prefs.getString(keyRes) ?: "") }
     
-    // Update value when external value changes (only if provided) or when recomposeKey changes
     LaunchedEffect(externalValue, recomposeKey) {
         externalValue?.let { value = it }
-        // Перечитываем значение из preferences при изменении recomposeKey
         recomposeKey?.let { value = prefs.getString(keyRes) ?: "" }
     }
     
@@ -559,7 +543,6 @@ fun EditTextPreference(
         var tempValue by remember(showDialog) { mutableStateOf(value) }
         val keyboardController = LocalSoftwareKeyboardController.current
         
-        // Обновляем tempValue при открытии диалога
         LaunchedEffect(showDialog) {
             if (showDialog) {
                 tempValue = value
@@ -623,7 +606,6 @@ fun ListPreference(
     
     var value by remember(keyRes, recomposeKey) { mutableStateOf(prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "") }
     
-    // Обновляем значение при изменении recomposeKey
     LaunchedEffect(recomposeKey) {
         recomposeKey?.let { value = prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "" }
     }
@@ -734,3 +716,4 @@ fun ClickablePreference(
         }
     }
 }
+
