@@ -110,7 +110,7 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
 
 ##### Arduino Sketch for Adalight
 
-A ready-to-use Arduino sketch compatible with the app is available in [`arduino_sketch_adalight.ino`](adalight-sketch/adalight-sketch.ino).
+A ready-to-use Arduino sketch compatible with the app is available in [`adalight-sketch.ino`](adalight-sketch/adalight-sketch.ino).
 
 **Quick Start:**
 
@@ -118,7 +118,7 @@ A ready-to-use Arduino sketch compatible with the app is available in [`arduino_
    - In Arduino IDE: `Tools` → `Manage Libraries` → search for "FastLED" → install
 
 2. **Configure the sketch:**
-   - Open `arduino_sketch_adalight.ino`
+   - Open `adalight-sketch/adalight-sketch.ino`
    - Modify constants at the top of the file:
      - `DATA_PIN` — pin for LED strip connection (default 6)
      - `NUM_LEDS` — number of LEDs in the strip (must match app settings!)

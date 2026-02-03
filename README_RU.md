@@ -107,7 +107,7 @@ Universal Ambient Light — это современное Android-приложе
 
 ##### Arduino скетч для Adalight
 
-Готовый скетч для Arduino, совместимый с приложением, находится в файле [`arduino_sketch_adalight.ino`](adalight-sketch/adalight-sketch.ino).
+Готовый скетч для Arduino, совместимый с приложением, находится в файле [`adalight-sketch.ino`](adalight-sketch/adalight-sketch.ino).
 
 **Быстрый старт:**
 
@@ -115,7 +115,7 @@ Universal Ambient Light — это современное Android-приложе
    - В Arduino IDE: `Инструменты` → `Управление библиотеками` → найдите "FastLED" → установите
 
 2. **Настройте скетч:**
-   - Откройте файл `arduino_sketch_adalight.ino`
+   - Откройте файл `adalight-sketch/adalight-sketch.ino`
    - Измените константы в начале файла:
      - `DATA_PIN` — пин для подключения LED ленты (по умолчанию 6)
      - `NUM_LEDS` — количество LED в ленте (должно совпадать с настройками в приложении!)
