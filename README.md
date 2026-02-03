@@ -108,6 +108,60 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
 - **Protocol**: ADA (Standard Arduino), LBAPA (APA102), AWA.
 - [Adalight Repository](https://github.com/adafruit/Adalight)
 
+##### Arduino Sketch for Adalight
+
+A ready-to-use Arduino sketch compatible with the app is available in [`arduino_sketch_adalight.ino`](adalight-sketch/adalight-sketch.ino).
+
+**Quick Start:**
+
+1. **Install FastLED library:**
+   - In Arduino IDE: `Tools` → `Manage Libraries` → search for "FastLED" → install
+
+2. **Configure the sketch:**
+   - Open `arduino_sketch_adalight.ino`
+   - Modify constants at the top of the file:
+     - `DATA_PIN` — pin for LED strip connection (default 6)
+     - `NUM_LEDS` — number of LEDs in the strip (must match app settings!)
+     - `LED_TYPE` — LED strip type (WS2812B, WS2811, SK6812, etc.)
+     - `COLOR_ORDER` — color order (GRB for WS2812B, RGB for others)
+     - `BRIGHTNESS` — brightness (0-255)
+
+3. **Wiring:**
+   - LED strip DATA → Arduino pin (default 6)
+   - LED strip VCC → 5V Arduino (or external power supply for long strips)
+   - LED strip GND → GND Arduino
+   - ⚠️ **Important:** For long strips (>10 leds), use an external 5V power supply!
+
+4. **Upload sketch:**
+   - Connect Arduino to computer via USB
+   - Select board and port in Arduino IDE
+   - Upload the sketch
+
+5. **Connect to Android:**
+   - Disconnect Arduino from computer
+   - Connect Arduino to Android device via USB OTG cable
+   - In the app, select connection type: **Adalight**
+   - Set Baud Rate: **115200**
+   - Select protocol: **ADA**
+   - Ensure LED count in the app matches `NUM_LEDS` in the sketch
+
+**WS2812B Wiring Example:**
+```
+WS2812B DATA → Pin 6 Arduino
+WS2812B VCC  → 5V Arduino (or external 5V)
+WS2812B GND  → GND Arduino
+```
+
+**For other LED types:**
+- **APA102 (SPI)**: Use FastLED library with `APA102` configuration and **LBAPA** protocol in the app
+- **WS2811**: Similar to WS2812B, usually `COLOR_ORDER = RGB`
+- **SK6812**: Similar to WS2812B, usually `COLOR_ORDER = GRB`
+
+**Troubleshooting:**
+- If LEDs don't light up: check wiring, ensure `NUM_LEDS` matches in sketch and app
+- If colors are wrong: change `COLOR_ORDER` (try RGB, GRB, BRG)
+- If no data received: check Baud Rate (should be 115200), ensure USB OTG cable supports data transfer
+
 ## 📱 Android TV Features
 This application is fully optimized for Android TV, including support for the Leanback Launcher and D-pad navigation. For easier text entry (IP addresses), we recommend using the "Google TV" or "Android TV Remote" app on your phone.
 
