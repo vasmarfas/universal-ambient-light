@@ -8,12 +8,36 @@ import android.os.Build
 import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import android.hardware.usb.UsbManager
+import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
 
 class BootActivity : AppCompatActivity() {
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val prefs = Preferences(this)
+        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+
+        // For Adalight started from QuickTile/BootActivity, ensure USB permission BEFORE asking MediaProjection.
+        if ("adalight".equals(connectionType, ignoreCase = true)) {
+            UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+                context = this,
+                device = null,
+                onReady = { requestMediaProjection() },
+                onDenied = { finish() },
+                showToast = true
+            )
+        } else {
+            requestMediaProjection()
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    private fun requestMediaProjection() {
         val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         if (manager != null) {
             startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)

@@ -218,7 +218,12 @@ class ScreenGrabberService : Service() {
             AnalyticsHelper.logServiceError(baseContext, "media_projection_manager_null", null)
             return false
         }
-        val priorityValue = Integer.parseInt(priority)
+        // Безопасный парсинг приоритета (на случай пустой или некорректной строки)
+        val priorityValue = try {
+            priority.toInt()
+        } catch (e: NumberFormatException) {
+            100
+        }
 
         val finalHost = host ?: "localhost"
         val finalPort = if (port > 0) port else 19400

@@ -1,7 +1,9 @@
 package com.vasmarfas.UniversalAmbientLight.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -19,7 +21,6 @@ import com.vasmarfas.UniversalAmbientLight.openGitHubIssues
 import com.vasmarfas.UniversalAmbientLight.openGooglePlayReview
 import com.vasmarfas.UniversalAmbientLight.ui.led.LedLayoutScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import android.content.Context
@@ -180,13 +181,17 @@ fun AppNavHost(
         }
         composable(Screen.Settings.route) {
             val context = LocalContext.current
-            LaunchedEffect(Unit) {
-                AnalyticsHelper.logScreenView(context, "settings", "SettingsScreen")
+            // Use a key based on back stack entry to reset state when navigating
+            val backStackEntry = navController.currentBackStackEntry
+            key(backStackEntry?.id) {
+                LaunchedEffect(Unit) {
+                    AnalyticsHelper.logScreenView(context, "settings", "SettingsScreen")
+                }
+                SettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onLedLayoutClick = { navController.navigate(Screen.LedLayout.route) }
+                )
             }
-            SettingsScreen(
-                onBackClick = { navController.popBackStack() },
-                onLedLayoutClick = { navController.navigate(Screen.LedLayout.route) }
-            )
         }
         composable(Screen.LedLayout.route) {
             val context = LocalContext.current

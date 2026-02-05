@@ -131,12 +131,20 @@
     <item>Medium (128px)</item>
     <item>High (256px)</item>
     <item>Ultra (512px)</item>
+    <item>720p (unstable)</item>
+    <item>1080p (unstable)</item>
+    <item>1440p (unstable)</item>
+    <item>2160p (unstable)</item>
   </string-array>
   <string-array name="pref_list_capture_quality_values">
     <item>64</item>
     <item>128</item>
     <item>256</item>
     <item>512</item>
+    <item>720</item>
+    <item>1080</item>
+    <item>1440</item>
+    <item>2160</item>
   </string-array>
   <!-- General settings -->
   <string name="pref_group_general">General</string>

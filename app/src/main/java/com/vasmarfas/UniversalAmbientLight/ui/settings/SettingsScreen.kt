@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -518,7 +519,17 @@ fun EditTextPreference(
         recomposeKey?.let { value = prefs.getString(keyRes) ?: "" }
     }
     
-    var showDialog by remember { mutableStateOf(false) }
+    // Reset dialog state when recomposeKey changes (e.g., when navigating away)
+    // This ensures dialogs are closed when the screen is navigated away from
+    var showDialog by remember(recomposeKey) { mutableStateOf(false) }
+    
+    // Close dialog when component is disposed (e.g., when navigating away)
+    DisposableEffect(Unit) {
+        onDispose {
+            // Force close dialog when leaving the screen
+            showDialog = false
+        }
+    }
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
@@ -609,7 +620,17 @@ fun ListPreference(
     LaunchedEffect(recomposeKey) {
         recomposeKey?.let { value = prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "" }
     }
-    var showDialog by remember { mutableStateOf(false) }
+    // Reset dialog state when recomposeKey changes (e.g., when navigating away)
+    // This ensures dialogs are closed when the screen is navigated away from
+    var showDialog by remember(recomposeKey) { mutableStateOf(false) }
+    
+    // Close dialog when component is disposed (e.g., when navigating away)
+    DisposableEffect(Unit) {
+        onDispose {
+            // Force close dialog when leaving the screen
+            showDialog = false
+        }
+    }
     val interactionSource = remember { MutableInteractionSource() }
 
     val summary = entries.getOrNull(entryValues.indexOf(value)) ?: value

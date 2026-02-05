@@ -78,6 +78,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
@@ -100,6 +101,33 @@ class MainActivity : ComponentActivity() {
     private var mSessionStartTime: Long? = null
 
     private var usbPermissionReceiverRegistered = false
+    private var usbAttachReceiverRegistered = false
+
+    private val usbAttachReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (UsbManager.ACTION_USB_DEVICE_ATTACHED != intent.action) return
+
+            val prefs = Preferences(this@MainActivity)
+            val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+            if (!"adalight".equals(connectionType, ignoreCase = true)) return
+
+            val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, android.hardware.usb.UsbDevice::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+            }
+
+            // Only request permission for devices that our USB-Serial prober recognizes
+            UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+                context = this@MainActivity,
+                device = device,
+                onReady = { /* permission granted, nothing else to do here */ },
+                onDenied = null,
+                showToast = true
+            )
+        }
+    }
 
     private val mMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -218,11 +246,54 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+
+        // Auto-request USB permission when a USB-Serial device is already connected while app is open.
+        val prefs = Preferences(this)
+        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        if ("adalight".equals(connectionType, ignoreCase = true)) {
+            UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+                context = this,
+                device = null,
+                onReady = { /* already granted */ },
+                onDenied = null,
+                showToast = false
+            )
+        }
+
+        if (!usbAttachReceiverRegistered) {
+            val filter = IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            ContextCompat.registerReceiver(
+                this,
+                usbAttachReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            usbAttachReceiverRegistered = true
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver)
+
+        if (usbAttachReceiverRegistered) {
+            try {
+                unregisterReceiver(usbAttachReceiver)
+            } catch (_: Exception) {
+            }
+            usbAttachReceiverRegistered = false
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (usbAttachReceiverRegistered) {
+            try {
+                unregisterReceiver(usbAttachReceiver)
+            } catch (_: Exception) {
+            }
+            usbAttachReceiverRegistered = false
+        }
     }
 
     private fun requestNotificationPermission() {

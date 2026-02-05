@@ -9,6 +9,9 @@ import android.os.Build
 import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
 
 class ToggleActivity : AppCompatActivity() {
 
@@ -63,9 +66,30 @@ class ToggleActivity : AppCompatActivity() {
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private fun requestPermission() {
-        val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
-        if (manager != null) {
-            startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+        val prefs = Preferences(this)
+        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+
+        val requestMediaProjection = {
+            val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+            if (manager != null) {
+                startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+            } else {
+                finish()
+            }
+        }
+
+        // ToggleActivity is used from launcher shortcut / external actions.
+        // If Adalight is selected, ensure USB permission first to avoid "tap twice" UX.
+        if ("adalight".equals(connectionType, ignoreCase = true)) {
+            UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+                context = this,
+                device = null,
+                onReady = requestMediaProjection,
+                onDenied = { finish() },
+                showToast = true
+            )
+        } else {
+            requestMediaProjection()
         }
     }
 

@@ -104,27 +104,47 @@ class ScreenEncoder(
         if (quality <= 0) quality = 128 // fallback
 
         // Use REAL screen dimensions, not the scaled-down ones from base class
-        // The base class uses findDivisor() which is meant for full-frame protocols,
-        // but we only need perimeter pixels for WLED/LED strips
         val screenWidth = getScreenWidth()
         val screenHeight = getScreenHeight()
-        
-        Log.d(TAG, "initCaptureDimensions: quality=$quality, screenWidth=$screenWidth, screenHeight=$screenHeight")
+
+        Log.d(
+            TAG,
+            "initCaptureDimensions: quality=$quality, screenWidth=$screenWidth, screenHeight=$screenHeight"
+        )
 
         // Calculate aspect ratio from real screen dimensions
         val ratio = screenWidth.toFloat() / screenHeight
         Log.d(TAG, "initCaptureDimensions: ratio=$ratio")
 
-        // Limit width by quality settings
-        val w = min(screenWidth, quality)
-        val h = (w / ratio).toInt()
-        Log.d(TAG, "initCaptureDimensions: calculated w=$w, h=$h")
+        val (w, h) = if (quality <= 512) {
+            // Legacy behaviour: treat quality as max capture width in pixels
+            val targetWidth = min(screenWidth, quality)
+            val targetHeight = (targetWidth / ratio).toInt()
+            Log.d(
+                TAG,
+                "initCaptureDimensions (legacy): requestedWidth=$quality, targetWidth=$targetWidth, targetHeight=$targetHeight"
+            )
+            targetWidth to targetHeight
+        } else {
+            // New behaviour for "p" presets (720p/1080p/1440p/2160p):
+            // treat quality as target VERTICAL resolution, keep aspect ratio from real screen.
+            val targetHeight = min(screenHeight, quality)
+            val targetWidth = (targetHeight * ratio).toInt()
+            Log.d(
+                TAG,
+                "initCaptureDimensions (p-preset): requestedHeight=$quality, targetWidth=$targetWidth, targetHeight=$targetHeight"
+            )
+            targetWidth to targetHeight
+        }
 
-        // Ensure even dimensions
+        // Ensure even dimensions and sane minimum size
         mCaptureWidth = max(32, w and 1.inv())
         mCaptureHeight = max(32, h and 1.inv())
-        
-        Log.d(TAG, "initCaptureDimensions: FINAL mCaptureWidth=$mCaptureWidth, mCaptureHeight=$mCaptureHeight")
+
+        Log.d(
+            TAG,
+            "initCaptureDimensions: FINAL mCaptureWidth=$mCaptureWidth, mCaptureHeight=$mCaptureHeight"
+        )
     }
 
     @Throws(MediaCodec.CodecException::class)

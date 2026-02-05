@@ -40,7 +40,7 @@ object LedDataExtractor {
         var captureMarginBottom = 0
         var captureMarginLeft = 0
         var ledOffset = 0
-        
+
         try {
             val prefs = Preferences(context)
             xLed = prefs.getInt(R.string.pref_key_x_led)
@@ -169,7 +169,7 @@ object LedDataExtractor {
         if (logsEnabled) Log.d(TAG, "extractPerimeterPixels: width=$width, height=$height, top=$topCount, right=$rightCount, bottom=$bottomCount, left=$leftCount, totalLEDs=$totalLEDs")
         if (logsEnabled) Log.d(TAG, "startCorner=$startCorner, direction=$direction")
         if (logsEnabled) Log.d(TAG, "screenData.size=${screenData.size}, expected=$expectedSize")
-        
+
         if (screenData.size < expectedSize) {
             if (logsEnabled) Log.e(TAG, "screenData is too small! Expected at least $expectedSize bytes, got ${screenData.size}")
         }
@@ -188,7 +188,7 @@ object LedDataExtractor {
         val marginRight = captureMarginRight.coerceIn(0, 40)
         val marginBottom = captureMarginBottom.coerceIn(0, 40)
         val marginLeft = captureMarginLeft.coerceIn(0, 40)
-        
+
         val marginTopPx = height * marginTop / 100f
         val marginRightPx = width * marginRight / 100f
         val marginBottomPx = height * marginBottom / 100f
@@ -217,7 +217,7 @@ object LedDataExtractor {
 
         // Determine edge order based on start corner and direction
         val edges = getEdgeOrder(startCorner, direction)
-        
+
         // Process each edge in order
         for (edge in edges) {
             val sideMode = when {
@@ -227,10 +227,10 @@ object LedDataExtractor {
                 edge.startsWith("left_") -> sideLeft
                 else -> "enabled"
             }
-            
+
             // Skip if not installed
             if (sideMode == "not_installed") continue
-            
+
             when (edge) {
                 "top_lr" -> {
                     // Top edge (left to right)

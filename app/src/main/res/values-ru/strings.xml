@@ -131,12 +131,20 @@
     <item>Среднее (128px)</item>
     <item>Высокое (256px)</item>
     <item>Ультра (512px)</item>
+    <item>720p (нестаб.)</item>
+    <item>1080p (нестаб.)</item>
+    <item>1440p (нестаб.)</item>
+    <item>2160p (нестаб.)</item>
   </string-array>
   <string-array name="pref_list_capture_quality_values">
     <item>64</item>
     <item>128</item>
     <item>256</item>
     <item>512</item>
+    <item>720</item>
+    <item>1080</item>
+    <item>1440</item>
+    <item>2160</item>
   </string-array>
   <!-- General settings -->
   <string name="pref_group_general">Общие</string>

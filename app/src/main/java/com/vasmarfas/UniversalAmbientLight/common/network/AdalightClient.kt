@@ -14,6 +14,7 @@ class AdalightClient(
     private val mContext: Context,
     private val mPriority: Int,
     baudRate: Int,
+    protocol: String = "ada",
     smoothingEnabled: Boolean = true,
     smoothingPreset: String = "balanced",
     settlingTime: Int = 200,
@@ -28,7 +29,11 @@ class AdalightClient(
     }
 
     private val mBaudRate: Int = if (baudRate > 0) baudRate else 115200
-    private val mProtocol = ProtocolType.ADA // Default to ADA
+    private val mProtocol = when (protocol.lowercase()) {
+        "lbapa", "1" -> ProtocolType.LBAPA
+        "awa", "2" -> ProtocolType.AWA
+        else -> ProtocolType.ADA
+    }
 
     private var mPort: UsbSerialPort? = null
     @Volatile
@@ -36,6 +41,13 @@ class AdalightClient(
 
     private val mSmoothing: ColorSmoothing
     private var mLedDataBuffer: Array<ColorRgb>? = null
+
+    // Сохраняем исходно запрошенную частоту, чтобы auto-throttle никогда не повышал её выше пользовательской
+    private val mRequestedUpdateFrequency: Int = updateFrequency
+    @Volatile
+    private var mEffectiveUpdateFrequency: Int = updateFrequency
+    @Volatile
+    private var mLastAutoThrottlePacketSize: Int = -1
 
     init {
         // Initialize smoothing with callback to send data
@@ -54,6 +66,10 @@ class AdalightClient(
         }
         if (updateFrequency != presetValues.updateFrequency) {
             mSmoothing.setUpdateFrequency(updateFrequency)
+            mEffectiveUpdateFrequency = updateFrequency
+        } else {
+            // Preset frequency remains active
+            mEffectiveUpdateFrequency = presetValues.updateFrequency
         }
         // enabled всегда переопределяем, так как это отдельная настройка
         mSmoothing.setEnabled(smoothingEnabled)
@@ -197,6 +213,7 @@ class AdalightClient(
 
         try {
             val packet = createPacket(mProtocol, leds)
+            maybeAutoThrottle(packet.size)
             mPort!!.write(packet, 1000)
 
             // Log for debugging occasionally
@@ -206,6 +223,30 @@ class AdalightClient(
         } catch (e: IOException) {
             Log.e(TAG, "Failed to send data", e)
             mConnected = false
+        }
+    }
+
+    /**
+     * Auto-throttle частоту сглаживания под выбранный baudrate и фактический размер пакета.
+     * Это резко повышает стабильность при большом количестве LED (иначе данные начинают идти "без пауз",
+     * Arduino теряет байты, и протокол рассинхронизируется).
+     */
+    private fun maybeAutoThrottle(packetSizeBytes: Int) {
+        if (packetSizeBytes <= 0) return
+        // Пересчитываем только если меняется размер (например, при смене протокола или количества LED)
+        if (packetSizeBytes == mLastAutoThrottlePacketSize) return
+        mLastAutoThrottlePacketSize = packetSizeBytes
+
+        // Приблизительно: 1 байт = 10 бит (8N1)
+        val maxBytesPerSecond = mBaudRate.toDouble() / 10.0
+        val maxHz = maxBytesPerSecond / packetSizeBytes.toDouble()
+        val safeHz = (maxHz * 0.90).toInt().coerceIn(1, 60)
+
+        val desiredHz = minOf(mRequestedUpdateFrequency, safeHz)
+        if (desiredHz != mEffectiveUpdateFrequency) {
+            mEffectiveUpdateFrequency = desiredHz
+            mSmoothing.setUpdateFrequency(desiredHz)
+            Log.i(TAG, "Auto-throttle smoothing: ${desiredHz}Hz (baud=$mBaudRate, packet=$packetSizeBytes bytes)")
         }
     }
 
@@ -252,14 +293,14 @@ class AdalightClient(
 
         val packet = ByteArray(6 + startFrameSize + dataSize + endFrameSize)
 
-        // Header (same as ADA)
+        // Header (same as ADA but with ledCount, not ledCount-1)
         packet[0] = 'A'.code.toByte()
         packet[1] = 'd'.code.toByte()
         packet[2] = 'a'.code.toByte()
 
-        val ledCountMinusOne = ledCount - 1
-        packet[3] = ((ledCountMinusOne shr 8) and 0xFF).toByte()
-        packet[4] = (ledCountMinusOne and 0xFF).toByte()
+        // LBAPA uses ledCount directly, NOT ledCount-1 like standard Adalight
+        packet[3] = ((ledCount shr 8) and 0xFF).toByte()
+        packet[4] = (ledCount and 0xFF).toByte()
         packet[5] = (packet[3].toInt() xor packet[4].toInt() xor 0x55).toByte()
 
         // Start Frame (4 bytes 0x00)
@@ -310,19 +351,24 @@ class AdalightClient(
         var fletcher1 = 0
         var fletcher2 = 0
         var fletcherExt = 0
+        // Hyperion implementation uses 0-based position
+        var position = 0
 
         for (i in 0 until dataSize) {
             val `val` = packet[6 + i].toInt() and 0xFF
-            val position = i + 1 // 1-based index
-
+            
             fletcherExt = (fletcherExt + (`val` xor position)) % 255
             fletcher1 = (fletcher1 + `val`) % 255
             fletcher2 = (fletcher2 + fletcher1) % 255
+            
+            position = (position + 1) % 256
         }
 
         packet[offset++] = fletcher1.toByte()
         packet[offset++] = fletcher2.toByte()
-        packet[offset] = fletcherExt.toByte()
+        
+        // Handle special case 0x41 ('A') to avoid confusion with header
+        packet[offset] = if (fletcherExt == 0x41) 0xaa.toByte() else fletcherExt.toByte()
 
         return packet
     }

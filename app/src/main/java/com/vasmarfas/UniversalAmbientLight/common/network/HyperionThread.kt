@@ -191,8 +191,8 @@ class HyperionThread(
             WLEDClient(mContext, host, mPort, mPriority, mWledColorOrder,
                 mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
         } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
-            // AdalightClient (context, priority, baudrate, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
-            AdalightClient(mContext, mPriority, mBaudRate,
+            // AdalightClient (context, priority, baudrate, protocol, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
+            AdalightClient(mContext, mPriority, mBaudRate, mAdalightProtocol,
                 mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
         } else {
             // Default to Hyperion
