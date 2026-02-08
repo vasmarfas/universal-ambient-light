@@ -515,8 +515,14 @@ class ScreenGrabberService : Service() {
             val metrics = DisplayMetrics()
             window.defaultDisplay.getRealMetrics(metrics)
 
+            val prefs = Preferences(this)
             val options = AppOptions(
-                mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality
+                mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality,
+                brightness = prefs.getInt(R.string.pref_key_color_brightness, 100),
+                contrast = prefs.getInt(R.string.pref_key_color_contrast, 100),
+                blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
+                whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
+                saturation = prefs.getInt(R.string.pref_key_color_saturation, 100)
             )
 
             if (DEBUG) Log.v(TAG, "Creating encoder: " + metrics.widthPixels + "x" + metrics.heightPixels)
@@ -581,8 +587,14 @@ class ScreenGrabberService : Service() {
             val metrics = DisplayMetrics()
             window.defaultDisplay.getRealMetrics(metrics)
 
+            val prefs = Preferences(this)
             val options = AppOptions(
-                mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality
+                mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality,
+                brightness = prefs.getInt(R.string.pref_key_color_brightness, 100),
+                contrast = prefs.getInt(R.string.pref_key_color_contrast, 100),
+                blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
+                whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
+                saturation = prefs.getInt(R.string.pref_key_color_saturation, 100)
             )
 
             mScreenEncoder = ScreenEncoder(

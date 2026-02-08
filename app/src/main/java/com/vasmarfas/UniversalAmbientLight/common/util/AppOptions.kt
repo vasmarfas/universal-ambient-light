@@ -8,7 +8,12 @@ class AppOptions(
     verticalLED: Int,
     val frameRate: Int,
     val useAverageColor: Boolean,
-    val captureQuality: Int
+    val captureQuality: Int,
+    val brightness: Int = 100, // Яркость в процентах [0-200]
+    val contrast: Int = 100, // Контрастность в процентах [0-200]
+    val blackLevel: Int = 0, // Уровень черного в процентах [0-100], значения ниже этого будут обрезаны
+    val whiteLevel: Int = 100, // Уровень белого в процентах [0-100], значения выше этого будут обрезаны
+    val saturation: Int = 100 // Насыщенность в процентах [0-200]
 ) {
     private val minimumImagePacketSize: Int
     val blackThreshold: Int = 5 // The limit each RGB value must be under to be considered a black pixel [0-255]

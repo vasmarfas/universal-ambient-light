@@ -14,6 +14,7 @@ import android.os.HandlerThread
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
+import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
@@ -262,6 +263,9 @@ class ScreenEncoder(
 
         val rgb = extractRgb(buffer, width, height, rowStride, pixelStride, bx, by, effWidth, effHeight)
         
+        // Применяем обработку цветов
+        ColorProcessor.processRgbData(rgb, mOptions)
+        
         // Log occasionally for debugging
         if (DEBUG && System.currentTimeMillis() % 5000 < 100) {
             Log.d(TAG, "sendPixelData: effWidth=$effWidth, effHeight=$effHeight, rgb.size=${rgb.size}, expected=${effWidth * effHeight * 3}")
@@ -373,9 +377,23 @@ class ScreenEncoder(
         }
 
         if (count > 0) {
-            mAvgColorResult[0] = (r / count).toByte()
-            mAvgColorResult[1] = (g / count).toByte()
-            mAvgColorResult[2] = (b / count).toByte()
+            val avgR = (r / count).toInt()
+            val avgG = (g / count).toInt()
+            val avgB = (b / count).toInt()
+            
+            // Применяем обработку цветов
+            val (rOut, gOut, bOut) = ColorProcessor.processColor(
+                avgR, avgG, avgB,
+                mOptions.brightness,
+                mOptions.contrast,
+                mOptions.blackLevel,
+                mOptions.whiteLevel,
+                mOptions.saturation
+            )
+            
+            mAvgColorResult[0] = rOut.toByte()
+            mAvgColorResult[1] = gOut.toByte()
+            mAvgColorResult[2] = bOut.toByte()
             mListener.sendFrame(mAvgColorResult, 1, 1)
         }
     }

@@ -301,6 +301,63 @@ fun SettingsScreen(
                         AnalyticsHelper.logSettingChanged(context, "use_avg_color", enabled.toString())
                     }
                 )
+                
+                // Color processing settings
+                EditTextPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_color_brightness,
+                    title = stringResource(R.string.pref_title_color_brightness),
+                    summaryProvider = { "${it}%" },
+                    keyboardType = KeyboardType.Number,
+                    onValueChange = { newValue ->
+                        val valueInt = newValue.toIntOrNull() ?: 100
+                        AnalyticsHelper.logSettingChanged(context, "color_brightness", newValue)
+                    }
+                )
+                EditTextPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_color_contrast,
+                    title = stringResource(R.string.pref_title_color_contrast),
+                    summaryProvider = { "${it}%" },
+                    keyboardType = KeyboardType.Number,
+                    onValueChange = { newValue ->
+                        val valueInt = newValue.toIntOrNull() ?: 100
+                        AnalyticsHelper.logSettingChanged(context, "color_contrast", newValue)
+                    }
+                )
+                EditTextPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_color_black_level,
+                    title = stringResource(R.string.pref_title_color_black_level),
+                    summaryProvider = { "${it}%" },
+                    keyboardType = KeyboardType.Number,
+                    onValueChange = { newValue ->
+                        val valueInt = newValue.toIntOrNull() ?: 0
+                        AnalyticsHelper.logSettingChanged(context, "color_black_level", newValue)
+                    }
+                )
+                EditTextPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_color_white_level,
+                    title = stringResource(R.string.pref_title_color_white_level),
+                    summaryProvider = { "${it}%" },
+                    keyboardType = KeyboardType.Number,
+                    onValueChange = { newValue ->
+                        val valueInt = newValue.toIntOrNull() ?: 100
+                        AnalyticsHelper.logSettingChanged(context, "color_white_level", newValue)
+                    }
+                )
+                EditTextPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_color_saturation,
+                    title = stringResource(R.string.pref_title_color_saturation),
+                    summaryProvider = { "${it}%" },
+                    keyboardType = KeyboardType.Number,
+                    onValueChange = { newValue ->
+                        val valueInt = newValue.toIntOrNull() ?: 100
+                        AnalyticsHelper.logSettingChanged(context, "color_saturation", newValue)
+                    }
+                )
             }
 
             // Smoothing Group

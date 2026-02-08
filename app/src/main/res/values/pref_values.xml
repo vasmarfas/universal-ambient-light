@@ -153,4 +153,20 @@
 
     <string name="pref_key_capture_margin_left" translatable="false">pref_key_capture_margin_left</string>
     <integer name="pref_default_capture_margin_left" translatable="false">0</integer>
+
+    <!-- Color processing settings -->
+    <string name="pref_key_color_brightness" translatable="false">pref_key_color_brightness</string>
+    <integer name="pref_default_color_brightness" translatable="false">100</integer>
+
+    <string name="pref_key_color_contrast" translatable="false">pref_key_color_contrast</string>
+    <integer name="pref_default_color_contrast" translatable="false">100</integer>
+
+    <string name="pref_key_color_black_level" translatable="false">pref_key_color_black_level</string>
+    <integer name="pref_default_color_black_level" translatable="false">0</integer>
+
+    <string name="pref_key_color_white_level" translatable="false">pref_key_color_white_level</string>
+    <integer name="pref_default_color_white_level" translatable="false">100</integer>
+
+    <string name="pref_key_color_saturation" translatable="false">pref_key_color_saturation</string>
+    <integer name="pref_default_color_saturation" translatable="false">100</integer>
 </resources>

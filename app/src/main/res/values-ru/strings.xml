@@ -125,6 +125,16 @@
   <string name="pref_summary_framerate">Кадров в секунду для отправки на контроллер</string>
   <string name="pref_title_capture_quality">Качество захвата</string>
   <string name="pref_summary_capture_quality">Разрешение захвата экрана (влияет на производительность)</string>
+  <string name="pref_title_color_brightness">Яркость</string>
+  <string name="pref_summary_color_brightness">Общая яркость (0–200%)</string>
+  <string name="pref_title_color_contrast">Контрастность</string>
+  <string name="pref_summary_color_contrast">Контрастность (0–200%)</string>
+  <string name="pref_title_color_black_level">Уровень черного</string>
+  <string name="pref_summary_color_black_level">Порог отсечки для темных цветов (0–100%). Большие значения отключают светодиоды на темных экранах</string>
+  <string name="pref_title_color_white_level">Уровень белого</string>
+  <string name="pref_summary_color_white_level">Максимальная яркость (0–100%)</string>
+  <string name="pref_title_color_saturation">Насыщенность</string>
+  <string name="pref_summary_color_saturation">Насыщенность цветов (0–200%)</string>
   <string name="battery_optimization_prompt">Чтобы захват/подсветка стабильнее работали в фоне (особенно на TV), рекомендуем отключить оптимизацию батареи для приложения.</string>
   <string-array name="pref_list_capture_quality">
     <item>Низкое (64px)</item>

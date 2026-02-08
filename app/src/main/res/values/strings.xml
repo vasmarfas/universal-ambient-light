@@ -125,6 +125,16 @@
   <string name="pref_summary_framerate">Frames per second in which to send data to hyperion</string>
   <string name="pref_title_capture_quality">Capture Quality</string>
   <string name="pref_summary_capture_quality">Screen capture resolution (affects performance)</string>
+  <string name="pref_title_color_brightness">Brightness</string>
+  <string name="pref_summary_color_brightness">Overall brightness adjustment (0-200%)</string>
+  <string name="pref_title_color_contrast">Contrast</string>
+  <string name="pref_summary_color_contrast">Contrast adjustment (0-200%)</string>
+  <string name="pref_title_color_black_level">Black Level</string>
+  <string name="pref_summary_color_black_level">Cutoff level for dark colors (0-100%). Higher values turn off LEDs on dark screens</string>
+  <string name="pref_title_color_white_level">White Level</string>
+  <string name="pref_summary_color_white_level">Maximum brightness level (0-100%)</string>
+  <string name="pref_title_color_saturation">Saturation</string>
+  <string name="pref_summary_color_saturation">Color saturation adjustment (0-200%)</string>
   <string name="battery_optimization_prompt">Чтобы захват/подсветка стабильнее работали в фоне (особенно на TV), рекомендуем отключить оптимизацию батареи для приложения.</string>
   <string-array name="pref_list_capture_quality">
     <item>Low (64px)</item>
