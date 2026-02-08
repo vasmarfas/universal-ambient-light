@@ -23,6 +23,11 @@ class HyperionFlatBuffers(
     private var mSocket: Socket? = null
 
     init {
+        // Validate port range (1-65535)
+        if (port < 1 || port > 65535) {
+            throw IllegalArgumentException("Port out of range: $port (must be between 1 and 65535)")
+        }
+        
         mSocket = Socket()
         mSocket!!.tcpNoDelay = true // Disable Nagle's algorithm for low latency
         mSocket!!.sendBufferSize = 8192 // Smaller buffer for faster sends

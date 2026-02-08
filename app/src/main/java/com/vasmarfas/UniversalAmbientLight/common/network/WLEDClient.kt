@@ -51,6 +51,11 @@ class WLEDClient(
     private val mLastErrorLogMs = AtomicLong(0L)
 
     init {
+        // Validate port range (1-65535)
+        if (port > 65535) {
+            throw IllegalArgumentException("Port out of range: $port (must be between 1 and 65535)")
+        }
+        
         // Use default port based on protocol if not specified
         if (port <= 0 || port == 80) {
             mPort = if (mProtocol == Protocol.DDP) DEFAULT_PORT_DDP else DEFAULT_PORT_DRGB

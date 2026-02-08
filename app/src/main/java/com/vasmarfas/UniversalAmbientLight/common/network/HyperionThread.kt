@@ -185,6 +185,11 @@ class HyperionThread(
 
     @Throws(IOException::class)
     private fun createClient(): HyperionClient? {
+        // Validate port range (1-65535)
+        if (mPort < 1 || mPort > 65535) {
+            throw IOException("Port out of range: $mPort (must be between 1 and 65535)")
+        }
+        
         val host = mHost ?: "localhost"
         return if ("wled".equals(mConnectionType, ignoreCase = true)) {
             // WLEDClient (context, host, port, priority, colorOrder, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)

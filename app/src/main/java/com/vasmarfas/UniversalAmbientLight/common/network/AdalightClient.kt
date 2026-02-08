@@ -211,10 +211,16 @@ class AdalightClient(
     private fun sendLedData(leds: Array<ColorRgb>) {
         if (!isConnected()) return
 
+        val port = mPort ?: run {
+            Log.w(TAG, "Port is null, connection lost")
+            mConnected = false
+            return
+        }
+
         try {
             val packet = createPacket(mProtocol, leds)
             maybeAutoThrottle(packet.size)
-            mPort!!.write(packet, 1000)
+            port.write(packet, 1000)
 
             // Log for debugging occasionally
             if (System.currentTimeMillis() % 2000 < 50) {
@@ -222,6 +228,12 @@ class AdalightClient(
             }
         } catch (e: IOException) {
             Log.e(TAG, "Failed to send data", e)
+            mConnected = false
+        } catch (e: NullPointerException) {
+            Log.e(TAG, "USB connection lost (NullPointerException)", e)
+            mConnected = false
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected error sending data", e)
             mConnected = false
         }
     }

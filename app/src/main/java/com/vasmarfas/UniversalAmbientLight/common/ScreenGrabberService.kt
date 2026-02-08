@@ -164,11 +164,12 @@ class ScreenGrabberService : Service() {
         mConnectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         val host = prefs.getString(R.string.pref_key_host, null)
         val port = prefs.getInt(R.string.pref_key_port, -1)
-        val priority = prefs.getString(R.string.pref_key_priority, "100") ?: "100"
+        val priority = prefs.getString(R.string.pref_key_priority, "100")?.takeIf { it.isNotBlank() } ?: "100"
         mFrameRate = prefs.getInt(R.string.pref_key_framerate)
 
         try {
-            mCaptureQuality = Integer.parseInt(prefs.getString(R.string.pref_key_capture_quality, "128") ?: "128")
+            val captureQualityStr = prefs.getString(R.string.pref_key_capture_quality, "128")?.takeIf { it.isNotBlank() } ?: "128"
+            mCaptureQuality = Integer.parseInt(captureQualityStr)
         } catch (e: NumberFormatException) {
             mCaptureQuality = 128
         }
@@ -203,6 +204,12 @@ class ScreenGrabberService : Service() {
             if (port == -1) {
                 mStartError = resources.getString(R.string.error_empty_port)
                 AnalyticsHelper.logServiceError(baseContext, "empty_port", null)
+                return false
+            }
+            // Validate port range (1-65535)
+            if (port < 1 || port > 65535) {
+                mStartError = "Invalid port: $port (must be between 1 and 65535)"
+                AnalyticsHelper.logServiceError(baseContext, "invalid_port", "port: $port")
                 return false
             }
         }
