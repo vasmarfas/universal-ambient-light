@@ -49,6 +49,8 @@ class ScreenGrabberService : Service() {
     private var mVerticalLEDCount: Int = 0
     private var mSendAverageColor: Boolean = false
     private var mScreenEncoder: ScreenEncoder? = null
+    private var mCameraEncoder: CameraEncoder? = null
+    private var mCaptureSource: String = "screen" // "screen" or "camera"
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
     private var mConnectionType = "hyperion"
@@ -106,16 +108,23 @@ class ScreenGrabberService : Service() {
                     // Reset WLED client data send block after EPERM error to resume sending on screen wake
                     mHyperionThread?.resetBlockedIfWLED()
                     
-                    if (mScreenEncoder != null && !isCapturing) {
-                        if (DEBUG) Log.v(TAG, "Encoder not grabbing, attempting to resume")
-                        mScreenEncoder!!.resumeRecording()
-                    }
+                    if (mCaptureSource == "camera") {
+                        // Camera mode: just resume camera if not capturing
+                        if (mCameraEncoder != null && !isCapturing) {
+                            mCameraEncoder!!.resumeRecording()
+                        }
+                    } else {
+                        if (mScreenEncoder != null && !isCapturing) {
+                            if (DEBUG) Log.v(TAG, "Encoder not grabbing, attempting to resume")
+                            mScreenEncoder!!.resumeRecording()
+                        }
 
-                    // If MediaProjection was stopped by system (sleep), resumeRecording() won't help.
-                    // Recreate encoder from saved projection data.
-                    if (!isCapturing) {
-                        if (DEBUG) Log.v(TAG, "Still not capturing after resume; trying to restart encoder")
-                        restartEncoderFromSavedProjection()
+                        // If MediaProjection was stopped by system (sleep), resumeRecording() won't help.
+                        // Recreate encoder from saved projection data.
+                        if (!isCapturing) {
+                            if (DEBUG) Log.v(TAG, "Still not capturing after resume; trying to restart encoder")
+                            restartEncoderFromSavedProjection()
+                        }
                     }
                     notifyActivity()
                 }
@@ -126,9 +135,10 @@ class ScreenGrabberService : Service() {
                     acquireWakeLock()
                     acquireWifiLock()
                     if (mScreenEncoder != null) {
-                        if (DEBUG) Log.v(TAG, "Clearing current light data")
+                        if (DEBUG) Log.v(TAG, "Clearing current light data (screen mode)")
                         mScreenEncoder!!.clearLights()
                     }
+                    // Camera mode: keep running — camera captures external TV, screen sleep is irrelevant
                 }
                 Intent.ACTION_CONFIGURATION_CHANGED -> {
                     if (DEBUG) Log.v(TAG, "ACTION_CONFIGURATION_CHANGED intent received")
@@ -136,10 +146,11 @@ class ScreenGrabberService : Service() {
                         if (DEBUG) Log.v(TAG, "Configuration changed, checking orientation")
                         mScreenEncoder!!.setOrientation(resources.configuration.orientation)
                     }
+                    mCameraEncoder?.setOrientation(resources.configuration.orientation)
                 }
                 Intent.ACTION_SHUTDOWN, Intent.ACTION_REBOOT -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SHUTDOWN|ACTION_REBOOT intent received")
-                    stopScreenRecord()
+                    stopAllCapture()
                 }
             }
         }
@@ -188,11 +199,11 @@ class ScreenGrabberService : Service() {
 
         val adalightProtocol = prefs.getString(R.string.pref_key_adalight_protocol, "ada") ?: "ada"
 
-        val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
-        val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "balanced") ?: "balanced"
-        val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 200)
-        val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 80).toLong()
-        val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 25)
+        val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
+        val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
+        val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 50)
+        val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 0).toLong()
+        val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 60)
 
         // For Adalight, host and port are not required
         if (!"adalight".equals(mConnectionType, ignoreCase = true)) {
@@ -258,6 +269,7 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.v(TAG, "Start command action: " + action.toString())
             when (action) {
                 ACTION_START -> if (mHyperionThread == null) {
+                    mCaptureSource = "screen"
                     val isPrepared = prepared()
                     if (isPrepared) {
                         val foregroundStarted = tryStartForeground()
@@ -276,28 +288,37 @@ class ScreenGrabberService : Service() {
                             return START_STICKY
                         }
 
-                        val intentFilter = IntentFilter()
-                        intentFilter.addAction(Intent.ACTION_SCREEN_ON)
-                        intentFilter.addAction(Intent.ACTION_SCREEN_OFF)
-                        intentFilter.addAction(Intent.ACTION_CONFIGURATION_CHANGED)
-                        intentFilter.addAction(Intent.ACTION_REBOOT)
-                        intentFilter.addAction(Intent.ACTION_SHUTDOWN)
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            registerReceiver(mEventReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
-                        } else {
-                            registerReceiver(mEventReceiver, intentFilter)
-                        }
+                        registerEventReceiver()
                     } else {
                         haltStartup()
                     }
                 }
-                ACTION_STOP -> stopScreenRecord()
+                ACTION_START_CAMERA -> if (mHyperionThread == null) {
+                    mCaptureSource = "camera"
+                    val isPrepared = prepared()
+                    if (isPrepared) {
+                        val foregroundStarted = tryStartForegroundCamera()
+
+                        if (!foregroundStarted && mTclBlocked) {
+                            acquireWakeLock()
+                        }
+
+                        startCameraCapture()
+                        registerEventReceiver()
+                    } else {
+                        haltStartup()
+                    }
+                }
+                ACTION_STOP -> stopAllCapture()
                 ACTION_CLEAR -> {
                     // Send one black frame but keep connection
                     if (mScreenEncoder != null) {
-                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once")
+                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (screen)")
                         mScreenEncoder!!.clearLights()
+                    }
+                    if (mCameraEncoder != null) {
+                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (camera)")
+                        mCameraEncoder!!.clearLights()
                     }
                 }
                 GET_STATUS -> notifyActivity()
@@ -321,11 +342,26 @@ class ScreenGrabberService : Service() {
         }
 
         releaseWakeLock()
-        stopScreenRecord()
+        stopAllCapture()
         stopForeground(true)
         notifyActivity()
 
         super.onDestroy()
+    }
+
+    private fun registerEventReceiver() {
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(Intent.ACTION_SCREEN_ON)
+        intentFilter.addAction(Intent.ACTION_SCREEN_OFF)
+        intentFilter.addAction(Intent.ACTION_CONFIGURATION_CHANGED)
+        intentFilter.addAction(Intent.ACTION_REBOOT)
+        intentFilter.addAction(Intent.ACTION_SHUTDOWN)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(mEventReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(mEventReceiver, intentFilter)
+        }
     }
 
     private fun tryStartForeground(): Boolean {
@@ -374,6 +410,87 @@ class ScreenGrabberService : Service() {
 
         notifyTclBlocked()
         return false
+    }
+
+    private fun tryStartForegroundCamera(): Boolean {
+        mForegroundFailed = false
+        mTclBlocked = false
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this, NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Foreground start (camera) failed: " + e.message)
+            mForegroundFailed = true
+            val msg = e.message
+            if (msg != null && (msg.contains("TclAppBoot") || msg.contains("forbid"))) {
+                mTclBlocked = true
+            }
+        }
+
+        // Retry
+        if (mForegroundFailed) {
+            try {
+                Thread.sleep(100)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ServiceCompat.startForeground(
+                        this, NOTIFICATION_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+                mForegroundFailed = false
+                mTclBlocked = false
+                return true
+            } catch (e: Exception) {
+                Log.e(TAG, "Foreground retry (camera) failed: " + e.message)
+                mTclBlocked = true
+            }
+        }
+
+        notifyTclBlocked()
+        return false
+    }
+
+    private fun startCameraCapture() {
+        if (DEBUG) Log.v(TAG, "Starting camera capture")
+        val thread = mHyperionThread
+        if (thread == null) {
+            Log.e(TAG, "HyperionThread is null; cannot start camera capture")
+            mStartError = resources.getString(R.string.error_server_unreachable)
+            haltStartup()
+            return
+        }
+
+        val prefs = Preferences(this)
+        val options = AppOptions(
+            mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality,
+            brightness = prefs.getInt(R.string.pref_key_color_brightness, 100),
+            contrast = prefs.getInt(R.string.pref_key_color_contrast, 100),
+            blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
+            whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
+            saturation = prefs.getInt(R.string.pref_key_color_saturation, 100)
+        )
+
+        val cornersStr = prefs.getString(R.string.pref_key_camera_corners, null)
+        val corners = CameraEncoder.parseCornersString(cornersStr)
+
+        mCameraEncoder = CameraEncoder(
+            this,
+            thread.receiver,
+            options,
+            corners
+        )
+        mCameraEncoder!!.start()
+        mCameraEncoder!!.sendStatus()
     }
 
     private fun acquireWakeLock() {
@@ -617,15 +734,21 @@ class ScreenGrabberService : Service() {
         }
     }
 
-    private fun stopScreenRecord() {
-        if (DEBUG) Log.v(TAG, "Stopping screen recorder")
+    private fun stopAllCapture() {
+        if (DEBUG) Log.v(TAG, "Stopping all capture")
         mReconnectEnabled = false
         mNotificationManager?.cancel(NOTIFICATION_ID)
 
         if (mScreenEncoder != null) {
-            if (DEBUG) Log.v(TAG, "Stopping encoder")
+            if (DEBUG) Log.v(TAG, "Stopping screen encoder")
             mScreenEncoder!!.stopRecording()
             mScreenEncoder = null
+        }
+
+        if (mCameraEncoder != null) {
+            if (DEBUG) Log.v(TAG, "Stopping camera encoder")
+            mCameraEncoder!!.stopRecording()
+            mCameraEncoder = null
         }
 
         releaseResource()
@@ -645,7 +768,8 @@ class ScreenGrabberService : Service() {
     }
 
     val isCapturing: Boolean
-        get() = mScreenEncoder != null && mScreenEncoder!!.isCapturing()
+        get() = (mScreenEncoder != null && mScreenEncoder!!.isCapturing()) ||
+                (mCameraEncoder != null && mCameraEncoder!!.isCapturing())
 
     val isCommunicating: Boolean
         get() = isCapturing && mHasConnected
@@ -680,6 +804,7 @@ class ScreenGrabberService : Service() {
 
         private const val BASE = "com.vasmarfas.UniversalAmbientLight.service."
         const val ACTION_START = BASE + "ACTION_START"
+        const val ACTION_START_CAMERA = BASE + "ACTION_START_CAMERA"
         const val ACTION_STOP = BASE + "ACTION_STOP"
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_EXIT = BASE + "ACTION_EXIT"

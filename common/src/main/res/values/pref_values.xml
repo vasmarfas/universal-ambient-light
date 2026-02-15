@@ -51,20 +51,20 @@
 
     <!-- Smoothing settings -->
     <string name="pref_key_smoothing_enabled" translatable="false">pref_key_smoothing_enabled</string>
-    <bool name="pref_default_smoothing_enabled" translatable="false">true</bool>
+    <bool name="pref_default_smoothing_enabled" translatable="false">false</bool>
 
     <string name="pref_key_smoothing_preset" translatable="false">pref_key_smoothing_preset</string>
-    <string name="pref_default_smoothing_preset" translatable="false">balanced</string>
+    <string name="pref_default_smoothing_preset" translatable="false">off</string>
 
     <string name="pref_key_settling_time" translatable="false">pref_key_settling_time</string>
-    <integer name="pref_default_settling_time" translatable="false">200</integer>
+    <integer name="pref_default_settling_time" translatable="false">50</integer>
 
     <string name="pref_key_output_delay" translatable="false">pref_key_output_delay</string>
-    <integer name="pref_default_output_delay" translatable="false">80</integer>
+    <integer name="pref_default_output_delay" translatable="false">0</integer>
 
     <string name="pref_key_update_frequency" translatable="false">pref_key_update_frequency</string>
-    <integer name="pref_default_update_frequency" translatable="false">25</integer>
-    <string name="pref_default_update_frequency_str" translatable="false">25</string>
+    <integer name="pref_default_update_frequency" translatable="false">60</integer>
+    <string name="pref_default_update_frequency_str" translatable="false">60</string>
 
     <!-- WLED advanced settings -->
     <string name="pref_key_wled_protocol" translatable="false">pref_key_wled_protocol</string>

@@ -119,6 +119,27 @@
   <string name="pref_summary_reconnect">Автоматическое переподключение при потере связи</string>
   <string name="pref_title_reconnect_delay">Задержка переподключения</string>
   <string name="pref_summary_reconnect_delay">Секунды ожидания перед попыткой переподключения</string>
+  <!-- Capture source -->
+  <string name="pref_title_capture_source">Источник захвата</string>
+  <string name="pref_summary_capture_source">Захват экрана или внешняя камера</string>
+  <string-array name="pref_list_capture_source">
+    <item>Экран</item>
+    <item>Камера</item>
+  </string-array>
+  <string-array name="pref_list_capture_source_values">
+    <item>screen</item>
+    <item>camera</item>
+  </string-array>
+  <string name="pref_title_camera_setup">Настройка углов камеры</string>
+  <string name="pref_summary_camera_setup">Настройте 4 угла для совмещения с экраном ТВ в кадре камеры</string>
+  <string name="camera_setup_title">Настройка камеры</string>
+  <string name="camera_setup_instruction">Перетащите 4 угла, чтобы совместить их с краями экрана ТВ</string>
+  <string name="camera_setup_save">Сохранить</string>
+  <string name="camera_setup_reset">Сбросить</string>
+  <string name="camera_permission_required">Для режима камеры необходимо разрешение на использование камеры</string>
+  <string name="camera_grant_permission">Дать разрешение</string>
+  <string name="camera_capturing_status">Камера захватывает…</string>
+  <string name="camera_not_available">Камера недоступна на этом устройстве</string>
   <!-- Capturing settings -->
   <string name="pref_group_capturing">Захват</string>
   <string name="pref_title_framerate">Частота захвата</string>

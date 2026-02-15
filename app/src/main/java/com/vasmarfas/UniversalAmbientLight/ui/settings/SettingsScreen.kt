@@ -35,7 +35,8 @@ import android.app.Activity
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
-    onLedLayoutClick: () -> Unit = {}
+    onLedLayoutClick: () -> Unit = {},
+    onCameraSetupClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
@@ -45,6 +46,9 @@ fun SettingsScreen(
     }
     
     // State for dependencies
+    var captureSource by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_capture_source) ?: "screen")
+    }
     var connectionType by remember {
         mutableStateOf(prefs.getString(R.string.pref_key_connection_type) ?: "hyperion")
     }
@@ -55,7 +59,7 @@ fun SettingsScreen(
         mutableStateOf(prefs.getString(R.string.pref_key_wled_protocol) ?: "ddp")
     }
     var smoothingPreset by remember {
-        mutableStateOf(prefs.getString(R.string.pref_key_smoothing_preset) ?: "balanced")
+        mutableStateOf(prefs.getString(R.string.pref_key_smoothing_preset) ?: "off")
     }
     
     // State for device scan dialog
@@ -260,6 +264,31 @@ fun SettingsScreen(
 
             // Capturing Group
             SettingsGroup(title = stringResource(R.string.pref_group_capturing)) {
+                // Capture Source (Screen / Camera)
+                key(captureSource) {
+                    ListPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_capture_source,
+                        title = stringResource(R.string.pref_title_capture_source),
+                        entriesRes = R.array.pref_list_capture_source,
+                        entryValuesRes = R.array.pref_list_capture_source_values,
+                        recomposeKey = captureSource,
+                        onValueChange = { newSource ->
+                            captureSource = newSource
+                            AnalyticsHelper.logSettingChanged(context, "capture_source", newSource)
+                        }
+                    )
+                }
+
+                // Camera corner setup (only when camera source is selected)
+                if (captureSource == "camera") {
+                    ClickablePreference(
+                        title = stringResource(R.string.pref_title_camera_setup),
+                        summary = stringResource(R.string.pref_summary_camera_setup),
+                        onClick = { onCameraSetupClick() }
+                    )
+                }
+
                 ClickablePreference(
                     title = stringResource(R.string.pref_title_led_layout),
                     summary = stringResource(R.string.pref_summary_led_layout),
@@ -367,7 +396,7 @@ fun SettingsScreen(
                     keyRes = R.string.pref_key_smoothing_enabled,
                     title = stringResource(R.string.pref_title_smoothing_enabled),
                     onValueChange = { enabled ->
-                        val preset = prefs.getString(R.string.pref_key_smoothing_preset, "balanced")
+                        val preset = prefs.getString(R.string.pref_key_smoothing_preset, "off")
                         AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
                         AnalyticsHelper.logSettingChanged(context, "smoothing_enabled", enabled.toString())
                         AnalyticsHelper.updateSmoothingProperty(context, enabled)
@@ -381,7 +410,7 @@ fun SettingsScreen(
                     entryValuesRes = R.array.pref_list_smoothing_preset_values,
                     onValueChange = { preset ->
                         smoothingPreset = preset
-                        val enabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
+                        val enabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
                         AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
                         AnalyticsHelper.logSettingChanged(context, "smoothing_preset", preset)
                         
@@ -408,7 +437,7 @@ fun SettingsScreen(
                         keyRes = R.string.pref_key_settling_time,
                         title = stringResource(R.string.pref_title_settling_time),
                         summaryProvider = { value -> 
-                            val ms = value?.toIntOrNull() ?: 200
+                            val ms = value?.toIntOrNull() ?: 50
                             "$ms мс"
                         },
                         keyboardType = KeyboardType.Number,
@@ -419,7 +448,7 @@ fun SettingsScreen(
                         keyRes = R.string.pref_key_output_delay,
                         title = stringResource(R.string.pref_title_output_delay),
                         summaryProvider = { value -> 
-                            val ms = value?.toIntOrNull() ?: 80
+                            val ms = value?.toIntOrNull() ?: 0
                             "$ms мс"
                         },
                         keyboardType = KeyboardType.Number,

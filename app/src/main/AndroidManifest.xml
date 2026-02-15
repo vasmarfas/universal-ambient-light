@@ -14,7 +14,11 @@
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <uses-feature
         android:name="android.hardware.touchscreen"
@@ -47,10 +51,11 @@
         <service
             android:name="com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService"
             android:exported="true"
-            android:foregroundServiceType="mediaProjection">
+            android:foregroundServiceType="mediaProjection|camera">
             <intent-filter>
                 <action android:name="com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService" />
                 <action android:name="com.vasmarfas.UniversalAmbientLight.service.ACTION_START" />
+                <action android:name="com.vasmarfas.UniversalAmbientLight.service.ACTION_START_CAMERA" />
                 <action android:name="com.vasmarfas.UniversalAmbientLight.service.ACTION_STOP" />
                 <action android:name="com.vasmarfas.UniversalAmbientLight.service.ACTION_STATUS" />
                 <action android:name="com.vasmarfas.UniversalAmbientLight.service.ACTION_EXIT" />

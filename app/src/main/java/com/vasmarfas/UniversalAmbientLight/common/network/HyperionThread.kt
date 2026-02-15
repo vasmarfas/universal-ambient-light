@@ -265,11 +265,11 @@ class HyperionThread(
 
             val adalightProtocol = prefs.getString(R.string.pref_key_adalight_protocol, "ada") ?: "ada"
 
-            val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
-            val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "balanced") ?: "balanced"
-            val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 200)
-            val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 80).toLong() // Теперь в миллисекундах
-            val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 25)
+            val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
+            val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
+            val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 50)
+            val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 0).toLong() // Теперь в миллисекундах
+            val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 60)
 
             return HyperionThread(
                 callback, host, port, priority, reconnect, reconnectDelay,
@@ -280,3 +280,4 @@ class HyperionThread(
         }
     }
 }
+

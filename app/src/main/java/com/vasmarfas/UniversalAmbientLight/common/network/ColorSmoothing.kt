@@ -17,9 +17,9 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     companion object {
         private const val TAG = "ColorSmoothing"
         private const val DEBUG = false
-        private const val DEFAULT_UPDATE_FREQUENCY_HZ = 25
-        private const val DEFAULT_SETTLING_TIME_MS = 200
-        private const val DEFAULT_OUTPUT_DELAY_MS = 80L // ~2 кадра при 25 FPS
+        private const val DEFAULT_UPDATE_FREQUENCY_HZ = 60
+        private const val DEFAULT_SETTLING_TIME_MS = 50
+        private const val DEFAULT_OUTPUT_DELAY_MS = 0L
         private const val MIN_UPDATE_INTERVAL_MS = 1L
     }
 

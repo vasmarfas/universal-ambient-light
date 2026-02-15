@@ -49,7 +49,7 @@ object AnalyticsHelper {
         analytics.setUserProperty("auto_reconnect_enabled", autoReconnect.toString())
         
         // Сглаживание включено
-        val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, true)
+        val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
         analytics.setUserProperty("smoothing_enabled", smoothingEnabled.toString())
     }
 

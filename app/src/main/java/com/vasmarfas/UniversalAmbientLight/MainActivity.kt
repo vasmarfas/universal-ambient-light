@@ -312,8 +312,15 @@ class MainActivity : ComponentActivity() {
 
     private fun toggleScreenCapture() {
         if (!mRecorderRunning) {
-            ensureUsbPermissionForAdalight {
-                requestScreenCapture()
+            val prefs = Preferences(this)
+            val captureSource = prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
+
+            if (captureSource == "camera") {
+                requestCameraCapture()
+            } else {
+                ensureUsbPermissionForAdalight {
+                    requestScreenCapture()
+                }
             }
         } else {
             stopScreenRecorder()
@@ -359,6 +366,40 @@ class MainActivity : ComponentActivity() {
             Log.e(TAG, "Failed to request screen capture: " + e.message)
             Toast.makeText(this, "Failed to request screen recording: " + e.message, Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun requestCameraCapture() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            AnalyticsHelper.logPermissionRequested(this, "CAMERA")
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                REQUEST_CAMERA_PERMISSION
+            )
+        } else {
+            startCameraGrabber()
+        }
+    }
+
+    private fun startCameraGrabber() {
+        val prefs = Preferences(this)
+        val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        AnalyticsHelper.logProtocolStarted(this, protocol)
+        AnalyticsHelper.logScreenCaptureStarted(this, "camera")
+
+        val intent = Intent(this, ScreenGrabberService::class.java)
+        intent.action = ScreenGrabberService.ACTION_START_CAMERA
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        mRecorderRunning = true
+        mSessionStartTime = System.currentTimeMillis()
+
+        ReviewHelper.onLightingStarted(this)
     }
 
     /**
@@ -504,6 +545,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                AnalyticsHelper.logPermissionGranted(this, "CAMERA")
+                startCameraGrabber()
+            } else {
+                AnalyticsHelper.logPermissionDenied(this, "CAMERA")
+                Toast.makeText(this, getString(R.string.camera_permission_required), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun checkForInstance() {
@@ -565,6 +615,7 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_NOTIFICATION_PERMISSION = 2
         private const val REQUEST_OVERLAY_PERMISSION = 3
         private const val REQUEST_UPDATE_CODE = 4
+        private const val REQUEST_CAMERA_PERMISSION = 5
         private const val TAG = "DEBUG"
     }
 }
@@ -603,14 +654,20 @@ fun MainScreen(
     onSettingsClick: () -> Unit,
     onEffectsClick: () -> Unit,
     effectMode: EffectMode,
+    captureSource: String = "screen",
     onHelpClick: () -> Unit = {},
     onSupportClick: () -> Unit = {},
     onReportIssueClick: () -> Unit = {},
     onLeaveReviewClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Rainbow Background
-        if (isRunning) {
+        // Camera mode background — show camera preview with corners
+        if (captureSource == "camera") {
+            com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground()
+        }
+
+        // Screen mode: Effects Background (only when running AND screen mode)
+        if (isRunning && captureSource != "camera") {
             val infiniteTransition = rememberInfiniteTransition(label = "effects")
 
             when (effectMode) {

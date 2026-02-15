@@ -19,6 +19,7 @@ import com.vasmarfas.UniversalAmbientLight.RatingDialog
 import com.vasmarfas.UniversalAmbientLight.LowRatingDialog
 import com.vasmarfas.UniversalAmbientLight.openGitHubIssues
 import com.vasmarfas.UniversalAmbientLight.openGooglePlayReview
+import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
 import com.vasmarfas.UniversalAmbientLight.ui.led.LedLayoutScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +32,7 @@ import android.content.ActivityNotFoundException
 import android.content.res.Configuration
 import android.app.UiModeManager
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 @Composable
 fun AppNavHost(
@@ -56,6 +58,11 @@ fun AppNavHost(
                 context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             }
 
+            // Read capture source from preferences (re-reads when returning from settings)
+            val captureSource = remember(navController.currentBackStackEntry) {
+                Preferences(context).getString(R.string.pref_key_capture_source, "screen") ?: "screen"
+            }
+
             LaunchedEffect(Unit) {
                 AnalyticsHelper.logScreenView(context, "home", "MainScreen")
             }
@@ -66,6 +73,7 @@ fun AppNavHost(
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onEffectsClick = onEffectsClick,
                 effectMode = effectMode,
+                captureSource = captureSource,
                 onHelpClick = { 
                     showHelpDialog = true
                     AnalyticsHelper.logHelpDialogOpened(context)
@@ -189,7 +197,8 @@ fun AppNavHost(
                 }
                 SettingsScreen(
                     onBackClick = { navController.popBackStack() },
-                    onLedLayoutClick = { navController.navigate(Screen.LedLayout.route) }
+                    onLedLayoutClick = { navController.navigate(Screen.LedLayout.route) },
+                    onCameraSetupClick = { navController.navigate(Screen.CameraSetup.route) }
                 )
             }
         }
@@ -200,6 +209,15 @@ fun AppNavHost(
                 AnalyticsHelper.logLedLayoutOpened(context)
             }
             LedLayoutScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.CameraSetup.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "camera_setup", "CameraSetupScreen")
+            }
+            CameraSetupScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
