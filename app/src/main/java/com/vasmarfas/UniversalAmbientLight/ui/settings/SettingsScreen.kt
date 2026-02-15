@@ -29,6 +29,11 @@ import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.widget.Toast
+import androidx.compose.foundation.text.selection.SelectionContainer
+import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import android.app.Activity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,6 +69,9 @@ fun SettingsScreen(
     
     // State for device scan dialog
     var showScanDialog by remember { mutableStateOf(false) }
+    
+    // State for debug dialog
+    var showDebugDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -491,9 +499,51 @@ fun SettingsScreen(
                     }
                 )
             }
+            
+            // Debug Group
+            SettingsGroup(title = "Debug") {
+                ClickablePreference(
+                    title = "Device Info",
+                    summary = "Show device information for debugging",
+                    onClick = { showDebugDialog = true }
+                )
+            }
         }
     }
     
+    if (showDebugDialog) {
+        val debugInfo = remember { DebugInfoHelper.getDebugInfo(context) }
+        AlertDialog(
+            onDismissRequest = { showDebugDialog = false },
+            title = { Text("Debug Info") },
+            text = {
+                SelectionContainer {
+                    Text(
+                        text = debugInfo,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Debug Info", debugInfo)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("Copy")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDebugDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
     if (showScanDialog) {
         DeviceScanDialog(
             onDismiss = { showScanDialog = false },
