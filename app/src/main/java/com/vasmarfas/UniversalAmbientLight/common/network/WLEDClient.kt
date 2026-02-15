@@ -288,15 +288,24 @@ class WLEDClient(
 
     @Throws(IOException::class)
     private fun sendPacket(packet: ByteArray) {
-        if (mSocket == null || mAddress == null) return
-        val datagramPacket = DatagramPacket(packet, packet.size, mAddress, mPort)
+        val socket = mSocket
+        val address = mAddress
+        if (socket == null || address == null) {
+            // Socket or address became null, mark as disconnected
+            mConnected = false
+            return
+        }
+        val datagramPacket = DatagramPacket(packet, packet.size, address, mPort)
         try {
-            mSocket!!.send(datagramPacket)
+            socket.send(datagramPacket)
         } catch (e: IOException) {
             // On Android TV during sleep EPERM may occur on sendto.
             // Try recreating socket - allows self-recovery after wake.
             reconnectIfNeeded()
             throw e
+        } catch (e: NullPointerException) {
+            // Race condition: socket became null during send
+            mConnected = false
         }
     }
 

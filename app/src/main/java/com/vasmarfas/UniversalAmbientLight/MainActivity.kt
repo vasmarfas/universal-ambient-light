@@ -1113,17 +1113,22 @@ fun HelpDialog(
 fun openGitHubIssues(context: Context) {
     val url = context.getString(R.string.github_issues_url)
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    
     try {
         context.startActivity(intent)
-    } catch (e: ActivityNotFoundException) {
-        // Fallback: try to open in browser
+    } catch (e: Exception) {
+        // Fallback: try to open in browser with category browsable
         try {
             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             browserIntent.addCategory(Intent.CATEGORY_BROWSABLE)
+            browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(browserIntent)
         } catch (e2: Exception) {
+            // SecurityException or ActivityNotFoundException
             // If all else fails, show toast or log
             android.util.Log.e("MainActivity", "Failed to open GitHub issues: ${e2.message}")
+            Toast.makeText(context, "Could not open browser. Please visit GitHub manually.", Toast.LENGTH_LONG).show()
         }
     }
 }

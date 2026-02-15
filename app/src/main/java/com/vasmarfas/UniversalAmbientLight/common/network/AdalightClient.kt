@@ -211,7 +211,8 @@ class AdalightClient(
     private fun sendLedData(leds: Array<ColorRgb>) {
         if (!isConnected()) return
 
-        val port = mPort ?: run {
+        val port = mPort
+        if (port == null) {
             Log.w(TAG, "Port is null, connection lost")
             mConnected = false
             return
