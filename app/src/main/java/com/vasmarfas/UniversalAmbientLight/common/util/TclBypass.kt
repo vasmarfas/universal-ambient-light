@@ -35,7 +35,9 @@ object TclBypass {
                 manufacturer.contains("oppo") ||
                 manufacturer.contains("vivo") ||
                 manufacturer.contains("realme") ||
-                manufacturer.contains("samsung")
+                manufacturer.contains("samsung") ||
+                manufacturer.contains("yandex") ||
+                manufacturer.contains("droidlogic")
     }
 
     fun openTclAutoStartSettings(context: Context): Boolean {

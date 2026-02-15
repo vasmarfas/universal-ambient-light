@@ -64,7 +64,7 @@ class BootActivity : AppCompatActivity() {
             val intent = Intent(context, ScreenGrabberService::class.java)
             intent.action = ScreenGrabberService.ACTION_START
             intent.putExtra(ScreenGrabberService.EXTRA_RESULT_CODE, resultCode)
-            intent.putExtras(data)
+            intent.putExtra(ScreenGrabberService.EXTRA_RESULT_DATA, data)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {

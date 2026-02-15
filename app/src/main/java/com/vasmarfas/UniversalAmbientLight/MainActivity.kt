@@ -516,7 +516,7 @@ class MainActivity : ComponentActivity() {
                 AnalyticsHelper.logProtocolStarted(this, protocol)
                 AnalyticsHelper.logScreenCaptureStarted(this, protocol)
                 
-                startScreenRecorder(resultCode, (data.clone() as Intent))
+                startScreenRecorder(resultCode, data)
                 mRecorderRunning = true
                 mSessionStartTime = System.currentTimeMillis()
                 

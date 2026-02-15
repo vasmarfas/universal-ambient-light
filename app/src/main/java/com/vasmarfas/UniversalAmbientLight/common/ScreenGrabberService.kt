@@ -617,13 +617,29 @@ class ScreenGrabberService : Service() {
             return
         }
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
+        
+        // Use the passed projection intent directly if available (safer for restricted devices)
+        val resultData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(EXTRA_RESULT_DATA)
+        }
+        
         // Save projection data to restore after sleep/wake on TV
-        saveProjectionData(resultCode, intent.extras)
+        if (resultData != null) {
+            saveProjectionData(resultCode, resultData.extras)
+        } else {
+            // Fallback for older version/unexpected call
+            saveProjectionData(resultCode, intent.extras)
+        }
 
         val projectionDataIntent = buildProjectionDataIntent()
+        val projectionIntent = resultData ?: projectionDataIntent ?: intent
+
         val projection = projectionManager.getMediaProjection(
             resultCode,
-            projectionDataIntent ?: intent
+            projectionIntent
         )
         val window = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
@@ -810,6 +826,7 @@ class ScreenGrabberService : Service() {
         const val ACTION_EXIT = BASE + "ACTION_EXIT"
         const val GET_STATUS = BASE + "ACTION_STATUS"
         const val EXTRA_RESULT_CODE = BASE + "EXTRA_RESULT_CODE"
+        const val EXTRA_RESULT_DATA = BASE + "EXTRA_RESULT_DATA"
         private const val NOTIFICATION_ID = 1
         private const val NOTIFICATION_EXIT_INTENT_ID = 2
 
