@@ -9,6 +9,12 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -162,23 +168,61 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                 // Camera Preview
                 CameraPreviewView(lifecycleOwner)
 
-                // Corner overlay: drag handlers + drawing
-                CornerOverlayCanvas(
-                    topLeft = topLeft,
-                    topRight = topRight,
-                    bottomRight = bottomRight,
-                    bottomLeft = bottomLeft,
-                    dragCorner = dragCorner,
-                    onDragCornerChanged = { dragCorner = it },
-                    onCornerMoved = { idx, offset ->
-                        when (idx) {
-                            0 -> topLeft = offset
-                            1 -> topRight = offset
-                            2 -> bottomRight = offset
-                            3 -> bottomLeft = offset
+                // Corner overlay with dragging support
+                // Using inline Canvas with direct state access so pointerInput
+                // always reads the latest MutableState values (no stale closures).
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { startOffset ->
+                                    val w = size.width.toFloat()
+                                    val h = size.height.toFloat()
+
+                                    val corners = listOf(
+                                        Offset(topLeft.x * w, topLeft.y * h),
+                                        Offset(topRight.x * w, topRight.y * h),
+                                        Offset(bottomRight.x * w, bottomRight.y * h),
+                                        Offset(bottomLeft.x * w, bottomLeft.y * h)
+                                    )
+
+                                    val threshold = 80f
+                                    var minDist = Float.MAX_VALUE
+                                    var minIdx = -1
+                                    corners.forEachIndexed { idx, pos ->
+                                        val dx = startOffset.x - pos.x
+                                        val dy = startOffset.y - pos.y
+                                        val dist = sqrt(dx * dx + dy * dy)
+                                        if (dist < threshold && dist < minDist) {
+                                            minDist = dist
+                                            minIdx = idx
+                                        }
+                                    }
+                                    dragCorner = minIdx
+                                },
+                                onDrag = { change, _ ->
+                                    if (dragCorner < 0) return@detectDragGestures
+                                    val w = size.width.toFloat()
+                                    val h = size.height.toFloat()
+                                    val pos = change.position
+                                    val nx = (pos.x / w).coerceIn(0f, 1f)
+                                    val ny = (pos.y / h).coerceIn(0f, 1f)
+                                    val newOffset = Offset(nx, ny)
+                                    when (dragCorner) {
+                                        0 -> topLeft = newOffset
+                                        1 -> topRight = newOffset
+                                        2 -> bottomRight = newOffset
+                                        3 -> bottomLeft = newOffset
+                                    }
+                                },
+                                onDragEnd = { dragCorner = -1 },
+                                onDragCancel = { dragCorner = -1 }
+                            )
                         }
-                    }
-                )
+                ) {
+                    drawCornersOverlay(topLeft, topRight, bottomRight, bottomLeft, dragCorner)
+                }
 
                 // Instruction text at bottom
                 Box(
@@ -203,8 +247,80 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
 }
 
 /**
+ * Draws the corner overlay quad + markers.
+ * Pure drawing function used inside Canvas DrawScope.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCornersOverlay(
+    topLeft: Offset,
+    topRight: Offset,
+    bottomRight: Offset,
+    bottomLeft: Offset,
+    dragCorner: Int = -1
+) {
+    val w = size.width
+    val h = size.height
+
+    val tl = Offset(topLeft.x * w, topLeft.y * h)
+    val tr = Offset(topRight.x * w, topRight.y * h)
+    val br = Offset(bottomRight.x * w, bottomRight.y * h)
+    val bl = Offset(bottomLeft.x * w, bottomLeft.y * h)
+
+    // Semi-transparent overlay
+    val overlayColor = Color.Black.copy(alpha = 0.4f)
+    drawRect(overlayColor)
+
+    // Quad path
+    val quadPath = Path().apply {
+        moveTo(tl.x, tl.y)
+        lineTo(tr.x, tr.y)
+        lineTo(br.x, br.y)
+        lineTo(bl.x, bl.y)
+        close()
+    }
+
+    // Fill quad lighter
+    drawPath(quadPath, Color.White.copy(alpha = 0.3f))
+
+    // Quad border
+    val borderColor = Color(0xFF00E676)
+    drawPath(quadPath, borderColor, style = Stroke(width = 3f))
+
+    // Corner markers
+    val cornerRadius = 18f
+    val corners = listOf(tl, tr, br, bl)
+    val labels = listOf("TL", "TR", "BR", "BL")
+
+    corners.forEachIndexed { idx, pos ->
+        val isActive = dragCorner == idx
+        val radius = if (isActive) cornerRadius * 1.5f else cornerRadius
+
+        drawCircle(color = borderColor, radius = radius, center = pos, style = Stroke(width = 3f))
+        drawCircle(
+            color = if (isActive) borderColor.copy(alpha = 0.8f) else borderColor.copy(alpha = 0.4f),
+            radius = radius - 3f,
+            center = pos
+        )
+
+        drawContext.canvas.nativeCanvas.drawText(
+            labels[idx],
+            pos.x - 10f,
+            pos.y + 5f,
+            android.graphics.Paint().apply {
+                color = android.graphics.Color.WHITE
+                textSize = 24f
+                isAntiAlias = true
+                isFakeBoldText = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        )
+    }
+}
+
+/**
  * Camera preview that fills the available space.
- * Used on CameraSetupScreen and MainScreen.
+ * Only binds Preview use case; does NOT call unbindAll(),
+ * so the CameraEncoder's ImageAnalysis in the service stays active.
+ * When this composable leaves the composition, only our Preview is unbound.
  */
 @Composable
 fun CameraPreviewView(
@@ -212,175 +328,64 @@ fun CameraPreviewView(
 ) {
     val context = LocalContext.current
 
-    AndroidView(
-        factory = { ctx ->
-            PreviewView(ctx).apply {
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-            }
-        },
-        modifier = Modifier.fillMaxSize(),
-        update = { previewView ->
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-            cameraProviderFuture.addListener({
-                try {
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.surfaceProvider = previewView.surfaceProvider
-                    }
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview
-                    )
-                } catch (e: Exception) {
-                    Log.e("CameraPreview", "Camera bind failed", e)
-                }
-            }, ContextCompat.getMainExecutor(context))
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
         }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        var previewUseCase: Preview? = null
+        var boundProvider: ProcessCameraProvider? = null
+
+        cameraProviderFuture.addListener({
+            try {
+                val provider = cameraProviderFuture.get()
+                boundProvider = provider
+                val preview = Preview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+                previewUseCase = preview
+
+                // Bind only our Preview — do NOT unbindAll()
+                provider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview
+                )
+            } catch (e: Exception) {
+                Log.e("CameraPreview", "Camera bind failed", e)
+            }
+        }, ContextCompat.getMainExecutor(context))
+
+        onDispose {
+            // Only unbind our own Preview use case
+            previewUseCase?.let { uc ->
+                try {
+                    boundProvider?.unbind(uc)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    AndroidView(
+        factory = { previewView },
+        modifier = Modifier.fillMaxSize()
     )
 }
 
 /**
- * Corner overlay canvas with draggable corners and quad visualization.
- * If dragging is not needed, pass onDragCornerChanged = {} and onCornerMoved = {_,_->}.
- */
-@Composable
-fun CornerOverlayCanvas(
-    topLeft: Offset,
-    topRight: Offset,
-    bottomRight: Offset,
-    bottomLeft: Offset,
-    dragCorner: Int = -1,
-    draggable: Boolean = true,
-    onDragCornerChanged: (Int) -> Unit = {},
-    onCornerMoved: (Int, Offset) -> Unit = { _, _ -> }
-) {
-    val modifier = if (draggable) {
-        Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { startOffset ->
-                        val w = size.width.toFloat()
-                        val h = size.height.toFloat()
-
-                        val corners = listOf(
-                            Offset(topLeft.x * w, topLeft.y * h),
-                            Offset(topRight.x * w, topRight.y * h),
-                            Offset(bottomRight.x * w, bottomRight.y * h),
-                            Offset(bottomLeft.x * w, bottomLeft.y * h)
-                        )
-
-                        val threshold = 80f
-                        var minDist = Float.MAX_VALUE
-                        var minIdx = -1
-                        corners.forEachIndexed { idx, pos ->
-                            val dx = startOffset.x - pos.x
-                            val dy = startOffset.y - pos.y
-                            val dist = sqrt(dx * dx + dy * dy)
-                            if (dist < threshold && dist < minDist) {
-                                minDist = dist
-                                minIdx = idx
-                            }
-                        }
-                        onDragCornerChanged(minIdx)
-                    },
-                    onDrag = { change, _ ->
-                        if (dragCorner < 0) return@detectDragGestures
-                        val w = size.width.toFloat()
-                        val h = size.height.toFloat()
-                        val pos = change.position
-                        val nx = (pos.x / w).coerceIn(0f, 1f)
-                        val ny = (pos.y / h).coerceIn(0f, 1f)
-                        onCornerMoved(dragCorner, Offset(nx, ny))
-                    },
-                    onDragEnd = { onDragCornerChanged(-1) },
-                    onDragCancel = { onDragCornerChanged(-1) }
-                )
-            }
-    } else {
-        Modifier.fillMaxSize()
-    }
-
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-
-        val tl = Offset(topLeft.x * w, topLeft.y * h)
-        val tr = Offset(topRight.x * w, topRight.y * h)
-        val br = Offset(bottomRight.x * w, bottomRight.y * h)
-        val bl = Offset(bottomLeft.x * w, bottomLeft.y * h)
-
-        // Semi-transparent overlay outside the quad
-        val overlayColor = Color.Black.copy(alpha = 0.4f)
-        drawRect(overlayColor)
-
-        // Cut-out the quad with "clear" (draw the quad area lighter)
-        val quadPath = Path().apply {
-            moveTo(tl.x, tl.y)
-            lineTo(tr.x, tr.y)
-            lineTo(br.x, br.y)
-            lineTo(bl.x, bl.y)
-            close()
-        }
-
-        // Draw filled quad to brighten the area
-        drawPath(quadPath, Color.White.copy(alpha = 0.3f))
-
-        // Draw quad border
-        val borderColor = Color(0xFF00E676) // Bright green
-        val borderStroke = Stroke(width = 3f)
-        drawPath(quadPath, borderColor, style = borderStroke)
-
-        // Draw corner markers
-        val cornerRadius = 18f
-        val corners = listOf(tl, tr, br, bl)
-        val labels = listOf("TL", "TR", "BR", "BL")
-
-        corners.forEachIndexed { idx, pos ->
-            val isActive = dragCorner == idx
-            val radius = if (isActive) cornerRadius * 1.5f else cornerRadius
-
-            // Outer circle
-            drawCircle(
-                color = borderColor,
-                radius = radius,
-                center = pos,
-                style = Stroke(width = 3f)
-            )
-            // Inner filled circle
-            drawCircle(
-                color = if (isActive) borderColor.copy(alpha = 0.8f) else borderColor.copy(alpha = 0.4f),
-                radius = radius - 3f,
-                center = pos
-            )
-
-            // Label
-            drawContext.canvas.nativeCanvas.drawText(
-                labels[idx],
-                pos.x - 10f,
-                pos.y + 5f,
-                android.graphics.Paint().apply {
-                    color = android.graphics.Color.WHITE
-                    textSize = 24f
-                    isAntiAlias = true
-                    isFakeBoldText = true
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-            )
-        }
-    }
-}
-
-/**
- * Full-screen camera preview background with corners overlay.
+ * Full-screen camera preview background with read-only corners overlay.
  * Used as a background on MainScreen when camera mode is selected.
- * Shows live preview when camera is available, otherwise dark background with corners.
+ *
+ * @param isCapturing When true, the camera is in use by the service (CameraEncoder),
+ *   so we show a dark background with corners + pulsing indicator instead of live preview.
+ *   When false, we show the live camera preview for calibration.
  */
 @Composable
-fun CameraPreviewBackground() {
+fun CameraPreviewBackground(isCapturing: Boolean = false) {
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
 
@@ -400,11 +405,11 @@ fun CameraPreviewBackground() {
     val bottomLeft = Offset(corners[6], corners[7])
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (hasCameraPermission) {
-            // Live camera preview
+        if (!isCapturing && hasCameraPermission) {
+            // Live camera preview (for calibration before starting)
             CameraPreviewView()
         } else {
-            // Dark background when no permission
+            // Dark background: either service is capturing (camera busy) or no permission
             Spacer(
                 modifier = Modifier
                     .fillMaxSize()
@@ -412,13 +417,45 @@ fun CameraPreviewBackground() {
             )
         }
 
-        // Read-only corner overlay (no dragging — user should use Camera Setup for adjusting)
-        CornerOverlayCanvas(
-            topLeft = topLeft,
-            topRight = topRight,
-            bottomRight = bottomRight,
-            bottomLeft = bottomLeft,
-            draggable = false
-        )
+        // Read-only corner overlay (no dragging)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCornersOverlay(topLeft, topRight, bottomRight, bottomLeft)
+        }
+
+        // Capturing indicator
+        if (isCapturing) {
+            val infiniteTransition = rememberInfiniteTransition(label = "capturePulse")
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.4f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseAlpha"
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.7f),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(modifier = Modifier.size(12.dp)) {
+                        drawCircle(Color.Red.copy(alpha = alpha))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.camera_capturing_status),
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
     }
 }

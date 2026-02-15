@@ -663,7 +663,7 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         // Camera mode background — show camera preview with corners
         if (captureSource == "camera") {
-            com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground()
+            com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground(isCapturing = isRunning)
         }
 
         // Screen mode: Effects Background (only when running AND screen mode)

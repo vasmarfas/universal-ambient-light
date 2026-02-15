@@ -51,6 +51,9 @@ class CameraEncoder(
     @Volatile
     private var mCapturing = false
 
+    // Track our own use case so we can unbind it without affecting other use cases (e.g. Activity Preview)
+    private var imageAnalysisUseCase: ImageAnalysis? = null
+
     // Corners (copy to prevent external mutation)
     private val mCorners = corners.copyOf()
 
@@ -104,9 +107,11 @@ class CameraEncoder(
 
         mainHandler.post {
             try {
-                cameraProvider?.unbindAll()
+                // Only unbind our own ImageAnalysis, not everything (Preview from Activity may still be bound)
+                imageAnalysisUseCase?.let { cameraProvider?.unbind(it) }
+                imageAnalysisUseCase = null
             } catch (e: Exception) {
-                Log.w(TAG, "unbindAll failed", e)
+                Log.w(TAG, "unbind failed", e)
             }
             cameraProvider = null
 
@@ -129,7 +134,8 @@ class CameraEncoder(
 
         mainHandler.post {
             try {
-                cameraProvider?.unbindAll()
+                imageAnalysisUseCase?.let { cameraProvider?.unbind(it) }
+                imageAnalysisUseCase = null
             } catch (_: Exception) {}
             cameraProvider = null
             try {
@@ -172,13 +178,19 @@ class CameraEncoder(
     private fun bindCamera() {
         val provider = cameraProvider ?: return
 
-        provider.unbindAll()
+        // Unbind only our previous ImageAnalysis (if any), not everything.
+        // This preserves the Activity's Preview use case.
+        imageAnalysisUseCase?.let {
+            try { provider.unbind(it) } catch (_: Exception) {}
+        }
 
         val imageAnalysis = ImageAnalysis.Builder()
             .setTargetResolution(Size(CAMERA_WIDTH, CAMERA_HEIGHT))
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
+
+        imageAnalysisUseCase = imageAnalysis
 
         var lastFrameTime = 0L
         imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
@@ -368,7 +380,7 @@ class CameraEncoder(
         }
 
         fun cornersToString(corners: FloatArray): String {
-            return corners.joinToString(",") { "%.4f".format(it) }
+            return corners.joinToString(",") { String.format(java.util.Locale.US, "%.4f", it) }
         }
 
         private fun sleep(ms: Long) {
