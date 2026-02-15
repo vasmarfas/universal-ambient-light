@@ -12,6 +12,7 @@ Universal Ambient Light is a modern Android application that captures screen con
 
 - 🎨 **Universal Controller Support**: Compatible with Hyperion, WLED, and Adalight.
 - 📱 **Android TV & Mobile Optimized**: Dedicated interfaces for touchscreens and D-pad navigation.
+- 📷 **Camera Capture Mode**: Alternative capture method using device camera with perspective correction for TVs without screen capture support.
 - 🔄 **Auto-Discovery**: Automatically scans the local network for available LED servers.
 - ⚙️ **Flexible Configuration**: Adjustable capture quality, frame rate, color smoothing, and latency settings.
 - 🚀 **Auto-Start**: Automatically launches the service on device boot.
@@ -68,6 +69,9 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
 - **LED Layout**: Configure starting corner, direction (clockwise/counterclockwise), and enable/disable individual sides.
 
 ### 3. Capture Settings
+- **Capture Source**: Choose between **Screen** (default) or **Camera** mode.
+  - *Screen*: Standard screen capture using MediaProjection API (requires screen capture permission).
+  - *Camera*: Alternative method using device camera with perspective correction. Ideal for TVs that don't support screen capture or for external phone setups.
 - **Capture Rate (FPS)**: Default 30 FPS (options: 10, 15, 24, 30, 60).
 - **Capture Quality**: 
   - *Low (64px)* — For low-end devices or to reduce latency.
@@ -75,6 +79,20 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
   - *High (256px)* — For powerful devices only.
   - *Ultra (512px)* — Maximum quality for high-end devices.
 - **Send Average Color**: Enable for maximum performance (sends a single color for the whole strip).
+
+### 3.1. Camera Mode Setup
+When using **Camera** as the capture source:
+1. Grant **Camera** permission when prompted.
+2. Open **Settings** → **Camera Corner Setup**.
+3. Position your device so the camera can see the TV screen.
+4. Drag the four corner markers (TL, TR, BR, BL) to match the edges of your TV screen.
+5. Tap **Save** to store the corner positions.
+6. The app will use these corners for perspective correction during capture.
+
+**Tips:**
+- Use the live preview on the main screen to calibrate your device position before starting capture.
+- Ensure good lighting so the camera can clearly see the TV screen.
+- The corner adjustment helps compensate for non-square camera placement relative to the TV.
 
 ### 4. Smoothing
 - **Enable Smoothing**: Enabled by default. Reduces LED flickering.
@@ -181,6 +199,20 @@ Playback issues with high-quality video (2K/4K/HDR) while the ambient light is a
 1. Lower the video playback quality to 1080p or 720p (depending on your TV's capabilities).
 2. Or completely disable the ambient light application while watching high-resolution content.
 3. You can try adjusting capture quality and FPS settings, but it is unlikely to fully solve the issue.
+
+### DRM-Protected Content
+**DRM-protected applications** (such as Netflix, Disney+, Amazon Prime Video, Кинопоиск, and similar streaming services) **will not work** with screen capture mode due to Android's security restrictions. This is a fundamental limitation of the Android MediaProjection API and cannot be bypassed.
+
+**Why this happens:**
+- Android blocks screen capture of DRM-protected content to prevent piracy.
+- This is enforced at the system level and cannot be overridden by applications.
+
+**Solutions:**
+1. **Use Camera Mode**: Switch to **Camera** capture source in settings. This method uses the device camera instead of screen capture, so it works with DRM-protected content. You'll need to position a phone/tablet with the camera facing the TV screen.
+2. **Disable Ambient Light**: Turn off the ambient light feature while watching DRM-protected content.
+3. **Use Non-DRM Sources**: Watch content from sources that don't use DRM protection (local files, YouTube, etc.).
+
+**Note:** Camera mode requires proper calibration of corner positions for accurate color capture.
 
 
 ## 📄 License
