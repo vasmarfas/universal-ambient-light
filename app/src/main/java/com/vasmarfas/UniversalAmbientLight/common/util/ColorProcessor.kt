@@ -92,30 +92,139 @@ object ColorProcessor {
     }
     
     /**
-     * Обрабатывает RGB байтовый массив на месте
-     * @param rgbData Массив RGB данных (r, g, b, r, g, b, ...)
-     * @param options Настройки приложения с параметрами обработки
+     * Обрабатывает RGB байтовый массив на месте.
+     * Оптимизировано для минимизации аллокаций и вычислений.
      */
     fun processRgbData(rgbData: ByteArray, options: AppOptions) {
+        // 0. Если обработка отключена, выходим сразу
+        if (!options.colorProcessingEnabled) {
+            return
+        }
+
+        // 1. Быстрая проверка на дефолтные настройки (ничего делать не надо)
+        if (options.brightness == 100 && 
+            options.contrast == 100 && 
+            options.blackLevel == 0 && 
+            options.whiteLevel == 100 && 
+            options.saturation == 100) {
+            return
+        }
+
+        // 2. Если насыщенность стандартная, используем быстрый LUT (Look-Up Table)
+        // Так как каналы обрабатываются независимо
+        if (options.saturation == 100) {
+            val lut = ByteArray(256)
+            for (i in 0..255) {
+                lut[i] = processSingleChannel(
+                    i, 
+                    options.brightness, 
+                    options.contrast, 
+                    options.blackLevel, 
+                    options.whiteLevel
+                ).toByte()
+            }
+
+            for (i in rgbData.indices) {
+                val index = rgbData[i].toInt() and 0xFF
+                rgbData[i] = lut[index]
+            }
+            return
+        }
+
+        // 3. Полная обработка с насыщенностью (без аллокаций объектов)
+        val brightnessFactor = options.brightness / 100f
+        val contrastFactor = (options.contrast - 100) / 100f + 1f
+        val saturationFactor = options.saturation / 100f
+        
+        // Предвычисляем пороговые значения для уровней
+        val blackThreshold = (options.blackLevel / 100f) * 255f
+        val whiteThreshold = (options.whiteLevel / 100f) * 255f
+        val range = whiteThreshold - blackThreshold
+        val rangeFactor = if (range > 0) 255f / range else 0f
+
         for (i in rgbData.indices step 3) {
             if (i + 2 < rgbData.size) {
-                val r = rgbData[i].toInt() and 0xFF
-                val g = rgbData[i + 1].toInt() and 0xFF
-                val b = rgbData[i + 2].toInt() and 0xFF
-                
-                val (rOut, gOut, bOut) = processColor(
-                    r, g, b,
-                    options.brightness,
-                    options.contrast,
-                    options.blackLevel,
-                    options.whiteLevel,
-                    options.saturation
-                )
-                
-                rgbData[i] = rOut.toByte()
-                rgbData[i + 1] = gOut.toByte()
-                rgbData[i + 2] = bOut.toByte()
+                var r = (rgbData[i].toInt() and 0xFF).toFloat()
+                var g = (rgbData[i + 1].toInt() and 0xFF).toFloat()
+                var b = (rgbData[i + 2].toInt() and 0xFF).toFloat()
+
+                // Яркость
+                if (options.brightness != 100) {
+                    r *= brightnessFactor
+                    g *= brightnessFactor
+                    b *= brightnessFactor
+                }
+
+                // Контрастность
+                if (options.contrast != 100) {
+                    r = 128f + (r - 128f) * contrastFactor
+                    g = 128f + (g - 128f) * contrastFactor
+                    b = 128f + (b - 128f) * contrastFactor
+                }
+
+                // Насыщенность (смешивание каналов)
+                val lum = 0.299f * r + 0.587f * g + 0.114f * b
+                r = lum + (r - lum) * saturationFactor
+                g = lum + (g - lum) * saturationFactor
+                b = lum + (b - lum) * saturationFactor
+
+                // Уровни (Black/White)
+                if (range > 0 && (options.blackLevel != 0 || options.whiteLevel != 100)) {
+                    r = (r - blackThreshold) * rangeFactor
+                    g = (g - blackThreshold) * rangeFactor
+                    b = (b - blackThreshold) * rangeFactor
+                }
+
+                // Clamping и запись
+                rgbData[i] = when {
+                    r < 0 -> 0
+                    r > 255 -> -1 // 255 as signed byte is -1
+                    else -> r.toInt().toByte()
+                }
+                rgbData[i+1] = when {
+                    g < 0 -> 0
+                    g > 255 -> -1
+                    else -> g.toInt().toByte()
+                }
+                rgbData[i+2] = when {
+                    b < 0 -> 0
+                    b > 255 -> -1
+                    else -> b.toInt().toByte()
+                }
             }
         }
+    }
+
+    /**
+     * Вспомогательная функция для генерации LUT одного канала
+     */
+    private fun processSingleChannel(
+        value: Int,
+        brightness: Int,
+        contrast: Int,
+        blackLevel: Int,
+        whiteLevel: Int
+    ): Int {
+        var v = value.toFloat()
+
+        // Яркость
+        v *= (brightness / 100f)
+
+        // Контрастность
+        val contrastFactor = (contrast - 100) / 100f
+        v = 128f + (v - 128f) * (1f + contrastFactor)
+
+        // Уровни
+        val blackThreshold = (blackLevel / 100f) * 255f
+        val whiteThreshold = (whiteLevel / 100f) * 255f
+        val range = whiteThreshold - blackThreshold
+        
+        if (range > 0) {
+            v = ((v - blackThreshold) / range) * 255f
+        } else {
+            v = 0f
+        }
+
+        return max(0, min(255, round(v).toInt()))
     }
 }

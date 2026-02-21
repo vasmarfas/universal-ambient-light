@@ -477,7 +477,8 @@ class ScreenGrabberService : Service() {
             contrast = prefs.getInt(R.string.pref_key_color_contrast, 100),
             blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
             whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
-            saturation = prefs.getInt(R.string.pref_key_color_saturation, 100)
+            saturation = prefs.getInt(R.string.pref_key_color_saturation, 100),
+            colorProcessingEnabled = prefs.getBoolean(R.string.pref_key_color_processing_enabled, true)
         )
 
         val cornersStr = prefs.getString(R.string.pref_key_camera_corners, null)
@@ -655,7 +656,8 @@ class ScreenGrabberService : Service() {
                 contrast = prefs.getInt(R.string.pref_key_color_contrast, 100),
                 blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
                 whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
-                saturation = prefs.getInt(R.string.pref_key_color_saturation, 100)
+                saturation = prefs.getInt(R.string.pref_key_color_saturation, 100),
+                colorProcessingEnabled = prefs.getBoolean(R.string.pref_key_color_processing_enabled, true)
             )
 
             if (DEBUG) Log.v(TAG, "Creating encoder: " + metrics.widthPixels + "x" + metrics.heightPixels)
@@ -727,7 +729,8 @@ class ScreenGrabberService : Service() {
                 contrast = prefs.getInt(R.string.pref_key_color_contrast, 100),
                 blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
                 whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
-                saturation = prefs.getInt(R.string.pref_key_color_saturation, 100)
+                saturation = prefs.getInt(R.string.pref_key_color_saturation, 100),
+                colorProcessingEnabled = prefs.getBoolean(R.string.pref_key_color_processing_enabled, true)
             )
 
             mScreenEncoder = ScreenEncoder(

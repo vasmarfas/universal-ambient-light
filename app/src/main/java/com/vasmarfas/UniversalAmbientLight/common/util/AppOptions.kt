@@ -13,7 +13,8 @@ class AppOptions(
     val contrast: Int = 100, // Контрастность в процентах [0-200]
     val blackLevel: Int = 0, // Уровень черного в процентах [0-100], значения ниже этого будут обрезаны
     val whiteLevel: Int = 100, // Уровень белого в процентах [0-100], значения выше этого будут обрезаны
-    val saturation: Int = 100 // Насыщенность в процентах [0-200]
+    val saturation: Int = 100, // Насыщенность в процентах [0-200]
+    val colorProcessingEnabled: Boolean = true // Главный выключатель обработки цвета
 ) {
     private val minimumImagePacketSize: Int
     val blackThreshold: Int = 5 // The limit each RGB value must be under to be considered a black pixel [0-255]

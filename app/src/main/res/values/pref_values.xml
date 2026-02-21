@@ -175,4 +175,7 @@
 
     <string name="pref_key_color_saturation" translatable="false">pref_key_color_saturation</string>
     <integer name="pref_default_color_saturation" translatable="false">100</integer>
+
+    <string name="pref_key_color_processing_enabled" translatable="false">pref_key_color_processing_enabled</string>
+    <bool name="pref_default_color_processing_enabled" translatable="false">true</bool>
 </resources>

@@ -156,6 +156,8 @@
   <string name="pref_summary_color_white_level">Maximum brightness level (0-100%)</string>
   <string name="pref_title_color_saturation">Saturation</string>
   <string name="pref_summary_color_saturation">Color saturation adjustment (0-200%)</string>
+  <string name="pref_title_color_processing_enabled">Color Processing</string>
+  <string name="pref_summary_color_processing_enabled">Enable brightness, contrast, and saturation adjustments (may affect performance)</string>
   <string name="battery_optimization_prompt">Чтобы захват/подсветка стабильнее работали в фоне (особенно на TV), рекомендуем отключить оптимизацию батареи для приложения.</string>
   <string-array name="pref_list_capture_quality">
     <item>Low (64px)</item>
