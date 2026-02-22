@@ -270,10 +270,10 @@ class ScreenGrabberService : Service() {
             when (action) {
                 ACTION_START -> if (mHyperionThread == null) {
                     mCaptureSource = "screen"
+                    val foregroundStarted = tryStartForeground()
+
                     val isPrepared = prepared()
                     if (isPrepared) {
-                        val foregroundStarted = tryStartForeground()
-
                         if (!foregroundStarted && mTclBlocked) {
                             acquireWakeLock()
                         }
@@ -295,10 +295,10 @@ class ScreenGrabberService : Service() {
                 }
                 ACTION_START_CAMERA -> if (mHyperionThread == null) {
                     mCaptureSource = "camera"
+                    val foregroundStarted = tryStartForegroundCamera()
+
                     val isPrepared = prepared()
                     if (isPrepared) {
-                        val foregroundStarted = tryStartForegroundCamera()
-
                         if (!foregroundStarted && mTclBlocked) {
                             acquireWakeLock()
                         }

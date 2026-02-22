@@ -130,6 +130,10 @@
     <string name="pref_key_led_offset" translatable="false">pref_key_led_offset</string>
     <integer name="pref_default_led_offset" translatable="false">0</integer>
 
+    <!-- Scan depth (in percent of screen size, 1-50) -->
+    <string name="pref_key_scan_depth" translatable="false">pref_key_scan_depth</string>
+    <integer name="pref_default_scan_depth" translatable="false">1</integer>
+
     <!-- Capture margin (in percent of screen size) - legacy, kept for backward compatibility -->
     <string name="pref_key_capture_margin" translatable="false">pref_key_capture_margin</string>
     <integer name="pref_default_capture_margin" translatable="false">0</integer>

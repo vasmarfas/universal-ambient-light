@@ -43,6 +43,8 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import kotlin.math.min
 
+private const val MAX_LEDS_VISUALIZATION = 5000
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LedLayoutScreen(
@@ -117,6 +119,7 @@ fun LedLayoutScreen(
         )
     }
     var ledOffsetText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_led_offset, 0).toString()) }
+    var scanDepthText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_scan_depth, 1).toString()) }
     
     val topLed = topLedText.toIntOrNull() ?: 0
     val rightLed = rightLedText.toIntOrNull() ?: 0
@@ -128,6 +131,7 @@ fun LedLayoutScreen(
     val captureMarginBottom = captureMarginBottomText.toIntOrNull() ?: 0
     val captureMarginLeft = captureMarginLeftText.toIntOrNull() ?: 0
     val ledOffset = ledOffsetText.toIntOrNull() ?: 0
+    val scanDepth = scanDepthText.toIntOrNull() ?: 1
     
     var startCorner by remember { 
         mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left") 
@@ -232,6 +236,7 @@ fun LedLayoutScreen(
                         captureMarginBottom = captureMarginBottom.coerceIn(0, 40),
                         captureMarginLeft = captureMarginLeft.coerceIn(0, 40),
                         ledOffset = ledOffset,
+                        scanDepth = scanDepth.coerceIn(1, 50),
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
@@ -329,6 +334,14 @@ fun LedLayoutScreen(
                             ledOffsetText = newText
                             newText.toIntOrNull()?.let { value ->
                                 prefs.putInt(R.string.pref_key_led_offset, value)
+                            }
+                        },
+                        scanDepthText = scanDepthText,
+                        onScanDepthTextChange = { newText ->
+                            scanDepthText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(1, 50)
+                                prefs.putInt(R.string.pref_key_scan_depth, clamped)
                             }
                         },
                         sideTop = sideTop,
@@ -435,6 +448,7 @@ fun LedLayoutScreen(
                         captureMarginBottom = captureMarginBottom.coerceIn(0, 40),
                         captureMarginLeft = captureMarginLeft.coerceIn(0, 40),
                         ledOffset = ledOffset,
+                        scanDepth = scanDepth.coerceIn(1, 50),
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
@@ -536,6 +550,14 @@ fun LedLayoutScreen(
                                 prefs.putInt(R.string.pref_key_led_offset, value)
                             }
                         },
+                        scanDepthText = scanDepthText,
+                        onScanDepthTextChange = { newText ->
+                            scanDepthText = newText
+                            newText.toIntOrNull()?.let { value ->
+                                val clamped = value.coerceIn(1, 50)
+                                prefs.putInt(R.string.pref_key_scan_depth, clamped)
+                            }
+                        },
                         sideTop = sideTop,
                         onSideTopChange = { mode ->
                             sideTop = mode
@@ -599,6 +621,8 @@ private fun LedLayoutSettingsContent(
     onCaptureMarginLeftTextChange: (String) -> Unit,
     ledOffsetText: String,
     onLedOffsetTextChange: (String) -> Unit,
+    scanDepthText: String,
+    onScanDepthTextChange: (String) -> Unit,
     sideTop: String,
     onSideTopChange: (String) -> Unit,
     sideRight: String,
@@ -856,7 +880,7 @@ private fun LedLayoutSettingsContent(
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done
+            imeAction = ImeAction.Next
         ),
         keyboardActions = KeyboardActions(
             onDone = { keyboardController?.hide() }
@@ -868,6 +892,30 @@ private fun LedLayoutSettingsContent(
             )
         },
         isError = ledOffsetText.isNotEmpty() && ledOffsetText.toIntOrNull() == null
+    )
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // Scan Depth
+    OutlinedTextField(
+        value = scanDepthText,
+        onValueChange = onScanDepthTextChange,
+        label = { Text(stringResource(R.string.led_layout_scan_depth_label)) },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
+        ),
+        supportingText = {
+            Text(
+                text = stringResource(R.string.led_layout_scan_depth_help),
+                fontSize = 12.sp
+            )
+        },
+        isError = scanDepthText.isNotEmpty() && (scanDepthText.toIntOrNull() == null || scanDepthText.toInt() !in 1..50)
     )
 
     Spacer(modifier = Modifier.height(24.dp))
@@ -1021,8 +1069,29 @@ fun LedVisualization(
     captureMarginBottom: Int,
     captureMarginLeft: Int,
     ledOffset: Int,
+    scanDepth: Int,
     modifier: Modifier = Modifier
 ) {
+    val (safeTop, safeRight, safeBottom, safeLeft) = remember(topLed, rightLed, bottomLed, leftLed) {
+        val t = topLed.coerceAtLeast(0)
+        val r = rightLed.coerceAtLeast(0)
+        val b = bottomLed.coerceAtLeast(0)
+        val l = leftLed.coerceAtLeast(0)
+        val total = t + r + b + l
+
+        if (total > MAX_LEDS_VISUALIZATION) {
+            val factor = MAX_LEDS_VISUALIZATION.toFloat() / total
+            listOf(
+                (t * factor).toInt(),
+                (r * factor).toInt(),
+                (b * factor).toInt(),
+                (l * factor).toInt()
+            )
+        } else {
+            listOf(t, r, b, l)
+        }
+    }
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -1077,10 +1146,11 @@ fun LedVisualization(
                 
                 // Calculate LED positions
                 var ledPositions = calculateLedPositions(
-                    topLed, rightLed, bottomLed, leftLed,
+                    safeTop, safeRight, safeBottom, safeLeft,
                     startCorner, direction,
                     sideTop, sideRight, sideBottom, sideLeft, bottomGap,
-                    width, height, screenPadding
+                    width, height, screenPadding,
+                    scanDepth
                 )
 
                 // Apply same offset in visualization so порядок номеров совпадает
@@ -1135,12 +1205,33 @@ fun LedVisualization(
                             else -> Color(0xFF2196F3) // Blue for others
                         }
 
-                        // Draw LED circle
-                        drawCircle(
-                            color = color,
-                            radius = if (index == 0) 18f else 8f,
-                            center = ledData.position
-                        )
+                        // Draw LED
+                        if (ledData.rectSize.width > 0 && ledData.rectSize.height > 0) {
+                            val topLeft = Offset(
+                                ledData.position.x - ledData.rectSize.width / 2f,
+                                ledData.position.y - ledData.rectSize.height / 2f
+                            )
+                            drawRect(
+                                color = color.copy(alpha = 0.7f),
+                                topLeft = topLeft,
+                                size = ledData.rectSize,
+                                style = androidx.compose.ui.graphics.drawscope.Fill
+                            )
+                            // Draw border for visibility
+                            drawRect(
+                                color = if (index == 0) Color.White else Color.Black.copy(alpha = 0.5f),
+                                topLeft = topLeft,
+                                size = ledData.rectSize,
+                                style = Stroke(width = if (index == 0) 2f else 1f)
+                            )
+                        } else {
+                            // Fallback
+                            drawCircle(
+                                color = color,
+                                radius = if (index == 0) 18f else 8f,
+                                center = ledData.position
+                            )
+                        }
 
                         if (shouldLabelIndices(index)) {
                             val paint = when {
@@ -1148,10 +1239,17 @@ fun LedVisualization(
                                 ledData.enabled -> enabledPaint
                                 else -> disabledPaint
                             }
+                            // Adjust text position slightly if rect
+                            val textY = if (ledData.rectSize.height > 0) {
+                                ledData.position.y + 7f 
+                            } else {
+                                ledData.position.y + if (index == 0) 10f else 7f
+                            }
+                            
                             nativeCanvas.drawText(
                                 "${index + 1}",
                                 ledData.position.x,
-                                ledData.position.y + if (index == 0) 10f else 7f,
+                                textY,
                                 paint
                             )
                         }
@@ -1164,7 +1262,8 @@ fun LedVisualization(
 
 data class LedData(
     val position: Offset,
-    val enabled: Boolean
+    val enabled: Boolean,
+    val rectSize: androidx.compose.ui.geometry.Size = androidx.compose.ui.geometry.Size(0f, 0f)
 )
 
 fun calculateLedPositions(
@@ -1181,7 +1280,8 @@ fun calculateLedPositions(
     bottomGap: Int,
     width: Float,
     height: Float,
-    padding: Float
+    padding: Float,
+    scanDepth: Int // Percent 1-50
 ): List<LedData> {
     val positions = mutableListOf<LedData>()
     
@@ -1191,6 +1291,14 @@ fun calculateLedPositions(
     val rightCount = rightLed.coerceAtLeast(0)
     val bottomCount = bottomLed.coerceAtLeast(0)
     val leftCount = leftLed.coerceAtLeast(0)
+
+    // Calculate scan depth in pixels (visual approximation)
+    // We use screenWidth/screenHeight which corresponds to the inner yellow box if 0 margins.
+    // But scan depth is relative to the capture area.
+    // Here we visualize it relative to the "screen" rectangle (gray box).
+    // Let's assume the gray box is the full captured image.
+    val scanDepthV = (screenHeight * scanDepth / 100f).coerceAtLeast(2f)
+    val scanDepthH = (screenWidth * scanDepth / 100f).coerceAtLeast(2f)
 
     fun step(length: Float, count: Int): Float {
         return if (count <= 1) 0f else length / (count - 1)
@@ -1220,18 +1328,20 @@ fun calculateLedPositions(
         // Skip if not installed
         if (sideMode == "not_installed") continue
         
-        when (edge) {
+            when (edge) {
             "top_lr" -> {
                 // Top edge (left to right)
                 for (i in 0 until topCount) {
                     val x = if (topCount <= 1) {
                         padding + screenWidth / 2f
                     } else {
-                        padding + i * stepTop
+                        padding + i * stepTop + stepTop / 2f
                     }
+                    // For top edge, rect is centered at x, starts at padding (top), height scanDepthV
                     positions.add(LedData(
-                        position = Offset(x, padding),
-                        enabled = sideMode == "enabled"
+                        position = Offset(x, padding + scanDepthV / 2f), // Center of rect
+                        enabled = sideMode == "enabled",
+                        rectSize = androidx.compose.ui.geometry.Size(stepTop, scanDepthV)
                     ))
                 }
             }
@@ -1242,11 +1352,12 @@ fun calculateLedPositions(
                     val x = if (topCount <= 1) {
                         padding + screenWidth / 2f
                     } else {
-                        padding + ledIndex * stepTop
+                        padding + ledIndex * stepTop + stepTop / 2f
                     }
                     positions.add(LedData(
-                        position = Offset(x, padding),
-                        enabled = sideMode == "enabled"
+                        position = Offset(x, padding + scanDepthV / 2f),
+                        enabled = sideMode == "enabled",
+                        rectSize = androidx.compose.ui.geometry.Size(stepTop, scanDepthV)
                     ))
                 }
             }
@@ -1256,11 +1367,13 @@ fun calculateLedPositions(
                     val y = if (rightCount <= 1) {
                         padding + screenHeight / 2f
                     } else {
-                        padding + i * stepRight
+                        padding + i * stepRight + stepRight / 2f
                     }
+                    // Right edge: rect starts at width-padding-scanDepthH
                     positions.add(LedData(
-                        position = Offset(padding + screenWidth, y),
-                        enabled = sideMode == "enabled"
+                        position = Offset(padding + screenWidth - scanDepthH / 2f, y),
+                        enabled = sideMode == "enabled",
+                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepRight)
                     ))
                 }
             }
@@ -1271,11 +1384,12 @@ fun calculateLedPositions(
                     val y = if (rightCount <= 1) {
                         padding + screenHeight / 2f
                     } else {
-                        padding + ledIndex * stepRight
+                        padding + ledIndex * stepRight + stepRight / 2f
                     }
                     positions.add(LedData(
-                        position = Offset(padding + screenWidth, y),
-                        enabled = sideMode == "enabled"
+                        position = Offset(padding + screenWidth - scanDepthH / 2f, y),
+                        enabled = sideMode == "enabled",
+                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepRight)
                     ))
                 }
             }
@@ -1287,11 +1401,13 @@ fun calculateLedPositions(
                     val x = if (bottomCount <= 1) {
                         padding + screenWidth / 2f
                     } else {
-                        padding + ledIndex * stepBottom
+                        padding + ledIndex * stepBottom + stepBottom / 2f
                     }
+                    // Bottom edge: rect starts at height-padding-scanDepthV
                     positions.add(LedData(
-                        position = Offset(x, padding + screenHeight),
-                        enabled = sideMode == "enabled" && !isInGap
+                        position = Offset(x, padding + screenHeight - scanDepthV / 2f),
+                        enabled = sideMode == "enabled" && !isInGap,
+                        rectSize = androidx.compose.ui.geometry.Size(stepBottom, scanDepthV)
                     ))
                 }
             }
@@ -1302,11 +1418,12 @@ fun calculateLedPositions(
                     val x = if (bottomCount <= 1) {
                         padding + screenWidth / 2f
                     } else {
-                        padding + i * stepBottom
+                        padding + i * stepBottom + stepBottom / 2f
                     }
                     positions.add(LedData(
-                        position = Offset(x, padding + screenHeight),
-                        enabled = sideMode == "enabled" && !isInGap
+                        position = Offset(x, padding + screenHeight - scanDepthV / 2f),
+                        enabled = sideMode == "enabled" && !isInGap,
+                        rectSize = androidx.compose.ui.geometry.Size(stepBottom, scanDepthV)
                     ))
                 }
             }
@@ -1317,11 +1434,13 @@ fun calculateLedPositions(
                     val y = if (leftCount <= 1) {
                         padding + screenHeight / 2f
                     } else {
-                        padding + ledIndex * stepLeft
+                        padding + ledIndex * stepLeft + stepLeft / 2f
                     }
+                    // Left edge: rect starts at padding
                     positions.add(LedData(
-                        position = Offset(padding, y),
-                        enabled = sideMode == "enabled"
+                        position = Offset(padding + scanDepthH / 2f, y),
+                        enabled = sideMode == "enabled",
+                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepLeft)
                     ))
                 }
             }
@@ -1331,11 +1450,12 @@ fun calculateLedPositions(
                     val y = if (leftCount <= 1) {
                         padding + screenHeight / 2f
                     } else {
-                        padding + i * stepLeft
+                        padding + i * stepLeft + stepLeft / 2f
                     }
                     positions.add(LedData(
-                        position = Offset(padding, y),
-                        enabled = sideMode == "enabled"
+                        position = Offset(padding + scanDepthH / 2f, y),
+                        enabled = sideMode == "enabled",
+                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepLeft)
                     ))
                 }
             }

@@ -40,7 +40,12 @@ class BootActivity : AppCompatActivity() {
     private fun requestMediaProjection() {
         val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         if (manager != null) {
-            startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+            try {
+                startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+            } catch (e: android.content.ActivityNotFoundException) {
+                android.widget.Toast.makeText(this, R.string.error_screen_recording_not_available, android.widget.Toast.LENGTH_LONG).show()
+                finish()
+            }
         } else {
             finish()
         }
