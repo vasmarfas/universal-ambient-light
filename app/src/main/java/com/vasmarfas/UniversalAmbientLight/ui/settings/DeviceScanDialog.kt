@@ -1,5 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.ui.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -201,15 +203,21 @@ private fun DeviceItem(
     }
     
     val deviceName = device.name ?: deviceTypeName
+    var isFocused by remember { mutableStateOf(false) }
     
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = if (isFocused) 
+                MaterialTheme.colorScheme.primaryContainer 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
+        ),
+        border = if (isFocused) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
     ) {
         Row(
             modifier = Modifier

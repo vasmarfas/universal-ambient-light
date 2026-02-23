@@ -81,7 +81,7 @@
 
     <!-- WLED advanced settings -->
     <string name="pref_key_wled_protocol" translatable="false">pref_key_wled_protocol</string>
-    <string name="pref_default_wled_protocol" translatable="false">ddp</string>
+    <string name="pref_default_wled_protocol" translatable="false">udp_raw</string>
 
     <string name="pref_key_wled_rgbw" translatable="false">pref_key_wled_rgbw</string>
     <bool name="pref_default_wled_rgbw" translatable="false">false</bool>

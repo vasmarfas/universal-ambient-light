@@ -49,6 +49,7 @@ class WLEDClient(
     private val mLastReconnectAttemptMs = AtomicLong(0L)
     private val mBlockedUntilMs = AtomicLong(0L)
     private val mLastErrorLogMs = AtomicLong(0L)
+    private var mDdpSequenceNumber = 1 // 1-15, 0 ignored
 
     init {
         // Validate port range (1-65535)
@@ -328,7 +329,7 @@ class WLEDClient(
 
             // Header
             packet[0] = (0x40 or (if (isLastPacket) 0x01 else 0x00)).toByte() // VER1 | PUSH
-            packet[1] = ((packetIndex + 1) and 0x0F).toByte() // sequence number
+            packet[1] = 0 // Sequence number 0 (ignored by receiver)
             packet[2] = (0x80 or (1 shl 3) or 5).toByte() // customerDefined | RGB | Pixel8
 
             packet[3] = 0x01 // ID: DISPLAY
@@ -344,6 +345,11 @@ class WLEDClient(
             packet[8] = ((packetDataSize shr 8) and 0xFF).toByte()
             packet[9] = (packetDataSize and 0xFF).toByte()
 
+            if (logsEnabled && System.currentTimeMillis() % 1000 < 50) {
+                val hexHeader = packet.take(10).joinToString(" ") { String.format("%02X", it) }
+                Log.v(TAG, "DDP Header [$packetIndex/$packetCount]: $hexHeader (Seq=${packet[1]}, Push=${packet[0].toInt() and 1}, Len=$packetDataSize)")
+            }
+
             // Data
             var dataIdx = DDP_HEADER_SIZE
             val ledsProcessed = channelOffset / 3
@@ -351,9 +357,10 @@ class WLEDClient(
 
             for (i in 0 until ledsInThisPacket) {
                 val led = leds[ledsProcessed + i]
-                packet[dataIdx++] = led.red.toByte()
-                packet[dataIdx++] = led.green.toByte()
-                packet[dataIdx++] = led.blue.toByte()
+                val ordered = convertColorOrder(led, mColorOrder)
+                packet[dataIdx++] = ordered[0]
+                packet[dataIdx++] = ordered[1]
+                packet[dataIdx++] = ordered[2]
             }
 
             packets.add(packet)

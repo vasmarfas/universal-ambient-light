@@ -44,6 +44,14 @@ class ScreenEncoder(
     private var mBorderX: Int = 0
     private var mBorderY: Int = 0
     private var mFrameCount: Int = 0
+    
+    // Performance profiling
+    private var mProfileFrames: Int = 0
+    private var mTotalLoopTime: Long = 0
+    private var mTotalCaptureTime: Long = 0
+    private var mTotalProcessTime: Long = 0
+    private var mTotalSendTime: Long = 0
+    private var mLastLogTime: Long = 0
 
     private val mFrameIntervalMs: Long = (1000L / mFrameRate)
 
@@ -53,9 +61,37 @@ class ScreenEncoder(
 
             val start = System.nanoTime()
             captureFrame()
+            val end = System.nanoTime()
+            
+            // Profiling loop time
+            val elapsedNs = end - start
+            val elapsedMs = elapsedNs / 1_000_000L
+            mTotalLoopTime += elapsedNs
+            mProfileFrames++
+            
+            val now = System.currentTimeMillis()
+            if (now - mLastLogTime >= 2000) { // Log every 2 seconds
+                if (mProfileFrames > 0) {
+                    val fps = mProfileFrames * 1000f / (now - mLastLogTime)
+                    // Averages in ms
+                    val avgLoop = (mTotalLoopTime / mProfileFrames) / 1_000_000f
+                    val avgCapture = (mTotalCaptureTime / mProfileFrames) / 1_000_000f
+                    val avgProcess = (mTotalProcessTime / mProfileFrames) / 1_000_000f
+                    val avgSend = (mTotalSendTime / mProfileFrames) / 1_000_000f
+                    
+                    Log.i(TAG, String.format("PERF: FPS=%.1f | Loop=%.1fms (Cap=%.1f, Proc=%.1f, Send=%.1f)", 
+                        fps, avgLoop, avgCapture, avgProcess, avgSend))
+                }
+                
+                mLastLogTime = now
+                mProfileFrames = 0
+                mTotalLoopTime = 0
+                mTotalCaptureTime = 0
+                mTotalProcessTime = 0
+                mTotalSendTime = 0
+            }
 
             if (mRunning && mCaptureHandler != null) {
-                val elapsedMs = (System.nanoTime() - start) / 1_000_000L
                 val delayMs = max(1L, mFrameIntervalMs - elapsedMs)
                 mCaptureHandler!!.postDelayed(this, delayMs)
             }
@@ -202,7 +238,10 @@ class ScreenEncoder(
     private fun captureFrame() {
         var img: Image? = null
         try {
+            val startCap = System.nanoTime()
             img = mImageReader!!.acquireLatestImage()
+            mTotalCaptureTime += (System.nanoTime() - startCap)
+            
             if (img != null) {
                 processImage(img)
             }
@@ -214,6 +253,7 @@ class ScreenEncoder(
     }
 
     private fun processImage(img: Image) {
+        val startProc = System.nanoTime()
         val planes = img.planes
         if (planes.isEmpty()) return
 
@@ -231,6 +271,8 @@ class ScreenEncoder(
         } else {
             sendPixelData(buffer, width, height, rowStride, pixelStride)
         }
+        
+        mTotalProcessTime += (System.nanoTime() - startProc)
     }
 
     private fun updateBorderDetection(
@@ -271,7 +313,9 @@ class ScreenEncoder(
             Log.d(TAG, "sendPixelData: effWidth=$effWidth, effHeight=$effHeight, rgb.size=${rgb.size}, expected=${effWidth * effHeight * 3}")
         }
         
+        val startSend = System.nanoTime()
         mListener.sendFrame(rgb, effWidth, effHeight)
+        mTotalSendTime += (System.nanoTime() - startSend)
     }
 
     private fun extractRgb(
@@ -394,7 +438,10 @@ class ScreenEncoder(
             mAvgColorResult[0] = rOut.toByte()
             mAvgColorResult[1] = gOut.toByte()
             mAvgColorResult[2] = bOut.toByte()
+            
+            val startSend = System.nanoTime()
             mListener.sendFrame(mAvgColorResult, 1, 1)
+            mTotalSendTime += (System.nanoTime() - startSend)
         }
     }
 

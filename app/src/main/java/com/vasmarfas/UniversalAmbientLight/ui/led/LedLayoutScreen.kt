@@ -53,7 +53,7 @@ fun LedLayoutScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val prefs = remember { Preferences(context) }
-    
+
     val legacyX = prefs.getInt(R.string.pref_key_x_led)
     val legacyY = prefs.getInt(R.string.pref_key_y_led)
 
@@ -81,7 +81,7 @@ fun LedLayoutScreen(
     val legacyMargin = prefs.getInt(R.string.pref_key_capture_margin, -1)
     val marginH = prefs.getInt(R.string.pref_key_capture_margin_horizontal, -1)
     val marginV = prefs.getInt(R.string.pref_key_capture_margin_vertical, -1)
-    
+
     var captureMarginTopText by remember {
         mutableStateOf(
             when {
@@ -120,7 +120,7 @@ fun LedLayoutScreen(
     }
     var ledOffsetText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_led_offset, 0).toString()) }
     var scanDepthText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_scan_depth, 1).toString()) }
-    
+
     val topLed = topLedText.toIntOrNull() ?: 0
     val rightLed = rightLedText.toIntOrNull() ?: 0
     val bottomLed = bottomLedText.toIntOrNull() ?: 0
@@ -132,14 +132,14 @@ fun LedLayoutScreen(
     val captureMarginLeft = captureMarginLeftText.toIntOrNull() ?: 0
     val ledOffset = ledOffsetText.toIntOrNull() ?: 0
     val scanDepth = scanDepthText.toIntOrNull() ?: 1
-    
-    var startCorner by remember { 
-        mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left") 
+
+    var startCorner by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left")
     }
-    var direction by remember { 
-        mutableStateOf(prefs.getString(R.string.pref_key_led_direction, "clockwise") ?: "clockwise") 
+    var direction by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_led_direction, "clockwise") ?: "clockwise")
     }
-    
+
     var sideTop by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_top, "enabled") ?: "enabled") }
     var sideRight by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_right, "enabled") ?: "enabled") }
     var sideBottom by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_bottom, "enabled") ?: "enabled") }
@@ -637,7 +637,7 @@ private fun LedLayoutSettingsContent(
     onDirectionChange: (String) -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    
+
     // LED count inputs per side (order: left, top, right, bottom)
     OutlinedTextField(
         value = leftLedText,
@@ -1107,7 +1107,7 @@ fun LedVisualization(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val width = size.width
                 val height = size.height
-                
+
                 // Draw screen rectangle
                 val screenPadding = 60f
                 drawRect(
@@ -1143,7 +1143,7 @@ fun LedVisualization(
                         style = Stroke(width = 2f)
                     )
                 }
-                
+
                 // Calculate LED positions
                 var ledPositions = calculateLedPositions(
                     safeTop, safeRight, safeBottom, safeLeft,
@@ -1166,7 +1166,7 @@ fun LedVisualization(
                         ledPositions = rotated
                     }
                 }
-                
+
                 // Draw LEDs
                 if (ledPositions.isNotEmpty()) {
                     // Немного ограничим количество подписанных LED, чтобы не грузить слабые устройства
@@ -1241,11 +1241,11 @@ fun LedVisualization(
                             }
                             // Adjust text position slightly if rect
                             val textY = if (ledData.rectSize.height > 0) {
-                                ledData.position.y + 7f 
+                                ledData.position.y + 7f
                             } else {
                                 ledData.position.y + if (index == 0) 10f else 7f
                             }
-                            
+
                             nativeCanvas.drawText(
                                 "${index + 1}",
                                 ledData.position.x,
@@ -1284,7 +1284,7 @@ fun calculateLedPositions(
     scanDepth: Int // Percent 1-50
 ): List<LedData> {
     val positions = mutableListOf<LedData>()
-    
+
     val screenWidth = width - padding * 2
     val screenHeight = height - padding * 2
     val topCount = topLed.coerceAtLeast(0)
@@ -1308,14 +1308,14 @@ fun calculateLedPositions(
     val stepRight = step(screenHeight, rightCount)
     val stepBottom = step(screenWidth, bottomCount)
     val stepLeft = step(screenHeight, leftCount)
-    
+
     // Determine edge order
     val edges = getEdgeOrder(startCorner, direction)
-    
+
     // Calculate gap range for bottom edge
     val gapStart = if (bottomGap > 0 && bottomCount > 0) (bottomCount - bottomGap) / 2 else -1
     val gapEnd = if (bottomGap > 0 && bottomCount > 0) gapStart + bottomGap else -1
-    
+
     for (edge in edges) {
         val sideMode = when {
             edge.startsWith("top_") -> sideTop
@@ -1324,11 +1324,11 @@ fun calculateLedPositions(
             edge.startsWith("left_") -> sideLeft
             else -> "enabled"
         }
-        
+
         // Skip if not installed
         if (sideMode == "not_installed") continue
-        
-            when (edge) {
+
+        when (edge) {
             "top_lr" -> {
                 // Top edge (left to right)
                 for (i in 0 until topCount) {
@@ -1461,7 +1461,7 @@ fun calculateLedPositions(
             }
         }
     }
-    
+
     return positions
 }
 
@@ -1514,7 +1514,7 @@ fun SettingCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val indication = LocalIndication.current
-    
+
     Card(
         modifier = Modifier
             .fillMaxWidth()

@@ -91,9 +91,9 @@ class DeviceDetector {
                                 Log.d(TAG, "WLED detected at $host via HTTP API")
                                 return DeviceInfo(
                                     host = host,
-                                    port = 4048,
+                                    port = 19446, // Default to UDP Raw instead of DDP
                                     type = DeviceType.WLED,
-                                    protocol = "ddp",
+                                    protocol = "udp_raw",
                                     name = name ?: "WLED"
                                 )
                             } else {
@@ -121,9 +121,9 @@ class DeviceDetector {
                                     if (json.has("info") || json.has("state")) {
                                         return DeviceInfo(
                                             host = host,
-                                            port = 4048,
+                                            port = 19446, // Default to UDP Raw instead of DDP
                                             type = DeviceType.WLED,
-                                            protocol = "ddp",
+                                            protocol = "udp_raw",
                                             name = name ?: "WLED"
                                         )
                                     }

@@ -61,11 +61,15 @@ fun SettingsScreen(
         mutableStateOf(prefs.getBoolean(R.string.pref_key_reconnect))
     }
     var wledProtocol by remember {
-        mutableStateOf(prefs.getString(R.string.pref_key_wled_protocol) ?: "ddp")
+        mutableStateOf(prefs.getString(R.string.pref_key_wled_protocol) ?: "udp_raw")
     }
     var smoothingPreset by remember {
         mutableStateOf(prefs.getString(R.string.pref_key_smoothing_preset) ?: "off")
     }
+    
+    // State for host/port to trigger recomposition
+    var currentHost by remember { mutableStateOf(prefs.getString(R.string.pref_key_host) ?: "") }
+    var currentPort by remember { mutableStateOf(prefs.getString(R.string.pref_key_port) ?: "") }
     
     // State for color processing visibility
     var colorProcessingEnabled by remember {
@@ -141,7 +145,9 @@ fun SettingsScreen(
                             keyRes = R.string.pref_key_host,
                             title = stringResource(R.string.pref_title_host),
                             summaryProvider = { it },
+                            recomposeKey = currentHost,
                             onValueChange = { newHost ->
+                                currentHost = newHost
                                 AnalyticsHelper.logHostChanged(context, newHost)
                                 AnalyticsHelper.logSettingChanged(context, "host", newHost)
                             }
@@ -164,6 +170,7 @@ fun SettingsScreen(
                                     // Auto-set port when WLED protocol changes
                                     val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
                                     prefs.putString(R.string.pref_key_port, defaultPort)
+                                    currentPort = defaultPort
                                 }
                             )
                         }
@@ -177,7 +184,9 @@ fun SettingsScreen(
                             title = stringResource(R.string.pref_title_port),
                             summaryProvider = { it },
                             keyboardType = KeyboardType.Number,
+                            recomposeKey = currentPort,
                             onValueChange = { newPort ->
+                                currentPort = newPort
                                 val portInt = newPort.toIntOrNull() ?: 0
                                 AnalyticsHelper.logPortChanged(context, portInt)
                                 AnalyticsHelper.logSettingChanged(context, "port", newPort)
@@ -597,6 +606,9 @@ fun SettingsScreen(
                                 
                                 prefs.putString(R.string.pref_key_host, device.host)
                                 prefs.putString(R.string.pref_key_port, device.port.toString())
+                                
+                                currentHost = device.host
+                                currentPort = device.port.toString()
                                 
                                 AnalyticsHelper.logHostChanged(context, device.host)
                                 AnalyticsHelper.logPortChanged(context, device.port)

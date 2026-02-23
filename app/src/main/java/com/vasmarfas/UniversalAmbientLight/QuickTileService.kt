@@ -21,7 +21,6 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.R
 
-@RequiresApi(api = Build.VERSION_CODES.N)
 class QuickTileService : TileService() {
     private val REMOVE_LISTENER_DELAY = 1000 * 10 // 10 second delay to remove listener
     private val mHandle = Handler(Looper.getMainLooper())
