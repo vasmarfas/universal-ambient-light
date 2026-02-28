@@ -21,6 +21,7 @@ import android.util.Log
 import android.view.WindowManager
 import android.net.wifi.WifiManager
 import androidx.annotation.RequiresApi
+import androidx.camera.core.CameraSelector
 import androidx.core.app.ServiceCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
@@ -29,6 +30,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.R
+import android.hardware.usb.UsbManager
 import java.util.Objects
 
 class ScreenGrabberService : Service() {
@@ -50,6 +52,7 @@ class ScreenGrabberService : Service() {
     private var mSendAverageColor: Boolean = false
     private var mScreenEncoder: ScreenEncoder? = null
     private var mCameraEncoder: CameraEncoder? = null
+    private var mUsbCameraEncoder: UsbCameraEncoder? = null
     private var mCaptureSource: String = "screen" // "screen" or "camera"
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
@@ -109,9 +112,11 @@ class ScreenGrabberService : Service() {
                     mHyperionThread?.resetBlockedIfWLED()
                     
                     if (mCaptureSource == "camera") {
-                        // Camera mode: just resume camera if not capturing
                         if (mCameraEncoder != null && !isCapturing) {
                             mCameraEncoder!!.resumeRecording()
+                        }
+                        if (mUsbCameraEncoder != null && !isCapturing) {
+                            mUsbCameraEncoder!!.resumeRecording()
                         }
                     } else {
                         if (mScreenEncoder != null && !isCapturing) {
@@ -147,6 +152,7 @@ class ScreenGrabberService : Service() {
                         mScreenEncoder!!.setOrientation(resources.configuration.orientation)
                     }
                     mCameraEncoder?.setOrientation(resources.configuration.orientation)
+                    mUsbCameraEncoder?.setOrientation(resources.configuration.orientation)
                 }
                 Intent.ACTION_SHUTDOWN, Intent.ACTION_REBOOT -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SHUTDOWN|ACTION_REBOOT intent received")
@@ -320,6 +326,10 @@ class ScreenGrabberService : Service() {
                         if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (camera)")
                         mCameraEncoder!!.clearLights()
                     }
+                    if (mUsbCameraEncoder != null) {
+                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (usb camera)")
+                        mUsbCameraEncoder!!.clearLights()
+                    }
                 }
                 GET_STATUS -> notifyActivity()
                 ACTION_EXIT -> stopSelf()
@@ -483,15 +493,43 @@ class ScreenGrabberService : Service() {
 
         val cornersStr = prefs.getString(R.string.pref_key_camera_corners, null)
         val corners = CameraEncoder.parseCornersString(cornersStr)
+        val cameraFacing = prefs.getInt(R.string.pref_key_camera_facing, CameraSelector.LENS_FACING_BACK)
 
-        mCameraEncoder = CameraEncoder(
-            this,
-            thread.receiver,
-            options,
-            corners
-        )
-        mCameraEncoder!!.start()
-        mCameraEncoder!!.sendStatus()
+        if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC) {
+            val vendorId = prefs.getInt(R.string.pref_key_usb_vendor_id, -1)
+            val productId = prefs.getInt(R.string.pref_key_usb_product_id, -1)
+
+            if (vendorId == -1 || productId == -1) {
+                Log.e(TAG, "USB camera selected but VID/PID not saved — falling back to back camera")
+                mCameraEncoder = CameraEncoder(this, thread.receiver, options, corners, CameraSelector.LENS_FACING_BACK)
+                mCameraEncoder!!.start()
+                mCameraEncoder!!.sendStatus()
+                return
+            }
+
+            // Verify the device is still connected and permission is held
+            val usbManager = getSystemService(USB_SERVICE) as? UsbManager
+            val usbDevice = usbManager?.deviceList?.values?.find {
+                it.vendorId == vendorId && it.productId == productId
+            }
+            if (usbDevice == null) {
+                Log.w(TAG, "USB camera (VID=$vendorId PID=$productId) not connected — falling back to back camera")
+                mCameraEncoder = CameraEncoder(this, thread.receiver, options, corners, CameraSelector.LENS_FACING_BACK)
+                mCameraEncoder!!.start()
+                mCameraEncoder!!.sendStatus()
+                return
+            }
+
+            val usbRotation = prefs.getInt(R.string.pref_key_usb_camera_rotation, 0)
+            Log.i(TAG, "Starting USB UVC camera encoder for VID=${"%04X".format(vendorId)} PID=${"%04X".format(productId)} rotation=$usbRotation")
+            mUsbCameraEncoder = UsbCameraEncoder(this, thread.receiver, options, corners, vendorId, productId, usbRotation)
+            mUsbCameraEncoder!!.start()
+            mUsbCameraEncoder!!.sendStatus()
+        } else {
+            mCameraEncoder = CameraEncoder(this, thread.receiver, options, corners, cameraFacing)
+            mCameraEncoder!!.start()
+            mCameraEncoder!!.sendStatus()
+        }
     }
 
     private fun acquireWakeLock() {
@@ -770,6 +808,12 @@ class ScreenGrabberService : Service() {
             mCameraEncoder = null
         }
 
+        if (mUsbCameraEncoder != null) {
+            if (DEBUG) Log.v(TAG, "Stopping USB camera encoder")
+            mUsbCameraEncoder!!.stopRecording()
+            mUsbCameraEncoder = null
+        }
+
         releaseResource()
 
         if (mHyperionThread != null) {
@@ -788,7 +832,8 @@ class ScreenGrabberService : Service() {
 
     val isCapturing: Boolean
         get() = (mScreenEncoder != null && mScreenEncoder!!.isCapturing()) ||
-                (mCameraEncoder != null && mCameraEncoder!!.isCapturing())
+                (mCameraEncoder != null && mCameraEncoder!!.isCapturing()) ||
+                (mUsbCameraEncoder != null && mUsbCameraEncoder!!.isCapturing())
 
     val isCommunicating: Boolean
         get() = isCapturing && mHasConnected

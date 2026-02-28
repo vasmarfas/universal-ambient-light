@@ -46,12 +46,23 @@ import com.vasmarfas.UniversalAmbientLight.common.CameraEncoder
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import kotlin.math.sqrt
 
+import android.content.Context
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import com.jiangdg.ausbc.MultiCameraClient
+import com.jiangdg.ausbc.camera.bean.CameraRequest
+import com.jiangdg.ausbc.widget.AspectRatioTextureView
+import com.serenegiant.usb.USBMonitor
+import com.vasmarfas.UniversalAmbientLight.common.UsbCameraEncoder
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbCameraUtil
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraSetupScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val usbCameraUtil = remember { UsbCameraUtil(context) }
 
     // Dynamic camera permission state
     var hasCameraPermission by remember {
@@ -94,6 +105,146 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
     // Currently dragged corner index (0-3) or -1
     var dragCorner by remember { mutableIntStateOf(-1) }
 
+    var cameraFacing by remember { mutableIntStateOf(prefs.getInt(R.string.pref_key_camera_facing, CameraSelector.LENS_FACING_BACK)) }
+    var selectedUsbVendorId by remember { mutableIntStateOf(prefs.getInt(R.string.pref_key_usb_vendor_id, -1)) }
+    var selectedUsbProductId by remember { mutableIntStateOf(prefs.getInt(R.string.pref_key_usb_product_id, -1)) }
+    var usbCameraRotation by remember { mutableIntStateOf(prefs.getInt(R.string.pref_key_usb_camera_rotation, 0)) }
+
+    // Check available cameras
+    var hasBackCamera by remember { mutableStateOf(false) }
+    var hasFrontCamera by remember { mutableStateOf(false) }
+    var hasExternalCamera by remember { mutableStateOf(false) }
+    var showCameraDialog by remember { mutableStateOf(false) }
+    var connectedUsbCameras by remember { mutableStateOf<List<UsbDevice>>(emptyList()) }
+    var usbCheckingState by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val providerFuture = ProcessCameraProvider.getInstance(context)
+        providerFuture.addListener({
+            try {
+                val provider = providerFuture.get()
+                hasBackCamera = provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+                hasFrontCamera = provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+                try {
+                    val extSelector = CameraSelector.Builder()
+                        .requireLensFacing(CameraSelector.LENS_FACING_EXTERNAL)
+                        .build()
+                    hasExternalCamera = provider.hasCamera(extSelector)
+                } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.e("CameraSetup", "Failed to check camera availability", e)
+            }
+        }, ContextCompat.getMainExecutor(context))
+
+        connectedUsbCameras = usbCameraUtil.getConnectedWebcams()
+    }
+
+    if (showCameraDialog) {
+        AlertDialog(
+            onDismissRequest = { showCameraDialog = false },
+            title = { Text(stringResource(R.string.camera_select_camera)) },
+            text = {
+                Column {
+                    // ---- Built-in cameras ----
+                    if (hasBackCamera) {
+                        TextButton(
+                            onClick = { cameraFacing = CameraSelector.LENS_FACING_BACK; showCameraDialog = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.camera_facing_back), modifier = Modifier.weight(1f))
+                            if (cameraFacing == CameraSelector.LENS_FACING_BACK)
+                                Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+                    if (hasFrontCamera) {
+                        TextButton(
+                            onClick = { cameraFacing = CameraSelector.LENS_FACING_FRONT; showCameraDialog = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.camera_facing_front), modifier = Modifier.weight(1f))
+                            if (cameraFacing == CameraSelector.LENS_FACING_FRONT)
+                                Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+                    if (hasExternalCamera) {
+                        TextButton(
+                            onClick = { cameraFacing = CameraSelector.LENS_FACING_EXTERNAL; showCameraDialog = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.camera_facing_external), modifier = Modifier.weight(1f))
+                            if (cameraFacing == CameraSelector.LENS_FACING_EXTERNAL)
+                                Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+
+                    // ---- USB/UVC devices via AUSBC userspace driver ----
+                    if (connectedUsbCameras.isNotEmpty()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        Text(
+                            text = "USB UVC (userspace driver)",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        connectedUsbCameras.forEach { device ->
+                            val isSelected = cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC &&
+                                    device.vendorId == selectedUsbVendorId &&
+                                    device.productId == selectedUsbProductId
+                            TextButton(
+                                onClick = {
+                                    showCameraDialog = false
+                                    // Request USB permission if needed, then switch to AUSBC mode
+                                    if (!usbCameraUtil.hasPermission(device)) {
+                                        usbCheckingState = true
+                                        usbCameraUtil.requestPermission(device) { granted ->
+                                            usbCheckingState = false
+                                            if (granted) {
+                                                selectedUsbVendorId = device.vendorId
+                                                selectedUsbProductId = device.productId
+                                                cameraFacing = UsbCameraEncoder.CAMERA_FACING_USB_UVC
+                                            }
+                                        }
+                                    } else {
+                                        selectedUsbVendorId = device.vendorId
+                                        selectedUsbProductId = device.productId
+                                        cameraFacing = UsbCameraEncoder.CAMERA_FACING_USB_UVC
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.Start,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(device.productName ?: "USB Camera")
+                                    Text(
+                                        "VID:${"%04X".format(device.vendorId)}  PID:${"%04X".format(device.productId)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+                                }
+                                if (isSelected) Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    } else {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        Text(
+                            text = stringResource(R.string.camera_usb_no_device),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCameraDialog = false }) {
+                    Text(stringResource(R.string.scanner_cancel))
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,6 +255,18 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                 },
                 actions = {
+                    // Camera Switcher
+                    TextButton(onClick = { showCameraDialog = true }) {
+                        val label = when (cameraFacing) {
+                            CameraSelector.LENS_FACING_BACK -> stringResource(R.string.camera_facing_back)
+                            CameraSelector.LENS_FACING_FRONT -> stringResource(R.string.camera_facing_front)
+                            CameraSelector.LENS_FACING_EXTERNAL -> stringResource(R.string.camera_facing_external)
+                            UsbCameraEncoder.CAMERA_FACING_USB_UVC -> stringResource(R.string.camera_facing_usb_uvc)
+                            else -> "Camera"
+                        }
+                        Text(label, color = Color.White)
+                    }
+
                     // Reset button
                     IconButton(onClick = {
                         topLeft = Offset(0.1f, 0.1f)
@@ -125,6 +288,12 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                             R.string.pref_key_camera_corners,
                             CameraEncoder.cornersToString(cornersArray)
                         )
+                        prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                        if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC) {
+                            prefs.putInt(R.string.pref_key_usb_vendor_id, selectedUsbVendorId)
+                            prefs.putInt(R.string.pref_key_usb_product_id, selectedUsbProductId)
+                            prefs.putInt(R.string.pref_key_usb_camera_rotation, usbCameraRotation)
+                        }
                         onBackClick()
                     }) {
                         Icon(Icons.Default.Check, contentDescription = stringResource(R.string.camera_setup_save))
@@ -165,8 +334,34 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                 }
             } else {
-                // Camera Preview
-                CameraPreviewView(lifecycleOwner)
+                // Camera Preview — AUSBC or CameraX depending on selected mode
+                if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC &&
+                    selectedUsbVendorId != -1 && selectedUsbProductId != -1
+                ) {
+                    UsbCameraPreviewView(
+                        vendorId = selectedUsbVendorId,
+                        productId = selectedUsbProductId,
+                        rotation = usbCameraRotation
+                    )
+                } else {
+                    CameraPreviewView(lifecycleOwner, cameraFacing)
+                }
+
+                // USB permission request overlay
+                if (usbCheckingState) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = Color.White)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(stringResource(R.string.camera_usb_checking), color = Color.White)
+                        }
+                    }
+                }
 
                 // Corner overlay with dragging support
                 // Using inline Canvas with direct state access so pointerInput
@@ -222,6 +417,38 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                         }
                 ) {
                     drawCornersOverlay(topLeft, topRight, bottomRight, bottomLeft, dragCorner)
+                }
+
+                // Rotation selector: only shown in USB UVC mode
+                if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 80.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.75f),
+                                RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.camera_usb_rotation_label) + ":",
+                                color = Color.White,
+                                fontSize = 13.sp
+                            )
+                            listOf(0, 90, 180, 270).forEach { deg ->
+                                FilterChip(
+                                    selected = usbCameraRotation == deg,
+                                    onClick = { usbCameraRotation = deg },
+                                    label = { Text("${deg}°") }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Instruction text at bottom
@@ -316,17 +543,121 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCornersOverlay(
     }
 }
 
+/** No-op USB device listener used when we open a device directly (no register() call needed). */
+private val NOOP_DEVICE_LISTENER = object : USBMonitor.OnDeviceConnectListener {
+    override fun onAttach(device: UsbDevice?) {}
+    override fun onDetach(device: UsbDevice?) {}
+    override fun onConnect(device: UsbDevice?, ctrlBlock: USBMonitor.UsbControlBlock?, createNew: Boolean) {}
+    override fun onDisconnect(device: UsbDevice?, ctrlBlock: USBMonitor.UsbControlBlock?) {}
+    override fun onCancel(device: UsbDevice?) {}
+}
+
+/**
+ * Live preview composable for a USB UVC camera via the AUSBC userspace driver.
+ * Opens the device identified by [vendorId]/[productId] directly via USBMonitor.openDevice()
+ * without calling register(), avoiding the Android 14+ RECEIVER_NOT_EXPORTED crash.
+ *
+ * [rotation] is a clockwise rotation in degrees (0, 90, 180, 270) applied to the preview.
+ * The preview is displayed with the correct aspect ratio — no stretching.
+ */
+@Composable
+fun UsbCameraPreviewView(vendorId: Int, productId: Int, rotation: Int = 0) {
+    val context = LocalContext.current
+
+    // We intentionally do NOT call setAspectRatio() on the view here — AspectRatioTextureView
+    // inverts the ratio in portrait mode (designed for a rotated native stream), which would
+    // stretch our raw 1280×720 UVC frames. Aspect ratio is handled via Compose modifiers below.
+    val textureView = remember { AspectRatioTextureView(context) }
+
+    DisposableEffect(vendorId, productId) {
+        var cameraRef: MultiCameraClient.Camera? = null
+        var monitorRef: USBMonitor? = null
+
+        // Directly open the USB device without calling register() — avoids the
+        // Android 14+ SecurityException ("RECEIVER_NOT_EXPORTED required").
+        // Permission was already granted by UsbCameraUtil in the setup dialog.
+        val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+        val device = usbManager.deviceList.values.find {
+            it.vendorId == vendorId && it.productId == productId
+        }
+
+        if (device != null && usbManager.hasPermission(device)) {
+            val monitor = USBMonitor(context, NOOP_DEVICE_LISTENER)
+            monitorRef = monitor
+            try {
+                val ctrlBlock = monitor.openDevice(device)
+                val cam = MultiCameraClient.Camera(context, device)
+                cam.setUsbControlBlock(ctrlBlock)
+                cameraRef = cam
+                val request = CameraRequest.Builder()
+                    .setPreviewWidth(1280)
+                    .setPreviewHeight(720)
+                    .create()
+                cam.openCamera(textureView, request)
+            } catch (e: Exception) {
+                Log.e("UsbCameraPreview", "Failed to open USB camera for preview", e)
+            }
+        }
+
+        onDispose {
+            cameraRef?.closeCamera()
+            cameraRef = null
+            monitorRef?.destroy()
+            monitorRef = null
+        }
+    }
+
+    // For 90°/270° rotations the effective visible area is portrait (9:16);
+    // for 0°/180° it is the native landscape (16:9).
+    val isPortraitRotation = rotation == 90 || rotation == 270
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            factory = { textureView },
+            update = { view ->
+                // Apply SurfaceTexture transform so the content rotates correctly within the
+                // measured bounds. Using view.post ensures the view is already laid out.
+                view.post {
+                    if (view.width > 0 && view.height > 0) {
+                        if (rotation != 0) {
+                            val mx = android.graphics.Matrix()
+                            val cx = view.width / 2f
+                            val cy = view.height / 2f
+                            mx.postRotate(rotation.toFloat(), cx, cy)
+                            // For 90°/270°: scale so the rotated content fills the bounds
+                            if (isPortraitRotation) {
+                                val scale = view.height.toFloat() / view.width.toFloat()
+                                mx.postScale(scale, 1f / scale, cx, cy)
+                            }
+                            view.setTransform(mx)
+                        } else {
+                            view.setTransform(null)
+                        }
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(if (isPortraitRotation) 9f / 16f else 16f / 9f)
+        )
+    }
+}
+
 /**
  * Camera preview that fills the available space.
- * Only binds Preview use case; does NOT call unbindAll(),
- * so the CameraEncoder's ImageAnalysis in the service stays active.
- * When this composable leaves the composition, only our Preview is unbound.
+ * When cameraLensFacing changes, fully rebinds camera and clears any frozen frame.
+ * Shows an error overlay if the camera is unavailable (e.g. no External Camera HAL for USB cameras).
  */
 @Composable
 fun CameraPreviewView(
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner = LocalLifecycleOwner.current
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner = LocalLifecycleOwner.current,
+    cameraLensFacing: Int = CameraSelector.LENS_FACING_BACK
 ) {
     val context = LocalContext.current
+    val cameraErrorState = remember { mutableStateOf(false) }
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -335,7 +666,8 @@ fun CameraPreviewView(
         }
     }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, cameraLensFacing) {
+        cameraErrorState.value = false
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         var previewUseCase: Preview? = null
         var boundProvider: ProcessCameraProvider? = null
@@ -344,24 +676,38 @@ fun CameraPreviewView(
             try {
                 val provider = cameraProviderFuture.get()
                 boundProvider = provider
+
+                // Always unbind first to clear frozen frame from previous camera
+                try { provider.unbindAll() } catch (_: Exception) {}
+
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = previewView.surfaceProvider
                 }
                 previewUseCase = preview
 
-                // Bind only our Preview — do NOT unbindAll()
-                provider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview
-                )
+                val cameraSelector = CameraSelector.Builder()
+                    .requireLensFacing(cameraLensFacing)
+                    .build()
+
+                try {
+                    if (provider.hasCamera(cameraSelector)) {
+                        provider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                        cameraErrorState.value = false
+                    } else {
+                        Log.e("CameraPreview", "Camera not found (facing=$cameraLensFacing). External Camera HAL may be absent.")
+                        cameraErrorState.value = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("CameraPreview", "Camera bind failed", e)
+                    cameraErrorState.value = true
+                }
             } catch (e: Exception) {
-                Log.e("CameraPreview", "Camera bind failed", e)
+                Log.e("CameraPreview", "Camera provider failed", e)
+                cameraErrorState.value = true
             }
         }, ContextCompat.getMainExecutor(context))
 
         onDispose {
-            // Only unbind our own Preview use case
             previewUseCase?.let { uc ->
                 try {
                     boundProvider?.unbind(uc)
@@ -370,11 +716,31 @@ fun CameraPreviewView(
         }
     }
 
-    AndroidView(
-        factory = { previewView },
-        modifier = Modifier.fillMaxSize()
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { previewView },
+            modifier = Modifier.fillMaxSize()
+        )
+        if (cameraErrorState.value) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.camera_error_not_available),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(32.dp)
+                )
+            }
+        }
+    }
 }
+
+
 
 /**
  * Full-screen camera preview background with read-only corners overlay.
@@ -399,22 +765,32 @@ fun CameraPreviewBackground(isCapturing: Boolean = false) {
         val saved = prefs.getString(R.string.pref_key_camera_corners, null)
         CameraEncoder.parseCornersString(saved)
     }
+    val cameraFacing = remember { prefs.getInt(R.string.pref_key_camera_facing, CameraSelector.LENS_FACING_BACK) }
+    val usbVendorId = remember { prefs.getInt(R.string.pref_key_usb_vendor_id, -1) }
+    val usbProductId = remember { prefs.getInt(R.string.pref_key_usb_product_id, -1) }
+    val usbRotation = remember { prefs.getInt(R.string.pref_key_usb_camera_rotation, 0) }
+
     val topLeft = Offset(corners[0], corners[1])
     val topRight = Offset(corners[2], corners[3])
     val bottomRight = Offset(corners[4], corners[5])
     val bottomLeft = Offset(corners[6], corners[7])
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (!isCapturing && hasCameraPermission) {
-            // Live camera preview (for calibration before starting)
-            CameraPreviewView()
-        } else {
-            // Dark background: either service is capturing (camera busy) or no permission
-            Spacer(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            )
+        when {
+            isCapturing -> {
+                // Service owns the camera — show dark background
+                Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
+            }
+            cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC && usbVendorId != -1 && usbProductId != -1 -> {
+                // USB UVC camera: preview handled by AUSBC, not CameraX
+                UsbCameraPreviewView(vendorId = usbVendorId, productId = usbProductId, rotation = usbRotation)
+            }
+            hasCameraPermission -> {
+                CameraPreviewView(cameraLensFacing = cameraFacing)
+            }
+            else -> {
+                Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
+            }
         }
 
         // Read-only corner overlay (no dragging)

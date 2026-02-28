@@ -40,6 +40,9 @@ android {
         versionName = appVersionName
         versionCode = appVersionCode
 
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -75,6 +78,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        jniLibs {
+            // Extract native libs to disk so 16 KB page-size alignment is not required.
+            // Required for AUSBC .so files which are not aligned to 16 KB boundaries.
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -130,6 +141,16 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+
+    // AUSBC — userspace UVC driver for USB cameras (no Android External Camera HAL required)
+    // Exclude UI-only transitive deps (immersionbar, webpdecoder) not available on standard repos
+    implementation("com.github.jiangdongguo.AndroidUSBCamera:libausbc:3.2.7") {
+        exclude(group = "com.gyf.immersionbar")
+        exclude(group = "com.zlc.glide")
+    }
+    // libuvc must be added explicitly: libausbc uses `implementation` (not `api`) for it,
+    // so the com.serenegiant.usb classes are not re-exported to consumers.
+    implementation("com.github.jiangdongguo.AndroidUSBCamera:libuvc:3.2.7")
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)

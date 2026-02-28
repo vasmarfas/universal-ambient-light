@@ -142,6 +142,23 @@
   <string name="camera_grant_permission">Grant Permission</string>
   <string name="camera_capturing_status">Camera is capturing…</string>
   <string name="camera_not_available">Camera is not available on this device</string>
+  <string name="camera_select_camera">Select Camera</string>
+  <string name="camera_facing_back">Back Camera</string>
+  <string name="camera_facing_front">Front Camera</string>
+  <string name="camera_facing_external">USB Camera</string>
+  <string name="pref_key_camera_facing">camera_facing</string>
+  <string name="camera_usb_hal_not_available">USB camera not available</string>
+  <string name="camera_usb_hal_description">USB permission was granted, but this device does not have an External Camera HAL installed.\n\nThe standard Camera2 API cannot access this USB camera. Apps like \"USB Camera\" use their own internal userspace UVC driver.\n\nYour device: check if the manufacturer supports USB cameras via Android Camera2 API.</string>
+  <string name="camera_usb_checking">Connecting to USB camera…</string>
+  <string name="camera_error_not_available">Camera unavailable.\nSelect a different camera or check permissions.</string>
+  <string name="camera_facing_usb_uvc">USB Camera (UVC)</string>
+  <string name="camera_usb_connected">USB camera connected via UVC driver</string>
+  <string name="camera_usb_connecting">Opening USB camera…</string>
+  <string name="camera_usb_no_device">No USB camera detected. Connect a UVC-compatible camera and try again.</string>
+  <string name="pref_key_usb_vendor_id">usb_vendor_id</string>
+  <string name="pref_key_usb_product_id">usb_product_id</string>
+  <string name="pref_key_usb_camera_rotation">usb_camera_rotation</string>
+  <string name="camera_usb_rotation_label">Rotation</string>
   <!-- Capturing settings -->
   <string name="pref_group_capturing">Capturing</string>
   <string name="pref_title_framerate">Capture Rate</string>

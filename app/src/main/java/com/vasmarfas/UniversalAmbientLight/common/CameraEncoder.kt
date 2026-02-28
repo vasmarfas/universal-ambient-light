@@ -35,7 +35,8 @@ class CameraEncoder(
     private val context: Context,
     private val listener: HyperionThread.HyperionThreadListener,
     private val options: AppOptions,
-    corners: FloatArray // 8 floats: tl_x, tl_y, tr_x, tr_y, br_x, br_y, bl_x, bl_y (normalized 0..1)
+    corners: FloatArray, // 8 floats: tl_x, tl_y, tr_x, tr_y, br_x, br_y, bl_x, bl_y (normalized 0..1)
+    private val cameraLensFacing: Int = CameraSelector.LENS_FACING_BACK
 ) : LifecycleOwner {
 
     // --- Lifecycle для CameraX ---
@@ -210,17 +211,49 @@ class CameraEncoder(
             imageProxy.close()
         }
 
-        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+        val cameraSelector = CameraSelector.Builder()
+            .requireLensFacing(cameraLensFacing)
+            .build()
 
         try {
-            provider.bindToLifecycle(this, cameraSelector, imageAnalysis)
-            mRunning = true
-            mCapturing = true
-            listener.sendStatus(true)
-            Log.i(TAG, "Camera bound successfully")
+            // Check if camera exists before binding
+            if (!provider.hasCamera(cameraSelector)) {
+                 Log.w(TAG, "Requested camera ($cameraLensFacing) not found")
+                 
+                 // If requested camera is not available, try to fallback to Back, then Front, then External?
+                 // Or just let it fail? User specifically requested this camera.
+                 // Let's try to fallback to Back camera if we are not already trying it.
+                 if (cameraLensFacing != CameraSelector.LENS_FACING_BACK) {
+                     Log.w(TAG, "Falling back to default back camera")
+                     val fallbackSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                     if (provider.hasCamera(fallbackSelector)) {
+                         bindToLifecycle(provider, fallbackSelector, imageAnalysis)
+                         return
+                     }
+                 }
+                 // If that fails too, just return/throw
+            }
+
+            bindToLifecycle(provider, cameraSelector, imageAnalysis)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to bind camera", e)
+             // Last resort fallback
+             if (cameraLensFacing != CameraSelector.LENS_FACING_BACK) {
+                 try {
+                     bindToLifecycle(provider, CameraSelector.DEFAULT_BACK_CAMERA, imageAnalysis)
+                 } catch (ex: Exception) {
+                     Log.e(TAG, "Fallback to back camera failed", ex)
+                 }
+             }
         }
+    }
+
+    private fun bindToLifecycle(provider: ProcessCameraProvider, selector: CameraSelector, analysis: ImageAnalysis) {
+        provider.bindToLifecycle(this, selector, analysis)
+        mRunning = true
+        mCapturing = true
+        listener.sendStatus(true)
+        Log.i(TAG, "Camera bound successfully")
     }
 
     // ======================== Frame processing ========================
