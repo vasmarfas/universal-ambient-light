@@ -86,7 +86,8 @@ class ToggleActivity : AppCompatActivity() {
                 device = null,
                 onReady = requestMediaProjection,
                 onDenied = { finish() },
-                showToast = true
+                showToast = true,
+                force = true
             )
         } else {
             requestMediaProjection()

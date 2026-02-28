@@ -60,7 +60,8 @@ object UsbSerialPermissionHelper {
         device: UsbDevice?,
         onReady: () -> Unit,
         onDenied: (() -> Unit)? = null,
-        showToast: Boolean = true
+        showToast: Boolean = true,
+        force: Boolean = false
     ): Boolean {
         val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
         if (usbManager == null) {
@@ -88,7 +89,7 @@ object UsbSerialPermissionHelper {
         }
 
         // Avoid spamming the same prompt
-        if (lastRequestedDeviceId == target.deviceId) {
+        if (!force && lastRequestedDeviceId == target.deviceId) {
             return false
         }
         lastRequestedDeviceId = target.deviceId
@@ -98,8 +99,14 @@ object UsbSerialPermissionHelper {
         val permissionIntent = PendingIntent.getBroadcast(
             context,
             0,
-            Intent(ACTION_USB_PERMISSION),
-            PendingIntent.FLAG_IMMUTABLE
+            Intent(ACTION_USB_PERMISSION).apply {
+                setPackage(context.packageName)
+            },
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                0
+            }
         )
 
         val filter = IntentFilter(ACTION_USB_PERMISSION)

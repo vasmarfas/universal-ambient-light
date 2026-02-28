@@ -415,69 +415,14 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
-        if (usbManager == null) {
-            Toast.makeText(this, "USB service is not available on this device", Toast.LENGTH_LONG).show()
-            onReady()
-            return
-        }
-
-        val drivers = com.hoho.android.usbserial.driver.UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
-        if (drivers.isEmpty()) {
-            Toast.makeText(this, "No USB serial devices found. Please connect your Adalight device via USB OTG cable", Toast.LENGTH_LONG).show()
-            onReady()
-            return
-        }
-
-        val device = drivers[0].device
-        if (usbManager.hasPermission(device)) {
-            onReady()
-            return
-        }
-
-        AnalyticsHelper.logUsbPermissionRequested(this)
-
-        val permissionIntent = android.app.PendingIntent.getBroadcast(
-            this,
-            0,
-            Intent("com.vasmarfas.UniversalAmbientLight.USB_PERMISSION"),
-            android.app.PendingIntent.FLAG_IMMUTABLE
+        UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+            context = this,
+            device = null,
+            onReady = onReady,
+            onDenied = null,
+            showToast = true,
+            force = true
         )
-
-        if (!usbPermissionReceiverRegistered) {
-            val filter = IntentFilter("com.vasmarfas.UniversalAmbientLight.USB_PERMISSION")
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
-                    val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                    unregisterReceiver(this)
-                    usbPermissionReceiverRegistered = false
-
-                    if (granted) {
-                        AnalyticsHelper.logUsbPermissionGranted(this@MainActivity)
-                        onReady()
-                    } else {
-                        AnalyticsHelper.logUsbPermissionDenied(this@MainActivity)
-                        Toast.makeText(
-                            this@MainActivity,
-                            "USB device permission denied. Please allow USB access or grant it in Android Settings > Apps > Hyperion Grabber > Permissions",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }
-
-            ContextCompat.registerReceiver(
-                this,
-                receiver,
-                filter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            )
-
-            usbPermissionReceiverRegistered = true
-        }
-
-        usbManager.requestPermission(device, permissionIntent)
-        Toast.makeText(this, "Please confirm USB access for your Adalight device", Toast.LENGTH_LONG).show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
