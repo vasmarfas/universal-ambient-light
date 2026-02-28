@@ -55,6 +55,10 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
 
 ### [RuStore](https://www.rustore.ru/catalog/app/com.vasmarfas.UniversalAmbientLight)
 
+### Experimental: External USB Camera Support
+An experimental build with **external USB camera (UVC) support** is available for advanced setups — for devices where screen capture is limited or not optimal. This version uses userspace drivers and is distributed outside Google Play.  
+**Early access for supporters:** [Boosty — Experimental Build: External USB Camera Support](https://boosty.to/vasmarfas/posts/ba545975-558f-496f-bb3f-d181349f447c)
+
 ## ⚙️ Configuration
 
 ### 1. Connection
@@ -64,22 +68,22 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
 
 ### 2. LED Configuration
 - **Per-Side LED Configuration**: You can configure each side separately:
-   - Top: 60 LEDs (default)
-   - Right: 34 LEDs (default)
-   - Bottom: 60 LEDs (default)
-   - Left: 34 LEDs (default)
+    - Top: 60 LEDs (default)
+    - Right: 34 LEDs (default)
+    - Bottom: 60 LEDs (default)
+    - Left: 34 LEDs (default)
 - **LED Layout**: Configure starting corner, direction (clockwise/counterclockwise), and enable/disable individual sides.
 
 ### 3. Capture Settings
 - **Capture Source**: Choose between **Screen** (default) or **Camera** mode.
-  - *Screen*: Standard screen capture using MediaProjection API (requires screen capture permission).
-  - *Camera*: Alternative method using device camera with perspective correction. Ideal for TVs that don't support screen capture or for external phone setups.
+    - *Screen*: Standard screen capture using MediaProjection API (requires screen capture permission).
+    - *Camera*: Alternative method using device camera with perspective correction. Ideal for TVs that don't support screen capture or for external phone setups.
 - **Capture Rate (FPS)**: Default 30 FPS (options: 10, 15, 24, 30, 60).
-- **Capture Quality**: 
-  - *Low (64px)* — For low-end devices or to reduce latency.
-  - *Medium (128px)* — Balanced (Default, Recommended).
-  - *High (256px)* — For powerful devices only.
-  - *Ultra (512px)* — Maximum quality for high-end devices.
+- **Capture Quality**:
+    - *Low (64px)* — For low-end devices or to reduce latency.
+    - *Medium (128px)* — Balanced (Default, Recommended).
+    - *High (256px)* — For powerful devices only.
+    - *Ultra (512px)* — Maximum quality for high-end devices.
 - **Send Average Color**: Enable for maximum performance (sends a single color for the whole strip).
 
 ### 3.1. Camera Mode Setup
@@ -135,35 +139,35 @@ A ready-to-use Arduino sketch compatible with the app is available in [`adalight
 **Quick Start:**
 
 1. **Install FastLED library:**
-   - In Arduino IDE: `Tools` → `Manage Libraries` → search for "FastLED" → install
+    - In Arduino IDE: `Tools` → `Manage Libraries` → search for "FastLED" → install
 
 2. **Configure the sketch:**
-   - Open `adalight-sketch/adalight-sketch.ino`
-   - Modify constants at the top of the file:
-     - `DATA_PIN` — pin for LED strip connection (default 6)
-     - `NUM_LEDS` — number of LEDs in the strip (must match app settings!)
-     - `LED_TYPE` — LED strip type (WS2812B, WS2811, SK6812, etc.)
-     - `COLOR_ORDER` — color order (GRB for WS2812B, RGB for others)
-     - `BRIGHTNESS` — brightness (0-255)
+    - Open `adalight-sketch/adalight-sketch.ino`
+    - Modify constants at the top of the file:
+        - `DATA_PIN` — pin for LED strip connection (default 6)
+        - `NUM_LEDS` — number of LEDs in the strip (must match app settings!)
+        - `LED_TYPE` — LED strip type (WS2812B, WS2811, SK6812, etc.)
+        - `COLOR_ORDER` — color order (GRB for WS2812B, RGB for others)
+        - `BRIGHTNESS` — brightness (0-255)
 
 3. **Wiring:**
-   - LED strip DATA → Arduino pin (default 6)
-   - LED strip VCC → 5V Arduino (or external power supply for long strips)
-   - LED strip GND → GND Arduino
-   - ⚠️ **Important:** For long strips (>10 leds), use an external 5V power supply!
+    - LED strip DATA → Arduino pin (default 6)
+    - LED strip VCC → 5V Arduino (or external power supply for long strips)
+    - LED strip GND → GND Arduino
+    - ⚠️ **Important:** For long strips (>10 leds), use an external 5V power supply!
 
 4. **Upload sketch:**
-   - Connect Arduino to computer via USB
-   - Select board and port in Arduino IDE
-   - Upload the sketch
+    - Connect Arduino to computer via USB
+    - Select board and port in Arduino IDE
+    - Upload the sketch
 
 5. **Connect to Android:**
-   - Disconnect Arduino from computer
-   - Connect Arduino to Android device via USB OTG cable
-   - In the app, select connection type: **Adalight**
-   - Set Baud Rate: **115200**
-   - Select protocol: **ADA**
-   - Ensure LED count in the app matches `NUM_LEDS` in the sketch
+    - Disconnect Arduino from computer
+    - Connect Arduino to Android device via USB OTG cable
+    - In the app, select connection type: **Adalight**
+    - Set Baud Rate: **115200**
+    - Select protocol: **ADA**
+    - Ensure LED count in the app matches `NUM_LEDS` in the sketch
 
 **WS2812B Wiring Example:**
 ```
