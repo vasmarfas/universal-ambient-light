@@ -8,6 +8,8 @@ Universal Ambient Light is a modern Android application that captures screen con
 
 **🇷🇺 [Read in Russian / Читать на русском](README_RU.md)**
 
+**❤️ Support the project:** if you'd like to support further development, please see [`SUPPORT.md`](SUPPORT.md).
+
 ## ✨ Key Features
 
 - 🎨 **Universal Controller Support**: Compatible with Hyperion, WLED, and Adalight.
