@@ -55,6 +55,10 @@ The latest versions (**TV** and **Mobile**) can be downloaded from the [Releases
 
 ### [RuStore](https://www.rustore.ru/catalog/app/com.vasmarfas.UniversalAmbientLight)
 
+### Experimental: External USB Camera Support
+An experimental build with **external USB camera (UVC) support** is available for advanced setups — for devices where screen capture is limited or not optimal. This version uses userspace drivers and is distributed outside Google Play.  
+**Early access for supporters:** [Boosty — Experimental Build: External USB Camera Support](https://boosty.to/vasmarfas/posts/ba545975-558f-496f-bb3f-d181349f447c)
+
 ## ⚙️ Configuration
 
 ### 1. Connection

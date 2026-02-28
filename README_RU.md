@@ -52,6 +52,10 @@ Universal Ambient Light — это современное Android-приложе
 
 ### [RuStore](https://www.rustore.ru/catalog/app/com.vasmarfas.UniversalAmbientLight)
 
+### Экспериментальная сборка: поддержка внешних USB-камер
+Экспериментальная сборка с **поддержкой внешних USB-камер (UVC)** доступна для продвинутых настроек — для устройств, где захват экрана ограничен или не оптимален. Эта версия использует userspace-драйверы и распространяется вне Google Play.  
+**Ранний доступ для подписчиков:** [Boosty — Experimental Build: External USB Camera Support](https://boosty.to/vasmarfas/posts/ba545975-558f-496f-bb3f-d181349f447c)
+
 ## ⚙️ Настройка
 
 ### 1. Подключение
