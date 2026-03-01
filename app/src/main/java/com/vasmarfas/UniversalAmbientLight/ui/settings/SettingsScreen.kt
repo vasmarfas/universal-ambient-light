@@ -95,6 +95,9 @@ fun SettingsScreen(
         mutableStateOf(prefs.getString(R.string.pref_key_capture_method) ?: "media_projection")
     }
 
+    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
+    var previousCaptureMethod by remember { mutableStateOf(captureMethod) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -325,8 +328,22 @@ fun SettingsScreen(
                         entryValuesRes = R.array.pref_list_capture_method_values,
                         recomposeKey = captureMethod,
                         onValueChange = { newMethod ->
-                            captureMethod = newMethod
-                            AnalyticsHelper.logSettingChanged(context, "capture_method", newMethod)
+                            if (newMethod == "accessibility") {
+                                // Check if service is already enabled
+                                if (com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService.getInstance() == null) {
+                                    // Show disclosure dialog BEFORE applying fully or opening settings
+                                    // Note: ListPreference already saved the value to prefs, so we might need to revert if denied
+                                    previousCaptureMethod = captureMethod // save old method (which is actually current before update in state)
+                                    // Ideally ListPreference shouldn't update automatically, but here we intercept
+                                    showAccessibilityDisclosure = true
+                                } else {
+                                    captureMethod = newMethod
+                                    AnalyticsHelper.logSettingChanged(context, "capture_method", newMethod)
+                                }
+                            } else {
+                                captureMethod = newMethod
+                                AnalyticsHelper.logSettingChanged(context, "capture_method", newMethod)
+                            }
                         }
                     )
                     
@@ -581,6 +598,47 @@ fun SettingsScreen(
         }
     }
     
+    if (showAccessibilityDisclosure) {
+        AlertDialog(
+            onDismissRequest = {
+                // Revert change if dismissed without accepting
+                captureMethod = previousCaptureMethod
+                prefs.putString(R.string.pref_key_capture_method, previousCaptureMethod)
+                showAccessibilityDisclosure = false
+            },
+            title = { Text(stringResource(R.string.accessibility_disclosure_title)) },
+            text = { Text(stringResource(R.string.accessibility_disclosure_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAccessibilityDisclosure = false
+                        // Apply change
+                        captureMethod = "accessibility"
+                        prefs.putString(R.string.pref_key_capture_method, "accessibility")
+                        AnalyticsHelper.logSettingChanged(context, "capture_method", "accessibility")
+                        
+                        // Open settings
+                        com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings(context)
+                    }
+                ) {
+                    Text(stringResource(R.string.accessibility_disclosure_button_accept))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        // Revert change
+                        captureMethod = previousCaptureMethod
+                        prefs.putString(R.string.pref_key_capture_method, previousCaptureMethod)
+                        showAccessibilityDisclosure = false
+                    }
+                ) {
+                    Text(stringResource(R.string.accessibility_disclosure_button_deny))
+                }
+            }
+        )
+    }
+
     if (showDebugDialog) {
         val debugInfo = remember { DebugInfoHelper.getDebugInfo(context) }
         AlertDialog(

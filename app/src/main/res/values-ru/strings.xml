@@ -356,12 +356,12 @@
   <string name="pref_title_wled_protocol">Протокол WLED</string>
   <string name="pref_summary_wled_protocol">DDP (рек. для WLED 0.11+) или UDP Raw</string>
   <string-array name="pref_list_wled_protocol">
-    <item>DDP (порт 4048)</item>
     <item>UDP Raw (порт 19446)</item>
+    <item>DDP (порт 4048)</item>
   </string-array>
   <string-array name="pref_list_wled_protocol_values">
-    <item>ddp</item>
     <item>udp_raw</item>
+    <item>ddp</item>
   </string-array>
   <string name="pref_title_wled_rgbw">WLED RGBW</string>
   <string name="pref_summary_wled_rgbw">Включить поддержку белого канала (RGBW)</string>
@@ -425,4 +425,9 @@
   <string name="rating_dialog_report_issue">Сообщить о проблеме</string>
   <string name="rating_dialog_cancel">Отмена</string>
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
+  <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
+  <string name="accessibility_disclosure_title">Требуется разрешение специальных возможностей</string>
+  <string name="accessibility_disclosure_message">Это приложение использует API специальных возможностей (AccessibilityService API) для захвата содержимого экрана. Это необходимо для анализа цветов на экране и синхронизации фоновой подсветки (Ambilight) в реальном времени.\n\nДанные экрана обрабатываются локально на вашем устройстве, никуда не сохраняются и не передаются третьим лицам.\n\nЕсли вы не согласны, вы не сможете использовать этот режим захвата.</string>
+  <string name="accessibility_disclosure_button_deny">Отказать</string>
+  <string name="accessibility_disclosure_button_accept">Принять и продолжить</string>
 </resources>

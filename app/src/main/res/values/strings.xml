@@ -355,12 +355,12 @@
   <string name="pref_title_wled_protocol">WLED Protocol</string>
   <string name="pref_summary_wled_protocol">DDP (recommended for WLED 0.11+) or UDP Raw</string>
   <string-array name="pref_list_wled_protocol">
-    <item>DDP (port 4048)</item>
     <item>UDP Raw (port 19446)</item>
+    <item>DDP (port 4048)</item>
   </string-array>
   <string-array name="pref_list_wled_protocol_values">
-    <item>ddp</item>
     <item>udp_raw</item>
+    <item>ddp</item>
   </string-array>
   <string name="pref_title_wled_rgbw">WLED RGBW</string>
   <string name="pref_summary_wled_rgbw">Enable white channel support (RGBW LED)</string>
@@ -426,4 +426,8 @@
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
   <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
   <string name="accessibility_enable_prompt">Please enable the Accessibility Service for Universal Ambient Light</string>
+  <string name="accessibility_disclosure_title">Accessibility Permission Required</string>
+  <string name="accessibility_disclosure_message">This app uses the AccessibilityService API to capture screen content. This is required to analyze colors on your screen and sync them with your background lights (Ambilight) in real-time.\n\nThe screen data is processed locally on your device, is never saved, and is never transmitted to any third-party servers.\n\nIf you do not agree, you cannot use this capture mode.</string>
+  <string name="accessibility_disclosure_button_deny">Deny</string>
+  <string name="accessibility_disclosure_button_accept">Agree &amp; Continue</string>
 </resources>
