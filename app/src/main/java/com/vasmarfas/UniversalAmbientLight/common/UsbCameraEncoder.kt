@@ -162,6 +162,19 @@ class UsbCameraEncoder(
         clearAndDisconnect()
     }
 
+    fun stopRecordingNoDisconnect() {
+        if (DEBUG) Log.i(TAG, "stopRecordingNoDisconnect")
+        mRunning = false
+        mCapturing = false
+        currentCamera?.closeCamera()
+        currentCamera = null
+        usbMonitor?.destroy()
+        usbMonitor = null
+        dummySurfaceTexture?.release()
+        dummySurfaceTexture = null
+        clearLights()
+    }
+
     fun resumeRecording() {
         if (!mCapturing) start()
     }

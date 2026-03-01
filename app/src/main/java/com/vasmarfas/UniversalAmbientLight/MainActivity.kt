@@ -79,12 +79,15 @@ import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbCameraUtil
+import com.vasmarfas.UniversalAmbientLight.common.UsbCameraEncoder
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import kotlin.math.sqrt
 import androidx.core.content.edit
+import androidx.camera.core.CameraSelector
 
 class MainActivity : ComponentActivity() {
 
@@ -134,6 +137,10 @@ class MainActivity : ComponentActivity() {
             val checked = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TAG, false)
             val wasRunning = mRecorderRunning
             mRecorderRunning = checked
+
+            if (!wasRunning && checked && mSessionStartTime == null) {
+                mSessionStartTime = System.currentTimeMillis()
+            }
             
             if (wasRunning && !checked && mSessionStartTime != null) {
                 val durationSeconds = ((System.currentTimeMillis() - mSessionStartTime!!) / 1000).coerceAtLeast(0)
@@ -369,6 +376,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestCameraCapture() {
+        val prefs = Preferences(this)
+        val cameraFacing = prefs.getInt(R.string.pref_key_camera_facing, CameraSelector.LENS_FACING_BACK)
+        if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC) {
+            ensureUsbCameraPermissionAndStart()
+            return
+        }
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -380,6 +394,41 @@ class MainActivity : ComponentActivity() {
             )
         } else {
             startCameraGrabber()
+        }
+    }
+
+    private fun ensureUsbCameraPermissionAndStart() {
+        val prefs = Preferences(this)
+        val vendorId = prefs.getInt(R.string.pref_key_usb_vendor_id, -1)
+        val productId = prefs.getInt(R.string.pref_key_usb_product_id, -1)
+        if (vendorId == -1 || productId == -1) {
+            Toast.makeText(this, getString(R.string.camera_usb_no_device), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        val device = usbManager.deviceList.values.find {
+            it.vendorId == vendorId && it.productId == productId
+        }
+        if (device == null) {
+            Toast.makeText(this, getString(R.string.camera_usb_no_device), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val usbCameraUtil = UsbCameraUtil(this)
+        if (usbCameraUtil.hasPermission(device)) {
+            startCameraGrabber()
+            return
+        }
+
+        usbCameraUtil.requestPermission(device) { granted ->
+            runOnUiThread {
+                if (granted) {
+                    startCameraGrabber()
+                } else {
+                    Toast.makeText(this, getString(R.string.camera_permission_required), Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -396,8 +445,6 @@ class MainActivity : ComponentActivity() {
         } else {
             startService(intent)
         }
-        mRecorderRunning = true
-        mSessionStartTime = System.currentTimeMillis()
 
         ReviewHelper.onLightingStarted(this)
     }
@@ -606,9 +653,14 @@ fun MainScreen(
     onLeaveReviewClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Camera mode background — show camera preview with corners
+        // Camera mode background — intentionally no live preview on Home screen
+        // to avoid camera ownership conflicts with the foreground service.
         if (captureSource == "camera") {
-            com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground(isCapturing = isRunning)
+            Spacer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
         }
 
         // Screen mode: Effects Background (only when running AND screen mode)

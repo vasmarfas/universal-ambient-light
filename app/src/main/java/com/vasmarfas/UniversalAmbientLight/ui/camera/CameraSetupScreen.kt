@@ -255,16 +255,32 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                 },
                 actions = {
-                    // Camera Switcher
-                    TextButton(onClick = { showCameraDialog = true }) {
-                        val label = when (cameraFacing) {
-                            CameraSelector.LENS_FACING_BACK -> stringResource(R.string.camera_facing_back)
-                            CameraSelector.LENS_FACING_FRONT -> stringResource(R.string.camera_facing_front)
-                            CameraSelector.LENS_FACING_EXTERNAL -> stringResource(R.string.camera_facing_external)
-                            UsbCameraEncoder.CAMERA_FACING_USB_UVC -> stringResource(R.string.camera_facing_usb_uvc)
-                            else -> "Camera"
+                    // More visible camera selector
+                    val label = when (cameraFacing) {
+                        CameraSelector.LENS_FACING_BACK -> stringResource(R.string.camera_facing_back)
+                        CameraSelector.LENS_FACING_FRONT -> stringResource(R.string.camera_facing_front)
+                        CameraSelector.LENS_FACING_EXTERNAL -> stringResource(R.string.camera_facing_external)
+                        UsbCameraEncoder.CAMERA_FACING_USB_UVC -> stringResource(R.string.camera_facing_usb_uvc)
+                        else -> "Camera"
+                    }
+                    FilledTonalButton(
+                        onClick = { showCameraDialog = true },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.2f),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Column(horizontalAlignment = Alignment.Start) {
+                            Text(
+                                text = stringResource(R.string.camera_select_camera),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
-                        Text(label, color = Color.White)
                     }
 
                     // Reset button
@@ -777,15 +793,18 @@ fun CameraPreviewBackground(isCapturing: Boolean = false) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            isCapturing -> {
-                // Service owns the camera — show dark background
-                Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
-            }
             cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC && usbVendorId != -1 && usbProductId != -1 -> {
-                // USB UVC camera: preview handled by AUSBC, not CameraX
-                UsbCameraPreviewView(vendorId = usbVendorId, productId = usbProductId, rotation = usbRotation)
+                // In USB mode, foreground service keeps an exclusive handle to the device.
+                // Keep previous behavior while capturing to avoid camera-open conflicts.
+                if (isCapturing) {
+                    Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
+                } else {
+                    // USB UVC camera: preview handled by AUSBC, not CameraX
+                    UsbCameraPreviewView(vendorId = usbVendorId, productId = usbProductId, rotation = usbRotation)
+                }
             }
             hasCameraPermission -> {
+                // Built-in cameras can keep preview visible while service is running.
                 CameraPreviewView(cameraLensFacing = cameraFacing)
             }
             else -> {

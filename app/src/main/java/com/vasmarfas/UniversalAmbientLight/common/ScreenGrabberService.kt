@@ -314,6 +314,21 @@ class ScreenGrabberService : Service() {
                     } else {
                         haltStartup()
                     }
+                } else {
+                    mCaptureSource = "camera"
+                    val foregroundStarted = tryStartForegroundCamera()
+                    if (!foregroundStarted && mTclBlocked) {
+                        acquireWakeLock()
+                    }
+
+                    // Recover from stale state: restart camera pipeline even if service/thread already exists.
+                    if (!isCapturing) {
+                        startCameraCapture()
+                    } else {
+                        mCameraEncoder?.resumeRecording()
+                        mUsbCameraEncoder?.resumeRecording()
+                    }
+                    notifyActivity()
                 }
                 ACTION_STOP -> stopAllCapture()
                 ACTION_CLEAR -> {
@@ -480,6 +495,16 @@ class ScreenGrabberService : Service() {
             return
         }
 
+        // Always release previous camera pipelines before creating a new one.
+        mCameraEncoder?.let {
+            it.stopRecordingNoDisconnect()
+            mCameraEncoder = null
+        }
+        mUsbCameraEncoder?.let {
+            it.stopRecordingNoDisconnect()
+            mUsbCameraEncoder = null
+        }
+
         val prefs = Preferences(this)
         val options = AppOptions(
             mHorizontalLEDCount, mVerticalLEDCount, mFrameRate, mSendAverageColor, mCaptureQuality,
@@ -525,11 +550,50 @@ class ScreenGrabberService : Service() {
             mUsbCameraEncoder = UsbCameraEncoder(this, thread.receiver, options, corners, vendorId, productId, usbRotation)
             mUsbCameraEncoder!!.start()
             mUsbCameraEncoder!!.sendStatus()
+            scheduleCameraStartupRetry(isUsb = true)
         } else {
             mCameraEncoder = CameraEncoder(this, thread.receiver, options, corners, cameraFacing)
             mCameraEncoder!!.start()
             mCameraEncoder!!.sendStatus()
+            scheduleCameraStartupRetry(isUsb = false)
         }
+    }
+
+    private fun scheduleCameraStartupRetry(isUsb: Boolean) {
+        val handler = mHandler ?: return
+        val maxAttempts = 8
+        val retryDelayMs = 350L
+        var attempts = 0
+
+        fun retry() {
+            if (mCaptureSource != "camera") return
+            if (mHyperionThread == null) return
+
+            val capturing = if (isUsb) {
+                mUsbCameraEncoder?.isCapturing() == true
+            } else {
+                mCameraEncoder?.isCapturing() == true
+            }
+            if (capturing) return
+
+            attempts += 1
+            if (attempts > maxAttempts) {
+                Log.w(TAG, "Camera did not start capturing after $maxAttempts retries (isUsb=$isUsb)")
+                notifyActivity()
+                return
+            }
+
+            if (isUsb) {
+                mUsbCameraEncoder?.resumeRecording()
+                mUsbCameraEncoder?.sendStatus()
+            } else {
+                mCameraEncoder?.resumeRecording()
+                mCameraEncoder?.sendStatus()
+            }
+            handler.postDelayed({ retry() }, retryDelayMs)
+        }
+
+        handler.postDelayed({ retry() }, retryDelayMs)
     }
 
     private fun acquireWakeLock() {

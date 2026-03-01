@@ -179,10 +179,11 @@ class CameraEncoder(
     private fun bindCamera() {
         val provider = cameraProvider ?: return
 
-        // Unbind only our previous ImageAnalysis (if any), not everything.
-        // This preserves the Activity's Preview use case.
-        imageAnalysisUseCase?.let {
-            try { provider.unbind(it) } catch (_: Exception) {}
+        // Service capture must have priority over UI preview; otherwise on some devices
+        // bindToLifecycle fails with "camera in use" and start button seems to do nothing.
+        try {
+            provider.unbindAll()
+        } catch (_: Exception) {
         }
 
         val imageAnalysis = ImageAnalysis.Builder()
