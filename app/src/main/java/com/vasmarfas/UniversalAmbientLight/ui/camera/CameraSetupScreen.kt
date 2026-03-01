@@ -148,7 +148,11 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     // ---- Built-in cameras ----
                     if (hasBackCamera) {
                         TextButton(
-                            onClick = { cameraFacing = CameraSelector.LENS_FACING_BACK; showCameraDialog = false },
+                            onClick = {
+                                cameraFacing = CameraSelector.LENS_FACING_BACK
+                                prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                                showCameraDialog = false
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.camera_facing_back), modifier = Modifier.weight(1f))
@@ -158,7 +162,11 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                     if (hasFrontCamera) {
                         TextButton(
-                            onClick = { cameraFacing = CameraSelector.LENS_FACING_FRONT; showCameraDialog = false },
+                            onClick = {
+                                cameraFacing = CameraSelector.LENS_FACING_FRONT
+                                prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                                showCameraDialog = false
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.camera_facing_front), modifier = Modifier.weight(1f))
@@ -168,7 +176,11 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                     if (hasExternalCamera) {
                         TextButton(
-                            onClick = { cameraFacing = CameraSelector.LENS_FACING_EXTERNAL; showCameraDialog = false },
+                            onClick = {
+                                cameraFacing = CameraSelector.LENS_FACING_EXTERNAL
+                                prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                                showCameraDialog = false
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.camera_facing_external), modifier = Modifier.weight(1f))
@@ -202,12 +214,18 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                                                 selectedUsbVendorId = device.vendorId
                                                 selectedUsbProductId = device.productId
                                                 cameraFacing = UsbCameraEncoder.CAMERA_FACING_USB_UVC
+                                                prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                                                prefs.putInt(R.string.pref_key_usb_vendor_id, selectedUsbVendorId)
+                                                prefs.putInt(R.string.pref_key_usb_product_id, selectedUsbProductId)
                                             }
                                         }
                                     } else {
                                         selectedUsbVendorId = device.vendorId
                                         selectedUsbProductId = device.productId
                                         cameraFacing = UsbCameraEncoder.CAMERA_FACING_USB_UVC
+                                        prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                                        prefs.putInt(R.string.pref_key_usb_vendor_id, selectedUsbVendorId)
+                                        prefs.putInt(R.string.pref_key_usb_product_id, selectedUsbProductId)
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth()
