@@ -653,18 +653,9 @@ fun MainScreen(
     onLeaveReviewClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Camera mode background — intentionally no live preview on Home screen
-        // to avoid camera ownership conflicts with the foreground service.
-        if (captureSource == "camera") {
-            Spacer(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            )
-        }
-
-        // Screen mode: Effects Background (only when running AND screen mode)
-        if (isRunning && captureSource != "camera") {
+        // Keep Home screen camera-preview-free to avoid ownership conflicts with the service.
+        // Effects background is shown for both capture sources to simplify calibration UX.
+        if (isRunning) {
             val infiniteTransition = rememberInfiniteTransition(label = "effects")
 
             when (effectMode) {

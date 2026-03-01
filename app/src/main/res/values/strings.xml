@@ -159,6 +159,10 @@
   <string name="pref_key_usb_product_id">usb_product_id</string>
   <string name="pref_key_usb_camera_rotation">usb_camera_rotation</string>
   <string name="camera_usb_rotation_label">Rotation</string>
+  <string name="camera_corner_edit_enable">Edit Corners</string>
+  <string name="camera_corner_edit_disable">Exit Corner Edit</string>
+  <string name="camera_corner_edit_hint_enabled">Corner edit mode: arrows move point, OK switches point, Back exits mode.</string>
+  <string name="camera_corner_edit_hint_disabled">To edit corners from TV remote, press \"Edit Corners\".</string>
   <!-- Capturing settings -->
   <string name="pref_group_capturing">Capturing</string>
   <string name="pref_title_framerate">Capture Rate</string>

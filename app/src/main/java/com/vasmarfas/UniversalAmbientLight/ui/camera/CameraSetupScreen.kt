@@ -3,6 +3,7 @@ package com.vasmarfas.UniversalAmbientLight.ui.camera
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -17,6 +18,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,14 +31,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -104,6 +115,12 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
 
     // Currently dragged corner index (0-3) or -1
     var dragCorner by remember { mutableIntStateOf(-1) }
+    // Currently selected corner for TV remote (D-pad) control (0=TL,1=TR,2=BR,3=BL)
+    var selectedCorner by remember { mutableIntStateOf(0) }
+    // Remote editing mode: arrow keys move corners only when enabled.
+    var isRemoteCornerEditMode by remember { mutableStateOf(false) }
+    var isEditCornersButtonFocused by remember { mutableStateOf(false) }
+    val editModeFocusRequester = remember { FocusRequester() }
 
     var cameraFacing by remember { mutableIntStateOf(prefs.getInt(R.string.pref_key_camera_facing, CameraSelector.LENS_FACING_BACK)) }
     var selectedUsbVendorId by remember { mutableIntStateOf(prefs.getInt(R.string.pref_key_usb_vendor_id, -1)) }
@@ -117,6 +134,29 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
     var showCameraDialog by remember { mutableStateOf(false) }
     var connectedUsbCameras by remember { mutableStateOf<List<UsbDevice>>(emptyList()) }
     var usbCheckingState by remember { mutableStateOf(false) }
+
+    // Saves only the corner positions (camera/rotation saved on chip selection & Save button).
+    val saveCorners = {
+        val arr = floatArrayOf(
+            topLeft.x, topLeft.y,
+            topRight.x, topRight.y,
+            bottomRight.x, bottomRight.y,
+            bottomLeft.x, bottomLeft.y
+        )
+        prefs.putString(R.string.pref_key_camera_corners, CameraEncoder.cornersToString(arr))
+    }
+
+    BackHandler(enabled = isRemoteCornerEditMode) {
+        saveCorners()
+        isRemoteCornerEditMode = false
+    }
+
+    // Keep focus trapped in edit mode so D-pad controls corners only.
+    LaunchedEffect(isRemoteCornerEditMode) {
+        if (isRemoteCornerEditMode) {
+            editModeFocusRequester.requestFocus()
+        }
+    }
 
     LaunchedEffect(Unit) {
         val providerFuture = ProcessCameraProvider.getInstance(context)
@@ -268,7 +308,10 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
             TopAppBar(
                 title = { Text(stringResource(R.string.camera_setup_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(
+                        onClick = onBackClick,
+                        enabled = !isRemoteCornerEditMode
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -283,6 +326,7 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                     FilledTonalButton(
                         onClick = { showCameraDialog = true },
+                        enabled = !isRemoteCornerEditMode,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = Color.White.copy(alpha = 0.2f),
@@ -302,34 +346,40 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
 
                     // Reset button
-                    IconButton(onClick = {
-                        topLeft = Offset(0.1f, 0.1f)
-                        topRight = Offset(0.9f, 0.1f)
-                        bottomRight = Offset(0.9f, 0.9f)
-                        bottomLeft = Offset(0.1f, 0.9f)
-                    }) {
+                    IconButton(
+                        onClick = {
+                            topLeft = Offset(0.1f, 0.1f)
+                            topRight = Offset(0.9f, 0.1f)
+                            bottomRight = Offset(0.9f, 0.9f)
+                            bottomLeft = Offset(0.1f, 0.9f)
+                        },
+                        enabled = !isRemoteCornerEditMode
+                    ) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.camera_setup_reset))
                     }
                     // Save button
-                    IconButton(onClick = {
-                        val cornersArray = floatArrayOf(
-                            topLeft.x, topLeft.y,
-                            topRight.x, topRight.y,
-                            bottomRight.x, bottomRight.y,
-                            bottomLeft.x, bottomLeft.y
-                        )
-                        prefs.putString(
-                            R.string.pref_key_camera_corners,
-                            CameraEncoder.cornersToString(cornersArray)
-                        )
-                        prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
-                        if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC) {
-                            prefs.putInt(R.string.pref_key_usb_vendor_id, selectedUsbVendorId)
-                            prefs.putInt(R.string.pref_key_usb_product_id, selectedUsbProductId)
-                            prefs.putInt(R.string.pref_key_usb_camera_rotation, usbCameraRotation)
-                        }
-                        onBackClick()
-                    }) {
+                    IconButton(
+                        onClick = {
+                            val cornersArray = floatArrayOf(
+                                topLeft.x, topLeft.y,
+                                topRight.x, topRight.y,
+                                bottomRight.x, bottomRight.y,
+                                bottomLeft.x, bottomLeft.y
+                            )
+                            prefs.putString(
+                                R.string.pref_key_camera_corners,
+                                CameraEncoder.cornersToString(cornersArray)
+                            )
+                            prefs.putInt(R.string.pref_key_camera_facing, cameraFacing)
+                            if (cameraFacing == UsbCameraEncoder.CAMERA_FACING_USB_UVC) {
+                                prefs.putInt(R.string.pref_key_usb_vendor_id, selectedUsbVendorId)
+                                prefs.putInt(R.string.pref_key_usb_product_id, selectedUsbProductId)
+                                prefs.putInt(R.string.pref_key_usb_camera_rotation, usbCameraRotation)
+                            }
+                            onBackClick()
+                        },
+                        enabled = !isRemoteCornerEditMode
+                    ) {
                         Icon(Icons.Default.Check, contentDescription = stringResource(R.string.camera_setup_save))
                     }
                 },
@@ -346,7 +396,35 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    if (!isRemoteCornerEditMode) return@onPreviewKeyEvent false
+
+                    // In edit mode arrows move corners; Tab cycles to the next corner.
+                    // All events below are consumed so D-pad doesn't change focus.
+                    val step = 0.01f
+                    fun moved(o: Offset, dx: Float, dy: Float) =
+                        Offset((o.x + dx).coerceIn(0f, 1f), (o.y + dy).coerceIn(0f, 1f))
+                    when (event.key) {
+                        Key.DirectionUp    -> { when (selectedCorner) { 0 -> topLeft = moved(topLeft, 0f, -step); 1 -> topRight = moved(topRight, 0f, -step); 2 -> bottomRight = moved(bottomRight, 0f, -step); 3 -> bottomLeft = moved(bottomLeft, 0f, -step) }; true }
+                        Key.DirectionDown  -> { when (selectedCorner) { 0 -> topLeft = moved(topLeft, 0f, step); 1 -> topRight = moved(topRight, 0f, step); 2 -> bottomRight = moved(bottomRight, 0f, step); 3 -> bottomLeft = moved(bottomLeft, 0f, step) }; true }
+                        Key.DirectionLeft  -> { when (selectedCorner) { 0 -> topLeft = moved(topLeft, -step, 0f); 1 -> topRight = moved(topRight, -step, 0f); 2 -> bottomRight = moved(bottomRight, -step, 0f); 3 -> bottomLeft = moved(bottomLeft, -step, 0f) }; true }
+                        Key.DirectionRight -> { when (selectedCorner) { 0 -> topLeft = moved(topLeft, step, 0f); 1 -> topRight = moved(topRight, step, 0f); 2 -> bottomRight = moved(bottomRight, step, 0f); 3 -> bottomLeft = moved(bottomLeft, step, 0f) }; true }
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> { selectedCorner = (selectedCorner + 1) % 4; true }
+                        Key.Tab            -> { selectedCorner = (selectedCorner + 1) % 4; true }
+                        Key.Back, Key.Escape -> { saveCorners(); isRemoteCornerEditMode = false; true }
+                        else -> false
+                    }
+                }
         ) {
+            // Invisible focus trap target used only while editing corners.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .focusRequester(editModeFocusRequester)
+                    .focusable(enabled = isRemoteCornerEditMode)
+            )
+
             if (!hasCameraPermission) {
                 // Show permission request UI
                 Column(
@@ -429,6 +507,10 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                                         }
                                     }
                                     dragCorner = minIdx
+                                    if (minIdx >= 0) {
+                                        selectedCorner = minIdx
+                                        isRemoteCornerEditMode = true
+                                    }
                                 },
                                 onDrag = { change, _ ->
                                     if (dragCorner < 0) return@detectDragGestures
@@ -450,7 +532,19 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                             )
                         }
                 ) {
-                    drawCornersOverlay(topLeft, topRight, bottomRight, bottomLeft, dragCorner)
+                    drawCornersOverlay(
+                        topLeft = topLeft,
+                        topRight = topRight,
+                        bottomRight = bottomRight,
+                        bottomLeft = bottomLeft,
+                        dragCorner = if (dragCorner >= 0) {
+                            dragCorner
+                        } else if (isRemoteCornerEditMode) {
+                            selectedCorner
+                        } else {
+                            -1
+                        }
+                    )
                 }
 
                 // Rotation selector: only shown in USB UVC mode
@@ -485,6 +579,53 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                     }
                 }
 
+                // In edit mode: show a status badge (button hidden to prevent accidental OK press).
+                // Outside edit mode: show the "Edit Corners" entry button.
+                if (isRemoteCornerEditMode) {
+                    val cornerLabel = listOf("TL", "TR", "BR", "BL")[selectedCorner]
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                            .background(
+                                MaterialTheme.colorScheme.errorContainer,
+                                RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = "✎  $cornerLabel  ·  ${stringResource(R.string.camera_corner_edit_hint_enabled)}",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                } else {
+                    FilledTonalButton(
+                        onClick = { isRemoteCornerEditMode = true },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                            .onFocusChanged { isEditCornersButtonFocused = it.isFocused },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isEditCornersButtonFocused)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isEditCornersButtonFocused)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.camera_corner_edit_enable),
+                            fontWeight = if (isEditCornersButtonFocused) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+
                 // Instruction text at bottom
                 Box(
                     modifier = Modifier
@@ -497,7 +638,8 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = stringResource(R.string.camera_setup_instruction),
+                        text = stringResource(R.string.camera_setup_instruction) + "\n" +
+                                stringResource(R.string.camera_corner_edit_hint_disabled),
                         color = Color.White,
                         fontSize = 14.sp
                     )

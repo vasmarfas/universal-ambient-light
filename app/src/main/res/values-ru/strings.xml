@@ -136,6 +136,10 @@
   <string name="pref_summary_camera_setup">Настройте 4 угла для совмещения с экраном ТВ в кадре камеры</string>
   <string name="camera_setup_title">Настройка камеры</string>
   <string name="camera_setup_instruction">Перетащите 4 угла, чтобы совместить их с краями экрана ТВ</string>
+  <string name="camera_corner_edit_enable">Редактировать углы</string>
+  <string name="camera_corner_edit_disable">Выйти из редактирования</string>
+  <string name="camera_corner_edit_hint_enabled">Стрелки — двигают угол · Tab — следующий угол · Esc/Назад — выход</string>
+  <string name="camera_corner_edit_hint_disabled">Для управления с пульта нажмите «Редактировать углы»</string>
   <string name="camera_setup_save">Сохранить</string>
   <string name="camera_setup_reset">Сбросить</string>
   <string name="camera_permission_required">Для режима камеры необходимо разрешение на использование камеры</string>
