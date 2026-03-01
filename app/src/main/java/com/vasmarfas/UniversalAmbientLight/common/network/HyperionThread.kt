@@ -226,9 +226,9 @@ class HyperionThread(
         
         val host = mHost ?: "localhost"
         return if ("wled".equals(mConnectionType, ignoreCase = true)) {
-            // WLEDClient (context, host, port, priority, colorOrder, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
+            // WLEDClient (context, host, port, priority, colorOrder, protocol, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
             WLEDClient(mContext, host, mPort, mPriority, mWledColorOrder,
-                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
+                mWledProtocol, mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
         } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
             // AdalightClient (context, priority, baudrate, protocol, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
             AdalightClient(mContext, mPriority, mBaudRate, mAdalightProtocol,

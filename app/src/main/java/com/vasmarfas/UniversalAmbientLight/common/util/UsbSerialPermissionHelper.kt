@@ -98,14 +98,14 @@ object UsbSerialPermissionHelper {
 
         val permissionIntent = PendingIntent.getBroadcast(
             context,
-            0,
+            target.deviceId,
             Intent(ACTION_USB_PERMISSION).apply {
                 setPackage(context.packageName)
             },
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             } else {
-                0
+                PendingIntent.FLAG_UPDATE_CURRENT
             }
         )
 
@@ -117,7 +117,18 @@ object UsbSerialPermissionHelper {
                 } catch (_: Exception) {
                 }
 
-                val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                val deviceFromIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                }
+                val targetDevice = deviceFromIntent ?: target
+                val grantedByBroadcast = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                // OEM fallback: some firmware can provide incorrect/missing EXTRA_PERMISSION_GRANTED.
+                val grantedByManager = usbManager.hasPermission(targetDevice)
+                val granted = grantedByBroadcast || grantedByManager
+
                 if (granted) {
                     AnalyticsHelper.logUsbPermissionGranted(ctx)
                     onReady()

@@ -19,6 +19,7 @@ class WLEDClient(
     port: Int,
     private val mPriority: Int,
     colorOrder: String?,
+    wledProtocol: String = "ddp",
     smoothingEnabled: Boolean = true,
     smoothingPreset: String = "balanced",
     settlingTime: Int = 200,
@@ -33,7 +34,10 @@ class WLEDClient(
 
     private val mPort: Int
     private val mColorOrder: String = colorOrder?.lowercase() ?: "rgb"
-    private val mProtocol = Protocol.DDP // Default to DDP
+    private val mProtocol: Protocol = when (wledProtocol.lowercase()) {
+        "udp_raw" -> Protocol.UDP_RAW
+        else -> Protocol.DDP
+    }
 
     @Volatile
     private var mConnected = false
@@ -398,9 +402,10 @@ class WLEDClient(
         packet[0] = PROTOCOL_DRGB
         packet[1] = WLED_TIMEOUT_SECONDS
 
+        val effectiveOrder = normalizeOrderForUdpRaw(mColorOrder)
         var idx = 2
         for (led in leds) {
-            val ordered = convertColorOrder(led, mColorOrder)
+            val ordered = convertColorOrder(led, effectiveOrder)
             packet[idx++] = ordered[0]
             packet[idx++] = ordered[1]
             packet[idx++] = ordered[2]
@@ -415,15 +420,30 @@ class WLEDClient(
         packet[2] = ((startIndex shr 8) and 0xFF).toByte()
         packet[3] = (startIndex and 0xFF).toByte()
 
+        val effectiveOrder = normalizeOrderForUdpRaw(mColorOrder)
         var idx = 4
         for (i in 0 until count) {
             val led = leds[startIndex + i]
-            val ordered = convertColorOrder(led, mColorOrder)
+            val ordered = convertColorOrder(led, effectiveOrder)
             packet[idx++] = ordered[0]
             packet[idx++] = ordered[1]
             packet[idx++] = ordered[2]
         }
         return packet
+    }
+
+    private fun normalizeOrderForUdpRaw(order: String): String {
+        // WLED UDP Raw path may apply channel mapping differently from DDP on some setups.
+        // Rotate order right by one step so UI color-order labels remain consistent between protocols.
+        return when (order.lowercase()) {
+            "rgb" -> "brg"
+            "grb" -> "bgr"
+            "brg" -> "rbg"
+            "rbg" -> "gbr"
+            "gbr" -> "grb"
+            "bgr" -> "rgb"
+            else -> "brg"
+        }
     }
 
     private fun convertColorOrder(led: ColorRgb, order: String): ByteArray {
