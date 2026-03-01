@@ -9,6 +9,7 @@ Universal Ambient Light is a modern Android application that captures screen con
 **🇷🇺 [Read in Russian / Читать на русском](README_RU.md)**
 
 **❤️ Support the project:** if you'd like to support further development, please see [`SUPPORT.md`](SUPPORT.md).
+**📄 Third-party licenses:** see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ## ✨ Key Features
 

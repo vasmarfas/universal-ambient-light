@@ -35,6 +35,11 @@ import android.widget.Toast
 import androidx.compose.foundation.text.selection.SelectionContainer
 import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import android.app.Activity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import dadb.Dadb
+import com.vasmarfas.UniversalAmbientLight.common.util.AdbKeyHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +86,14 @@ fun SettingsScreen(
     
     // State for debug dialog
     var showDebugDialog by remember { mutableStateOf(false) }
+    
+    // State for ADB pairing
+    var showAdbPairingDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    
+    var captureMethod by remember {
+        mutableStateOf(prefs.getString(R.string.pref_key_capture_method) ?: "media_projection")
+    }
 
     Scaffold(
         topBar = {
@@ -300,6 +313,37 @@ fun SettingsScreen(
                             AnalyticsHelper.logSettingChanged(context, "capture_source", newSource)
                         }
                     )
+                }
+
+                // Capture Method (MediaProjection, Screencap, Accessibility)
+                if (captureSource == "screen") {
+                    ListPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_capture_method,
+                        title = stringResource(R.string.pref_title_capture_method),
+                        entriesRes = R.array.pref_list_capture_method,
+                        entryValuesRes = R.array.pref_list_capture_method_values,
+                        recomposeKey = captureMethod,
+                        onValueChange = { newMethod ->
+                            captureMethod = newMethod
+                            AnalyticsHelper.logSettingChanged(context, "capture_method", newMethod)
+                        }
+                    )
+                    
+                    if (captureMethod == "adb_local" || captureMethod == "adb_stream" || captureMethod == "scrcpy") {
+                        EditTextPreference(
+                            prefs = prefs,
+                            keyRes = R.string.pref_key_adb_port,
+                            title = stringResource(R.string.pref_title_adb_port),
+                            summaryProvider = { it },
+                            keyboardType = KeyboardType.Number
+                        )
+                        ClickablePreference(
+                            title = stringResource(R.string.pref_btn_adb_pair),
+                            summary = stringResource(R.string.pref_summary_adb_pair),
+                            onClick = { showAdbPairingDialog = true }
+                        )
+                    }
                 }
 
                 // Camera corner setup (only when camera source is selected)
@@ -616,6 +660,87 @@ fun SettingsScreen(
                             }
         )
     }
+    if (showAdbPairingDialog) {
+        AdbPairingDialog(
+            context = context,
+            prefs = prefs,
+            onDismiss = { showAdbPairingDialog = false }
+        )
+    }
+}
+
+@Composable
+fun AdbPairingDialog(
+    context: android.content.Context,
+    prefs: Preferences,
+    onDismiss: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!testing) onDismiss() },
+        title = { Text(stringResource(R.string.adb_pair_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.adb_pair_instruction),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (status != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = status!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (status!!.startsWith("✓"))
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error
+                    )
+                }
+                if (testing) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !testing,
+                onClick = {
+                    testing = true
+                    status = null
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val port = prefs.getString(R.string.pref_key_adb_port, "5555")?.toIntOrNull() ?: 5555
+                            val keyPair = AdbKeyHelper.getKeyPair(context)
+                            val dadb = Dadb.create("127.0.0.1", port, keyPair)
+                            // Simple shell ping to confirm connection works
+                            dadb.shell("echo ok")
+                            dadb.close()
+                            withContext(Dispatchers.Main) {
+                                testing = false
+                                status = "✓ ${context.getString(R.string.adb_test_success)}"
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                testing = false
+                                status = String.format(context.getString(R.string.adb_test_failed), e.message ?: "unknown")
+                            }
+                        }
+                    }
+                }
+            ) {
+                Text(stringResource(R.string.pref_btn_adb_pair))
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !testing, onClick = onDismiss) {
+                Text(stringResource(R.string.scanner_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -636,6 +761,7 @@ fun CheckBoxPreference(
     prefs: Preferences,
     keyRes: Int,
     title: String,
+    summary: String? = null,
     onValueChange: ((Boolean) -> Unit)? = null
 ) {
     var checked by remember { mutableStateOf(prefs.getBoolean(keyRes)) }
@@ -660,6 +786,13 @@ fun CheckBoxPreference(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            if (summary != null) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         Switch(checked = checked, onCheckedChange = null)
     }

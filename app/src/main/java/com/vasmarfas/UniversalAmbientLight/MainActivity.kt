@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -71,6 +72,7 @@ import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 import com.vasmarfas.UniversalAmbientLight.common.BootActivity
+import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
@@ -79,6 +81,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
@@ -334,6 +337,26 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestScreenCapture() {
+        val prefs = Preferences(this)
+        val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+        
+        if (method == "accessibility") {
+            if (AccessibilityCaptureService.getInstance() == null) {
+                Toast.makeText(this, getString(R.string.accessibility_enable_prompt), Toast.LENGTH_LONG).show()
+                openAccessibilitySettings(this)
+                return
+            }
+        }
+
+        if (method != "media_projection") {
+            Log.d(TAG, "Alternative capture mode ($method) enabled — starting service directly")
+            // startScreencapRecorder now handles all alternative methods (renaming it to startAlternativeRecorder would be cleaner, but keeping name for compatibility with existing BootActivity method)
+            BootActivity.startAlternativeRecorder(this)
+            mRecorderRunning = true
+            mSessionStartTime = System.currentTimeMillis()
+            return
+        }
+
         // On TCL and other restricted devices, try shell bypass first
         if (TclBypass.isTclDevice() || TclBypass.isRestrictedManufacturer()) {
             Log.d(TAG, "Detected TCL/restricted device, trying shell bypass")

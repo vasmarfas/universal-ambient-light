@@ -9,6 +9,7 @@ Universal Ambient Light — это современное Android-приложе
 **🇬🇧 [Read in English / Читать на английском](README.md)**
 
 **❤️ Поддержать проект:** если вы хотите поддержать дальнейшую разработку, загляните в [`SUPPORT.md`](SUPPORT.md).
+**📄 Лицензии сторонних компонентов:** см. [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ## ✨ Основные возможности
 

@@ -9,6 +9,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -46,6 +47,10 @@ class HyperionThread(
     private var mPendingTask: Future<*>? = null
     @Volatile
     private var mPendingFrame: FrameData? = null
+    @Volatile
+    private var mLastSentFrame: FrameData? = null
+    private val mSendLock = Any()
+    private val mKeepAliveExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
     // ColorSmoothing
     private val mSmoothing: ColorSmoothing? = null // Smoothing теперь внутри клиентов
@@ -87,7 +92,11 @@ class HyperionThread(
             if (frame == null || client == null || !client.isConnected()) return
 
             try {
-                client.setImage(frame.data, frame.width, frame.height, mPriority, FRAME_DURATION)
+                synchronized(mSendLock) {
+                    client.setImage(frame.data, frame.width, frame.height, mPriority, FRAME_DURATION)
+                }
+                // Keep a stable copy for keepalive resends.
+                mLastSentFrame = FrameData(frame.data.copyOf(), frame.width, frame.height)
 
                 if (client is HyperionFlatBuffers) {
                     client.cleanReplies()
@@ -115,6 +124,11 @@ class HyperionThread(
                 mPendingTask = null
             }
             mPendingFrame = null
+            mLastSentFrame = null
+
+            if (!mKeepAliveExecutor.isShutdown) {
+                mKeepAliveExecutor.shutdownNow()
+            }
 
             if (!mExecutor.isShutdown) {
                 mExecutor.shutdownNow()
@@ -156,7 +170,27 @@ class HyperionThread(
     }
 
     override fun run() {
+        startKeepAlive()
         connect()
+    }
+
+    private fun startKeepAlive() {
+        mKeepAliveExecutor.scheduleWithFixedDelay({
+            val client = mClient.get() ?: return@scheduleWithFixedDelay
+            if (!client.isConnected()) return@scheduleWithFixedDelay
+            // WLED and Adalight have their own keepalive logic.
+            if (client !is HyperionFlatBuffers) return@scheduleWithFixedDelay
+
+            val last = mLastSentFrame ?: return@scheduleWithFixedDelay
+            try {
+                synchronized(mSendLock) {
+                    client.setImage(last.data, last.width, last.height, mPriority, FRAME_DURATION)
+                }
+                client.cleanReplies()
+            } catch (e: IOException) {
+                handleError(e)
+            }
+        }, KEEPALIVE_PERIOD_MS, KEEPALIVE_PERIOD_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun connect() {
@@ -242,6 +276,7 @@ class HyperionThread(
         private const val TAG = "HyperionThread"
         private const val FRAME_DURATION = -1
         private const val SHUTDOWN_TIMEOUT_MS = 100
+        private const val KEEPALIVE_PERIOD_MS = 1000L
 
         @JvmStatic
         fun fromPreferences(

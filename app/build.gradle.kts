@@ -92,6 +92,7 @@ dependencies {
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.localbroadcastmanager)
     implementation(libs.flatbuffers.java)
+    implementation("dev.mobile:dadb:1.2.10")
     implementation(libs.usb.serial)
 
     implementation(libs.androidx.leanback)

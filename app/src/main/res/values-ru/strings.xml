@@ -143,6 +143,39 @@
   <string name="camera_capturing_status">Камера захватывает…</string>
   <string name="camera_not_available">Камера недоступна на этом устройстве</string>
   <!-- Capturing settings -->
+  <!-- Capture Method -->
+  <string name="pref_title_capture_method">Метод захвата</string>
+  <string name="pref_summary_capture_method">Выберите способ получения изображения с экрана</string>
+  <string-array name="pref_list_capture_method">
+    <item>MediaProjection (Стандартный)</item>
+    <item>Scrcpy (ADB, ~30мс) ★★★★★</item>
+    <item>ADB Stream (H.264, ~50мс)</item>
+    <item>Screencap (Shell / ADB)</item>
+    <item>Screencap (Root)</item>
+    <item>ADB (Скриншот, ~200мс)</item>
+    <item>Accessibility (Android 11+)</item>
+  </string-array>
+  <string-array name="pref_list_capture_method_values">
+    <item>media_projection</item>
+    <item>scrcpy</item>
+    <item>adb_stream</item>
+    <item>screencap_shell</item>
+    <item>screencap_root</item>
+    <item>adb_local</item>
+    <item>accessibility</item>
+  </string-array>
+
+  <string name="pref_title_adb_port">ADB Порт</string>
+  <string name="pref_summary_adb_port">Порт для локального ADB (по умолчанию: 5555)</string>
+  <string name="pref_btn_adb_pair">Проверить подключение ADB</string>
+  <string name="pref_summary_adb_pair">Проверить соединение и авторизовать ключ на ТВ</string>
+  <string name="adb_pair_title">Авторизация ADB</string>
+  <string name="adb_pair_instruction">При первом подключении ТВ покажет диалог «Разрешить отладку по Wi-Fi?» — нажмите Разрешить на экране ТВ. Убедитесь, что в настройках разработчика включена Отладка по Wi-Fi.</string>
+  <string name="adb_test_connecting">Подключение к ADB на localhost…</string>
+  <string name="adb_test_success">Подключено! Ключ ADB авторизован.</string>
+  <string name="adb_test_failed">Ошибка подключения: %s\n\nУбедитесь, что включена Отладка по Wi-Fi, и разрешите подключение на экране ТВ.</string>
+  <string name="accessibility_enable_prompt">Пожалуйста, включите Специальные возможности для Universal Ambient Light</string>
+
   <string name="pref_group_capturing">Захват</string>
   <string name="pref_title_framerate">Частота захвата</string>
   <string name="pref_summary_framerate">Кадров в секунду для отправки на контроллер</string>

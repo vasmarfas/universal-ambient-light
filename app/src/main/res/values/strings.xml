@@ -142,6 +142,38 @@
   <string name="camera_grant_permission">Grant Permission</string>
   <string name="camera_capturing_status">Camera is capturing…</string>
   <string name="camera_not_available">Camera is not available on this device</string>
+  <!-- Capture Method -->
+  <string name="pref_title_capture_method">Capture Method</string>
+  <string name="pref_summary_capture_method">Choose how to capture the screen content</string>
+  <string-array name="pref_list_capture_method">
+    <item>MediaProjection (Standard)</item>
+    <item>Scrcpy (ADB, ~30ms) ★★★★★</item>
+    <item>ADB Stream (H.264, ~50ms)</item>
+    <item>Screencap (Shell / ADB)</item>
+    <item>Screencap (Root)</item>
+    <item>ADB (Screenshot, ~200ms)</item>
+    <item>Accessibility (Android 11+)</item>
+  </string-array>
+  <string-array name="pref_list_capture_method_values">
+    <item>media_projection</item>
+    <item>scrcpy</item>
+    <item>adb_stream</item>
+    <item>screencap_shell</item>
+    <item>screencap_root</item>
+    <item>adb_local</item>
+    <item>accessibility</item>
+  </string-array>
+
+  <string name="pref_title_adb_port">ADB Port</string>
+  <string name="pref_summary_adb_port">Port for local ADB connection (default: 5555)</string>
+  <string name="pref_btn_adb_pair">Test ADB Connection</string>
+  <string name="pref_summary_adb_pair">Check connection and authorize the key on the TV</string>
+  <string name="adb_pair_title">ADB Authorization</string>
+  <string name="adb_pair_instruction">On first connection the TV will show an "Allow wireless debugging?" dialog — tap Allow on the TV screen. Make sure Wireless Debugging is enabled in Developer Options.</string>
+  <string name="adb_test_connecting">Connecting to ADB on localhost…</string>
+  <string name="adb_test_success">Connected! ADB key authorized.</string>
+  <string name="adb_test_failed">Connection failed: %s\n\nMake sure Wireless Debugging is enabled and accept the dialog on the TV.</string>
+
   <!-- Capturing settings -->
   <string name="pref_group_capturing">Capturing</string>
   <string name="pref_title_framerate">Capture Rate</string>
@@ -392,4 +424,6 @@
   <string name="rating_dialog_report_issue">Report Issue</string>
   <string name="rating_dialog_cancel">Cancel</string>
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
+  <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
+  <string name="accessibility_enable_prompt">Please enable the Accessibility Service for Universal Ambient Light</string>
 </resources>
