@@ -10,3 +10,4 @@ google-services.json
 /build
 /captures
 .externalNativeBuild
+.cxx
