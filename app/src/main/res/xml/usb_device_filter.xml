@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CH340/CH341 (QinHeng Electronics) -->
+    <usb-device vendor-id="6790" product-id="29987" /> <!-- 1a86:7523 CH340 -->
+    <usb-device vendor-id="6790" product-id="21795" /> <!-- 1a86:5523 CH341 -->
+    <usb-device vendor-id="6790" product-id="21972" /> <!-- 1a86:55d4 CH340K -->
+
+    <!-- FTDI -->
+    <usb-device vendor-id="1027" product-id="24577" /> <!-- 0403:6001 FT232R -->
+    <usb-device vendor-id="1027" product-id="24592" /> <!-- 0403:6010 FT2232 -->
+    <usb-device vendor-id="1027" product-id="24593" /> <!-- 0403:6011 FT4232 -->
+    <usb-device vendor-id="1027" product-id="24596" /> <!-- 0403:6014 FT232H -->
+    <usb-device vendor-id="1027" product-id="24597" /> <!-- 0403:6015 FT-X -->
+
+    <!-- Prolific PL2303 -->
+    <usb-device vendor-id="1659" product-id="8963" />  <!-- 067b:2303 PL2303 -->
+    <usb-device vendor-id="1659" product-id="9123" />  <!-- 067b:23a3 PL2303GC -->
+    <usb-device vendor-id="1659" product-id="9139" />  <!-- 067b:23b3 PL2303GB -->
+    <usb-device vendor-id="1659" product-id="9155" />  <!-- 067b:23c3 PL2303GT -->
+    <usb-device vendor-id="1659" product-id="9171" />  <!-- 067b:23d3 PL2303GL -->
+
+    <!-- Silicon Labs CP210x -->
+    <usb-device vendor-id="4292" product-id="60000" /> <!-- 10c4:ea60 CP2102/CP2109 -->
+    <usb-device vendor-id="4292" product-id="60016" /> <!-- 10c4:ea70 CP2105 -->
+    <usb-device vendor-id="4292" product-id="60017" /> <!-- 10c4:ea71 CP2108 -->
+
+    <!-- Arduino (ATmega16U2/8U2 USB-Serial) -->
+    <usb-device vendor-id="9025" product-id="67" />    <!-- 2341:0043 Arduino Uno R3 -->
+    <usb-device vendor-id="9025" product-id="66" />    <!-- 2341:0042 Arduino Mega 2560 R3 -->
+    <usb-device vendor-id="9025" product-id="16" />    <!-- 2341:0010 Arduino Mega 2560 -->
+    <usb-device vendor-id="9025" product-id="1" />     <!-- 2341:0001 Arduino Uno -->
+
+    <!-- Espressif (ESP32-S2/S3 native USB) -->
+    <usb-device vendor-id="12346" product-id="32978" /> <!-- 303a:80d2 ESP32-S2 -->
+    <usb-device vendor-id="12346" product-id="4097" />  <!-- 303a:1001 ESP32-S2/S3 JTAG -->
+</resources>

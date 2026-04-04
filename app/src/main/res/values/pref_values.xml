@@ -37,6 +37,9 @@
     <string name="pref_key_boot" translatable="false">pref_key_start_on_boot</string>
     <bool name="pref_default_boot" translatable="false">false</bool>
 
+    <string name="pref_key_lighting_was_active" translatable="false">pref_key_lighting_was_active</string>
+    <bool name="pref_default_lighting_was_active" translatable="false">false</bool>
+
     <string name="pref_key_framerate" translatable="false">pref_key_framerate</string>
     <integer name="pref_default_framerate" translatable="false">30</integer>
     <string-array name="pref_list_framerate_values" translatable="false">
