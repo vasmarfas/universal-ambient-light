@@ -24,8 +24,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
@@ -327,6 +329,16 @@ fun SettingsScreen(
                         entriesRes = R.array.pref_list_capture_method,
                         entryValuesRes = R.array.pref_list_capture_method_values,
                         recomposeKey = captureMethod,
+                        disabledIndices = remember {
+                            val entryValues = context.resources.getStringArray(R.array.pref_list_capture_method_values)
+                            val disabled = mutableSetOf<Int>()
+                            entryValues.forEachIndexed { index, value ->
+                                when (value) {
+                                    "mtk_thal_capture" -> if (!MtkThalCaptureEncoder.isAvailable()) disabled.add(index)
+                                }
+                            }
+                            disabled
+                        },
                         onValueChange = { newMethod ->
                             if (newMethod == "accessibility") {
                                 // Check if service is already enabled
@@ -966,7 +978,8 @@ fun ListPreference(
     entriesRes: Int,
     entryValuesRes: Int,
     onValueChange: ((String) -> Unit)? = null,
-    recomposeKey: Any? = null
+    recomposeKey: Any? = null,
+    disabledIndices: Set<Int> = emptySet()
 ) {
     val entries = stringArrayResource(entriesRes)
     val entryValues = stringArrayResource(entryValuesRes)
@@ -1016,27 +1029,33 @@ fun ListPreference(
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     entries.forEachIndexed { index, entry ->
+                        val isDisabled = index in disabledIndices
                         val interactionSource = remember { MutableInteractionSource() }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = LocalIndication.current,
-                                    onClick = {
-                                        val newValue = entryValues[index]
-                                        value = newValue
-                                        prefs.putString(keyRes, newValue)
-                                        onValueChange?.invoke(newValue)
-                                        showDialog = false
-                                    }
+                                .then(
+                                    if (isDisabled) Modifier
+                                    else Modifier.clickable(
+                                        interactionSource = interactionSource,
+                                        indication = LocalIndication.current,
+                                        onClick = {
+                                            val newValue = entryValues[index]
+                                            value = newValue
+                                            prefs.putString(keyRes, newValue)
+                                            onValueChange?.invoke(newValue)
+                                            showDialog = false
+                                        }
+                                    )
                                 )
-                                .padding(12.dp),
+                                .padding(12.dp)
+                                .alpha(if (isDisabled) 0.38f else 1f),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = value == entryValues[index],
-                                onClick = null
+                                onClick = null,
+                                enabled = !isDisabled
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(text = entry)

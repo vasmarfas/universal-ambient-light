@@ -153,6 +153,7 @@
     <item>Screencap (Root)</item>
     <item>ADB (Screenshot, ~200ms)</item>
     <item>Accessibility (Android 11+)</item>
+    <item>MTK Hardware Capture (Root)</item>
   </string-array>
   <string-array name="pref_list_capture_method_values">
     <item>media_projection</item>
@@ -162,6 +163,7 @@
     <item>screencap_root</item>
     <item>adb_local</item>
     <item>accessibility</item>
+    <item>mtk_thal_capture</item>
   </string-array>
 
   <string name="pref_title_adb_port">ADB Port</string>
@@ -281,6 +283,7 @@
     <item>115200 (recommended)</item>
     <item>230400</item>
     <item>250000</item>
+    <item>500000</item>
   </string-array>
   <string-array name="pref_list_adalight_baudrate_values" translatable="false">
     <item>9600</item>
@@ -290,6 +293,7 @@
     <item>115200</item>
     <item>230400</item>
     <item>250000</item>
+    <item>500000</item>
   </string-array>
   <string name="pref_title_wled_color_order">WLED Color Order</string>
   <string name="pref_summary_wled_color_order">Color channel order for WLED (RGB, GRB, BRG, etc.)</string>
