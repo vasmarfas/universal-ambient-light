@@ -88,6 +88,17 @@ object UsbSerialPermissionHelper {
             return true
         }
 
+        // Try granting via root before showing dialog to user
+        if (UsbRootPermissionHelper.isRootAvailable()) {
+            if (UsbRootPermissionHelper.grantPermissionViaRoot(context)) {
+                // Re-check after root grant
+                if (usbManager.hasPermission(target)) {
+                    onReady()
+                    return true
+                }
+            }
+        }
+
         // Avoid spamming the same prompt
         if (!force && lastRequestedDeviceId == target.deviceId) {
             return false

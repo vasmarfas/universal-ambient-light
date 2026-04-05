@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Control Firebase data collection in debug builds based on whether a real
+     google-services.json is present. Values are set via manifestPlaceholders
+     in build.gradle.kts. Release builds are unaffected by this file. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <meta-data android:name="firebase_performance_collection_deactivated" android:value="${firebasePerfDeactivated}" />
+        <meta-data android:name="firebase_crashlytics_collection_enabled" android:value="${firebaseCrashlyticsEnabled}" />
+        <meta-data android:name="firebase_analytics_collection_deactivated" android:value="${firebaseAnalyticsDeactivated}" />
+    </application>
+</manifest>

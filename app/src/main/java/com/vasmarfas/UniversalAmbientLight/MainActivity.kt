@@ -316,6 +316,7 @@ class MainActivity : ComponentActivity() {
     private fun toggleScreenCapture() {
         if (!mRecorderRunning) {
             val prefs = Preferences(this)
+            prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
             val captureSource = prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
 
             if (captureSource == "camera") {
@@ -326,6 +327,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } else {
+            Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
             stopScreenRecorder()
             mRecorderRunning = false
             val durationSeconds = mSessionStartTime?.let { startTime ->

@@ -40,6 +40,11 @@ android {
         versionName = appVersionName
         versionCode = appVersionCode
 
+        externalNativeBuild {
+            cmake {
+                abiFilters("armeabi-v7a")
+            }
+        }
     }
 
     signingConfigs {
@@ -55,6 +60,15 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            // Disable Firebase in debug builds with dummy google-services.json,
+            // but keep it enabled when a real one is present (e.g., for testing).
+            val gsFile = file("google-services.json")
+            val hasDummyFirebase = !gsFile.exists() || gsFile.readText().contains("dummy-local-dev")
+            manifestPlaceholders["firebaseCrashlyticsEnabled"] = (!hasDummyFirebase).toString()
+            manifestPlaceholders["firebaseAnalyticsDeactivated"] = hasDummyFirebase.toString()
+            manifestPlaceholders["firebasePerfDeactivated"] = hasDummyFirebase.toString()
+        }
         getByName("release") {
             isMinifyEnabled = false
             proguardFiles(
@@ -75,6 +89,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/jni/CMakeLists.txt")
+        }
     }
 }
 
@@ -137,4 +157,44 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.perf)
     implementation(libs.firebase.config)
+}
+
+// Generate a dummy google-services.json for local builds when the real one is missing.
+// CI places the real file from secrets before this task runs, so it's a no-op there.
+tasks.register("generateDummyGoogleServicesJson") {
+    val gsFile = file("google-services.json")
+    onlyIf { !gsFile.exists() }
+    doLast {
+        gsFile.writeText(
+            """{
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "dummy-local-dev",
+    "storage_bucket": "dummy-local-dev.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "android_client_info": {
+          "package_name": "com.vasmarfas.UniversalAmbientLight"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyDummyLocalDevKeyNotReal000000"
+        }
+      ]
+    }
+  ],
+  "configuration_version": "1"
+}
+"""
+        )
+        logger.lifecycle("Generated dummy google-services.json for local build")
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("generateDummyGoogleServicesJson")
 }

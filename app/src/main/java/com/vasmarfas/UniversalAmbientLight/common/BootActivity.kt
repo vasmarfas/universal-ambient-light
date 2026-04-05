@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.provider.Settings
 import android.widget.Toast
@@ -22,6 +23,12 @@ class BootActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Launched by USB_DEVICE_ATTACHED — handle USB device attachment
+        if (UsbManager.ACTION_USB_DEVICE_ATTACHED == intent?.action) {
+            handleUsbDeviceAttached()
+            return
+        }
+
         val prefs = Preferences(this)
         val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
@@ -35,25 +42,72 @@ class BootActivity : AppCompatActivity() {
             }
         }
 
-        if (captureMethod != "media_projection") {
-            // Alternative modes: skip MediaProjection dialog, start service directly
-            startAlternativeRecorder(this)
-            finish()
-            return
-        }
-
-        // For Adalight started from QuickTile/BootActivity, ensure USB permission BEFORE asking MediaProjection.
+        // For Adalight: ensure USB permission BEFORE starting any capture mode
         if ("adalight".equals(connectionType, ignoreCase = true)) {
             UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
                 context = this,
                 device = null,
-                onReady = { requestMediaProjection() },
+                onReady = { startCaptureAfterPermission(captureMethod) },
                 onDenied = { finish() },
                 showToast = true
             )
         } else {
-            requestMediaProjection()
+            startCaptureAfterPermission(captureMethod)
         }
+    }
+
+    private fun startCaptureAfterPermission(captureMethod: String?) {
+        if (captureMethod != "media_projection") {
+            startAlternativeRecorder(this)
+            finish()
+            return
+        }
+        requestMediaProjection()
+    }
+
+    /**
+     * Handles launch from USB_DEVICE_ATTACHED intent.
+     * If connection type is adalight: ensures USB permission for the attached device.
+     * If auto-boot is enabled: starts the capture service.
+     */
+    private fun handleUsbDeviceAttached() {
+        val prefs = Preferences(this)
+        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+
+        if (!"adalight".equals(connectionType, ignoreCase = true)) {
+            finish()
+            return
+        }
+
+        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+        }
+
+        UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+            context = this,
+            device = device,
+            onReady = {
+                // If auto-boot is enabled and lighting was active before reboot, start the capture service
+                val autoStart = prefs.getBoolean(R.string.pref_key_boot)
+                val wasActive = prefs.getBoolean(R.string.pref_key_lighting_was_active)
+                if (autoStart && wasActive) {
+                    val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                    if (captureMethod != "media_projection") {
+                        startAlternativeRecorder(this)
+                        finish()
+                    } else {
+                        requestMediaProjection()
+                    }
+                } else {
+                    finish()
+                }
+            },
+            onDenied = { finish() },
+            showToast = false
+        )
     }
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)

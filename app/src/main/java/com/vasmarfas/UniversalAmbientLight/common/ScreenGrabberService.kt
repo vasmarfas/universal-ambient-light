@@ -55,6 +55,7 @@ class ScreenGrabberService : Service() {
     private var mScrcpyEncoder: ScrcpyEncoder? = null
     private var mAccessibilityEncoder: AccessibilityEncoder? = null
     private var mCameraEncoder: CameraEncoder? = null
+    private var mMtkThalCaptureEncoder: MtkThalCaptureEncoder? = null
     private var mCaptureSource: String = "screen" // "screen" or "camera"
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
@@ -136,6 +137,9 @@ class ScreenGrabberService : Service() {
                             } else if (mAccessibilityEncoder != null) {
                                 if (DEBUG) Log.v(TAG, "Resuming accessibility encoder")
                                 mAccessibilityEncoder!!.resumeRecording()
+                            } else if (mMtkThalCaptureEncoder != null) {
+                                if (DEBUG) Log.v(TAG, "Resuming MTK THAL Capture encoder")
+                                mMtkThalCaptureEncoder!!.resumeRecording()
                             } else if (mScreenEncoder != null) {
                                 if (DEBUG) Log.v(TAG, "Resuming media projection encoder")
                                 mScreenEncoder!!.resumeRecording()
@@ -144,7 +148,7 @@ class ScreenGrabberService : Service() {
 
                         // If MediaProjection was stopped by system (sleep), resumeRecording() won't help.
                         // Recreate encoder from saved projection data.
-                        if (!isCapturing && mScreenEncoder == null && mScreencapEncoder == null && mAdbEncoder == null && mScreenrecordEncoder == null && mScrcpyEncoder == null && mAccessibilityEncoder == null) {
+                        if (!isCapturing && mScreenEncoder == null && mScreencapEncoder == null && mAdbEncoder == null && mScreenrecordEncoder == null && mScrcpyEncoder == null && mAccessibilityEncoder == null && mMtkThalCaptureEncoder == null) {
                             if (DEBUG) Log.v(TAG, "No encoder active, trying restartEncoderFromSavedProjection")
                             restartEncoderFromSavedProjection()
                         }
@@ -163,6 +167,7 @@ class ScreenGrabberService : Service() {
                     if (mScreenrecordEncoder != null) mScreenrecordEncoder!!.clearLights()
                     if (mScrcpyEncoder != null) mScrcpyEncoder!!.clearLights()
                     if (mAccessibilityEncoder != null) mAccessibilityEncoder!!.clearLights()
+                    if (mMtkThalCaptureEncoder != null) mMtkThalCaptureEncoder!!.clearLights()
                     // Camera mode: keep running — camera captures external TV, screen sleep is irrelevant
                 }
                 Intent.ACTION_CONFIGURATION_CHANGED -> {
@@ -176,6 +181,7 @@ class ScreenGrabberService : Service() {
                     mScrcpyEncoder?.setOrientation(resources.configuration.orientation)
                     mAccessibilityEncoder?.setOrientation(resources.configuration.orientation)
                     mCameraEncoder?.setOrientation(resources.configuration.orientation)
+                    mMtkThalCaptureEncoder?.setOrientation(resources.configuration.orientation)
                 }
                 Intent.ACTION_SHUTDOWN, Intent.ACTION_REBOOT -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SHUTDOWN|ACTION_REBOOT intent received")
@@ -383,6 +389,10 @@ class ScreenGrabberService : Service() {
                     if (mCameraEncoder != null) {
                         if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (camera)")
                         mCameraEncoder!!.clearLights()
+                    }
+                    if (mMtkThalCaptureEncoder != null) {
+                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (mtk_thal_capture)")
+                        mMtkThalCaptureEncoder!!.clearLights()
                     }
                 }
                 GET_STATUS -> notifyActivity()
@@ -841,6 +851,23 @@ class ScreenGrabberService : Service() {
             return
         }
 
+        if (method == "mtk_thal_capture") {
+            if (DEBUG) Log.v(TAG, "Creating MTK THAL Capture encoder")
+            mMtkThalCaptureEncoder = MtkThalCaptureEncoder(
+                this.applicationContext,
+                thread.receiver,
+                metrics.widthPixels,
+                metrics.heightPixels,
+                options,
+                onFatalError = { errorMsg ->
+                    mStartError = errorMsg
+                    haltStartup()
+                }
+            )
+            mMtkThalCaptureEncoder!!.sendStatus()
+            return
+        }
+
         val useRoot = method == "screencap_root"
         if (DEBUG) Log.v(TAG, "Creating screencap encoder (root=$useRoot)")
         mScreencapEncoder = ScreencapEncoder(
@@ -983,6 +1010,12 @@ class ScreenGrabberService : Service() {
             mCameraEncoder = null
         }
 
+        if (mMtkThalCaptureEncoder != null) {
+            if (DEBUG) Log.v(TAG, "Stopping MTK THAL Capture encoder")
+            mMtkThalCaptureEncoder!!.stopRecording()
+            mMtkThalCaptureEncoder = null
+        }
+
         releaseResource()
 
         if (mHyperionThread != null) {
@@ -1006,7 +1039,8 @@ class ScreenGrabberService : Service() {
                 (mScreenrecordEncoder != null && mScreenrecordEncoder!!.isCapturing()) ||
                 (mScrcpyEncoder != null && mScrcpyEncoder!!.isCapturing()) ||
                 (mAccessibilityEncoder != null && mAccessibilityEncoder!!.isCapturing()) ||
-                (mCameraEncoder != null && mCameraEncoder!!.isCapturing())
+                (mCameraEncoder != null && mCameraEncoder!!.isCapturing()) ||
+                (mMtkThalCaptureEncoder != null && mMtkThalCaptureEncoder!!.isCapturing())
 
     val isCommunicating: Boolean
         get() = isCapturing && mHasConnected
