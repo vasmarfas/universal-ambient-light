@@ -34,6 +34,7 @@ abstract class ScreenEncoderBase(
     // Components
     protected val mBorderProcessor: BorderProcessor
     protected val mHandler: Handler
+    private val mHandlerThread: HandlerThread
 
     // Mutable state
     @Volatile
@@ -56,6 +57,7 @@ abstract class ScreenEncoderBase(
         // Handler thread for callbacks
         val thread = HandlerThread(TAG, Process.THREAD_PRIORITY_DISPLAY)
         thread.start()
+        mHandlerThread = thread
         mHandler = Handler(thread.looper)
 
         if (DEBUG) {
@@ -109,6 +111,15 @@ abstract class ScreenEncoderBase(
     
     protected fun getScreenHeight(): Int {
         return if (mInitOrientation != mCurrentOrientation) mScreenWidth else mScreenHeight
+    }
+
+    protected fun stopHandlerThread() {
+        mHandlerThread.quitSafely()
+        try {
+            mHandlerThread.join(1000)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     abstract fun stopRecording()

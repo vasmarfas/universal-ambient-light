@@ -300,6 +300,23 @@ class ScreenGrabberService : Service() {
         if (intent == null || intent.action == null) {
             val nullItem = if (intent == null) "intent" else "action"
             if (DEBUG) Log.v(TAG, "Null $nullItem provided to start command")
+            // Service was restarted by Android (START_STICKY) without a valid intent.
+            // We must call startForeground() immediately to satisfy the 5-second window,
+            // then stop since there is no projection token to resume with.
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ServiceCompat.startForeground(
+                        this, NOTIFICATION_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "startForeground on null-intent restart failed: ${e.message}")
+            }
+            stopSelf()
+            return START_NOT_STICKY
         } else {
             val action = intent.action
             if (DEBUG) Log.v(TAG, "Start command action: " + action.toString())
@@ -313,7 +330,7 @@ class ScreenGrabberService : Service() {
                     val foregroundType = if (useMediaProjection) 
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION 
                     else 
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
 
                     // Start foreground with appropriate type
                     val foregroundStarted = tryStartForegroundCompat(foregroundType)

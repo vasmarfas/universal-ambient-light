@@ -91,9 +91,12 @@ class ScreenEncoder(
                 mTotalSendTime = 0
             }
 
-            if (mRunning && mCaptureHandler != null) {
+            // Capture to local var to avoid race condition: stopInternal() may null
+            // mCaptureHandler on another thread between the null-check and the !! unwrap.
+            val handler = mCaptureHandler
+            if (mRunning && handler != null) {
                 val delayMs = max(1L, mFrameIntervalMs - elapsedMs)
-                mCaptureHandler!!.postDelayed(this, delayMs)
+                handler.postDelayed(this, delayMs)
             }
         }
     }
@@ -225,14 +228,15 @@ class ScreenEncoder(
     }
 
     private fun startCapture() {
-        if (mCaptureHandler == null) {
+        val handler = mCaptureHandler
+        if (handler == null) {
             Log.e(TAG, "Cannot start capture: mCaptureHandler is null")
             return
         }
         mRunning = true
         setCapturing(true)
         mFrameCount = 0
-        mCaptureHandler!!.post(mCaptureRunnable)
+        handler.post(mCaptureRunnable)
     }
 
     private fun captureFrame() {
@@ -450,13 +454,21 @@ class ScreenEncoder(
         mRunning = false
         setCapturing(false)
 
-        if (mCaptureHandler != null) {
-            mCaptureHandler!!.removeCallbacksAndMessages(null)
-        }
+        mCaptureHandler?.removeCallbacksAndMessages(null)
 
+        // Release VirtualDisplay first to stop new frames being written to the surface
         if (mVirtualDisplay != null) {
             mVirtualDisplay!!.release()
             mVirtualDisplay = null
+        }
+
+        // Close ImageReader BEFORE quitting the handler looper.
+        // ImageReader.close() touches native Binder-backed buffers; closing it after the
+        // looper is gone can cause a deadlock in FinalizerDaemon (BinderInternal$GcWatcher
+        // timed out) because the native finalizer cannot acquire the required Binder lock.
+        if (mImageReader != null) {
+            mImageReader!!.close()
+            mImageReader = null
         }
 
         if (mCaptureThread != null) {
@@ -471,18 +483,14 @@ class ScreenEncoder(
         mBorderY = 0
         mFrameCount = 0
 
-        mHandler.looper.quit()
+        // quitSafely + join to ensure the thread is fully stopped before resources are GC'd
+        stopHandlerThread()
 
         // Keep connection alive on system stop (sleep) to prevent WLED from reverting to default effect
         if (disconnect) {
             clearAndDisconnect()
         } else {
             clearLights()
-        }
-
-        if (mImageReader != null) {
-            mImageReader!!.close()
-            mImageReader = null
         }
     }
 
@@ -517,9 +525,7 @@ class ScreenEncoder(
         mCaptureWidth = mCaptureHeight
         mCaptureHeight = tmp
 
-        if (mCaptureHandler != null) {
-            mCaptureHandler!!.removeCallbacksAndMessages(null)
-        }
+        mCaptureHandler?.removeCallbacksAndMessages(null)
 
         mVirtualDisplay!!.resize(mCaptureWidth, mCaptureHeight, mDensity)
 

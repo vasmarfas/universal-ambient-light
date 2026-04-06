@@ -2,11 +2,13 @@ package com.vasmarfas.UniversalAmbientLight.common
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.vasmarfas.UniversalAmbientLight.R
@@ -72,7 +74,19 @@ class ToggleActivity : AppCompatActivity() {
         val requestMediaProjection = {
             val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
             if (manager != null) {
-                startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+                try {
+                    startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+                } catch (e: ActivityNotFoundException) {
+                    // Some custom Android TV firmware doesn't ship the standard SystemUI
+                    // MediaProjectionPermissionActivity. Fall back to launching the service
+                    // directly without MediaProjection if the configured method supports it.
+                    Log.w(TAG, "MediaProjection permission dialog unavailable: ${e.message}")
+                    val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                    if (captureMethod != "media_projection") {
+                        startScreenRecorderDirect(this)
+                    }
+                    finish()
+                }
             } else {
                 finish()
             }
@@ -104,12 +118,26 @@ class ToggleActivity : AppCompatActivity() {
 
     companion object {
         const val REQUEST_MEDIA_PROJECTION = 1
+        private const val TAG = "ToggleActivity"
 
         private fun startScreenRecorder(context: Context, resultCode: Int, data: Intent) {
             val intent = Intent(context, ScreenGrabberService::class.java)
             intent.action = ScreenGrabberService.ACTION_START
             intent.putExtra(ScreenGrabberService.EXTRA_RESULT_CODE, resultCode)
             intent.putExtras(data)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        // Starts the service directly without MediaProjection token — for alternative
+        // capture methods (screencap, adb, accessibility, etc.) on devices where the
+        // system MediaProjection permission dialog is unavailable.
+        private fun startScreenRecorderDirect(context: Context) {
+            val intent = Intent(context, ScreenGrabberService::class.java)
+            intent.action = ScreenGrabberService.ACTION_START
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
