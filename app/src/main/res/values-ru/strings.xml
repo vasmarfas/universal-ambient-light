@@ -176,6 +176,17 @@
   <string name="adb_test_connecting">Подключение к ADB на localhost…</string>
   <string name="adb_test_success">Подключено! Ключ ADB авторизован.</string>
   <string name="adb_test_failed">Ошибка подключения: %s\n\nУбедитесь, что включена Отладка по Wi-Fi, и разрешите подключение на экране ТВ.</string>
+  <string name="adb_status_label">Настройки разработчика: %1$s    ADB: %2$s</string>
+  <string name="adb_status_on">ВКЛ</string>
+  <string name="adb_status_off">ВЫКЛ</string>
+  <string name="adb_btn_open_dev_options">Открыть настройки разработчика</string>
+  <string name="adb_btn_how_to_enable_dev_options">Как включить настройки разработчика</string>
+  <string name="adb_btn_open_wireless_debug">Открыть Отладку по Wi-Fi</string>
+  <string name="adb_btn_copy_command">Скопировать команду adb connect</string>
+  <string name="adb_toast_dev_options_help">Сначала включите настройки разработчика: «О телефоне» → 7 раз тапнуть по «Номер сборки»</string>
+  <string name="adb_toast_cannot_open_dev">Не удалось открыть настройки разработчика на этом устройстве</string>
+  <string name="adb_toast_cannot_open_wireless">Не удалось открыть Отладку по Wi-Fi на этом устройстве</string>
+  <string name="adb_toast_command_copied">Скопировано: %1$s</string>
   <string name="accessibility_enable_prompt">Пожалуйста, включите Специальные возможности для Universal Ambient Light</string>
 
   <string name="pref_group_capturing">Захват</string>

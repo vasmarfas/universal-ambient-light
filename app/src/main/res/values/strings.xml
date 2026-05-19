@@ -175,6 +175,17 @@
   <string name="adb_test_connecting">Connecting to ADB on localhost…</string>
   <string name="adb_test_success">Connected! ADB key authorized.</string>
   <string name="adb_test_failed">Connection failed: %s\n\nMake sure Wireless Debugging is enabled and accept the dialog on the TV.</string>
+  <string name="adb_status_label">Developer Options: %1$s    ADB: %2$s</string>
+  <string name="adb_status_on">ON</string>
+  <string name="adb_status_off">OFF</string>
+  <string name="adb_btn_open_dev_options">Open Developer Options</string>
+  <string name="adb_btn_how_to_enable_dev_options">How to enable Developer Options</string>
+  <string name="adb_btn_open_wireless_debug">Open Wireless Debugging</string>
+  <string name="adb_btn_copy_command">Copy adb connect command</string>
+  <string name="adb_toast_dev_options_help">Enable Developer Options first: Settings → About phone → tap Build number 7 times</string>
+  <string name="adb_toast_cannot_open_dev">Cannot open Developer Options on this device</string>
+  <string name="adb_toast_cannot_open_wireless">Cannot open Wireless Debugging on this device</string>
+  <string name="adb_toast_command_copied">Copied: %1$s</string>
 
   <!-- Capturing settings -->
   <string name="pref_group_capturing">Capturing</string>

@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -75,11 +77,17 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
         }
     }
 
-    // Corner positions (normalized 0..1)
-    var topLeft by remember { mutableStateOf(Offset(0.1f, 0.1f)) }
-    var topRight by remember { mutableStateOf(Offset(0.9f, 0.1f)) }
-    var bottomRight by remember { mutableStateOf(Offset(0.9f, 0.9f)) }
-    var bottomLeft by remember { mutableStateOf(Offset(0.1f, 0.9f)) }
+    // Offset has no built-in Saver, so define one and survive config changes.
+    val offsetSaver = remember {
+        listSaver<Offset, Float>(
+            save = { listOf(it.x, it.y) },
+            restore = { Offset(it[0], it[1]) }
+        )
+    }
+    var topLeft by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.1f, 0.1f)) }
+    var topRight by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.9f, 0.1f)) }
+    var bottomRight by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.9f, 0.9f)) }
+    var bottomLeft by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.1f, 0.9f)) }
 
     // Load saved corners
     LaunchedEffect(Unit) {

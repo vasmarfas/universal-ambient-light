@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dadb.Dadb
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbKeyHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.DevOptionsHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -749,15 +750,100 @@ fun AdbPairingDialog(
     var status by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
 
+    val devEnabled = remember { DevOptionsHelper.isDeveloperOptionsEnabled(context) }
+    val adbEnabled = remember { DevOptionsHelper.isAdbEnabled(context) }
+    val onLabel = stringResource(R.string.adb_status_on)
+    val offLabel = stringResource(R.string.adb_status_off)
+
     AlertDialog(
         onDismissRequest = { if (!testing) onDismiss() },
         title = { Text(stringResource(R.string.adb_pair_title)) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     text = stringResource(R.string.adb_pair_instruction),
                     style = MaterialTheme.typography.bodySmall
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = stringResource(
+                        R.string.adb_status_label,
+                        if (devEnabled) onLabel else offLabel,
+                        if (adbEnabled) onLabel else offLabel
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (devEnabled && adbEnabled)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.error
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    enabled = !testing,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        if (devEnabled) {
+                            if (!DevOptionsHelper.openDeveloperOptions(context)) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.adb_toast_cannot_open_dev),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        } else {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.adb_toast_dev_options_help),
+                                Toast.LENGTH_LONG
+                            ).show()
+                            DevOptionsHelper.openAboutDeviceForBuildNumber(context)
+                        }
+                    }
+                ) {
+                    Text(stringResource(
+                        if (devEnabled) R.string.adb_btn_open_dev_options
+                        else R.string.adb_btn_how_to_enable_dev_options
+                    ))
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                OutlinedButton(
+                    enabled = !testing,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        if (!DevOptionsHelper.openWirelessDebugging(context)) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.adb_toast_cannot_open_wireless),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                ) { Text(stringResource(R.string.adb_btn_open_wireless_debug)) }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                OutlinedButton(
+                    enabled = !testing,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val port = prefs.getString(R.string.pref_key_adb_port, "5555") ?: "5555"
+                        val cmd = "adb connect 127.0.0.1:$port"
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        cm?.setPrimaryClip(ClipData.newPlainText("adb command", cmd))
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.adb_toast_command_copied, cmd),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                ) { Text(stringResource(R.string.adb_btn_copy_command)) }
+
                 if (status != null) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
@@ -786,7 +872,6 @@ fun AdbPairingDialog(
                             val port = prefs.getString(R.string.pref_key_adb_port, "5555")?.toIntOrNull() ?: 5555
                             val keyPair = AdbKeyHelper.getKeyPair(context)
                             val dadb = Dadb.create("127.0.0.1", port, keyPair)
-                            // Simple shell ping to confirm connection works
                             dadb.shell("echo ok")
                             dadb.close()
                             withContext(Dispatchers.Main) {

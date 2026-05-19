@@ -46,15 +46,20 @@ fun AppTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
+            // view.context may be a ContextWrapper (e.g. in nested compose hosts);
+            // walk the wrapper chain instead of crashing on a hard cast.
+            val activity = generateSequence<android.content.Context>(view.context) {
+                (it as? android.content.ContextWrapper)?.baseContext
+            }.firstOrNull { it is Activity } as? Activity ?: return@SideEffect
+            val window = activity.window
             val insetsController = WindowCompat.getInsetsController(window, view)
-            
-            // Для Android 15+ (API 35+) setStatusBarColor не поддерживается
-            // Используем только WindowInsetsController
+
+            // setStatusBarColor removed in Android 15 (API 35).
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                @Suppress("DEPRECATION")
                 window.statusBarColor = Color.Transparent.toArgb()
             }
-            
+
             insetsController.isAppearanceLightStatusBars = !darkTheme
         }
     }

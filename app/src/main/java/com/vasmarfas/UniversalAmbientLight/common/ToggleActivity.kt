@@ -1,7 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common
 
 import android.app.Activity
-import android.app.ActivityManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -56,17 +55,8 @@ class ToggleActivity : AppCompatActivity() {
     }
 
     private val isServiceRunning: Boolean
-        get() {
-            val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            for (service in manager.getRunningServices(Int.MAX_VALUE)) {
-                if (ScreenGrabberService::class.java.name == service.service.className) {
-                    return true
-                }
-            }
-            return false
-        }
+        get() = ScreenGrabberService.sInstanceRunning
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private fun requestPermission() {
         val prefs = Preferences(this)
         val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
@@ -125,11 +115,7 @@ class ToggleActivity : AppCompatActivity() {
             intent.action = ScreenGrabberService.ACTION_START
             intent.putExtra(ScreenGrabberService.EXTRA_RESULT_CODE, resultCode)
             intent.putExtras(data)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            context.startForegroundService(intent)
         }
 
         // Starts the service directly without MediaProjection token — for alternative
@@ -138,11 +124,7 @@ class ToggleActivity : AppCompatActivity() {
         private fun startScreenRecorderDirect(context: Context) {
             val intent = Intent(context, ScreenGrabberService::class.java)
             intent.action = ScreenGrabberService.ACTION_START
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            context.startForegroundService(intent)
         }
     }
 }
