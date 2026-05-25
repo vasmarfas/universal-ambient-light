@@ -1,10 +1,13 @@
 package com.vasmarfas.UniversalAmbientLight.common.util
 
+import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.vasmarfas.UniversalAmbientLight.R
 
 /**
@@ -18,39 +21,72 @@ object AnalyticsHelper {
         return FirebaseAnalytics.getInstance(context)
     }
 
-    /**
-     * Инициализирует user properties при запуске приложения
-     */
     fun initializeUserProperties(context: Context) {
         val analytics = getAnalytics(context)
         val prefs = Preferences(context)
 
-        // Протокол подключения
         val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         analytics.setUserProperty("connection_protocol", protocol)
-        
-        // Язык приложения
+
         val language = prefs.getString(R.string.pref_key_language, "en") ?: "en"
         analytics.setUserProperty("app_language", language)
-        
-        // Версия Android
+
         analytics.setUserProperty("android_version", Build.VERSION.SDK_INT.toString())
-        
-        // Версия приложения
-        try {
-            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            analytics.setUserProperty("app_version", packageInfo.versionName ?: "unknown")
+        analytics.setUserProperty("device_form_factor", deviceFormFactor(context))
+
+        val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection") ?: "media_projection"
+        analytics.setUserProperty("capture_method", captureMethod)
+
+        analytics.setUserProperty("framerate", safeGetInt(prefs, R.string.pref_key_framerate).toString())
+
+        val useAvgColor = prefs.getBoolean(R.string.pref_key_use_avg_color)
+        analytics.setUserProperty("use_avg_color", useAvgColor.toString())
+
+        val wledProtocol = prefs.getString(R.string.pref_key_wled_protocol, "ddp") ?: "ddp"
+        analytics.setUserProperty("wled_protocol", wledProtocol)
+
+        val appVersion = try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
         } catch (e: PackageManager.NameNotFoundException) {
-            analytics.setUserProperty("app_version", "unknown")
+            "unknown"
         }
-        
-        // Автоподключение включено
+        analytics.setUserProperty("app_version", appVersion)
+
         val autoReconnect = prefs.getBoolean(R.string.pref_key_reconnect)
         analytics.setUserProperty("auto_reconnect_enabled", autoReconnect.toString())
-        
-        // Сглаживание включено
+
         val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
         analytics.setUserProperty("smoothing_enabled", smoothingEnabled.toString())
+
+        syncCrashlyticsContext(context)
+    }
+
+    private fun deviceFormFactor(context: Context): String {
+        val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+        return if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) "tv" else "mobile"
+    }
+
+    private fun safeGetInt(prefs: Preferences, keyRes: Int): Int =
+        try { prefs.getInt(keyRes) } catch (e: Exception) { 0 }
+
+    /** Mirrors current config into Crashlytics custom keys so crash/ANR reports carry context. */
+    fun syncCrashlyticsContext(context: Context) {
+        try {
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            val prefs = Preferences(context)
+            crashlytics.setCustomKey("connection_protocol", prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion")
+            crashlytics.setCustomKey("capture_method", prefs.getString(R.string.pref_key_capture_method, "media_projection") ?: "media_projection")
+            crashlytics.setCustomKey("device_form_factor", deviceFormFactor(context))
+            crashlytics.setCustomKey("manufacturer", Build.MANUFACTURER ?: "unknown")
+            crashlytics.setCustomKey("framerate", safeGetInt(prefs, R.string.pref_key_framerate))
+            crashlytics.setCustomKey("use_avg_color", prefs.getBoolean(R.string.pref_key_use_avg_color))
+            crashlytics.setCustomKey("smoothing_enabled", prefs.getBoolean(R.string.pref_key_smoothing_enabled, false))
+            crashlytics.setCustomKey("auto_reconnect_enabled", prefs.getBoolean(R.string.pref_key_reconnect))
+            crashlytics.setCustomKey("wled_protocol", prefs.getString(R.string.pref_key_wled_protocol, "ddp") ?: "ddp")
+            crashlytics.setCustomKey("led_x", safeGetInt(prefs, R.string.pref_key_x_led))
+            crashlytics.setCustomKey("led_y", safeGetInt(prefs, R.string.pref_key_y_led))
+        } catch (_: Exception) {
+        }
     }
 
     /**
@@ -83,6 +119,37 @@ object AnalyticsHelper {
             }
         } else null
         getAnalytics(context).logEvent("screen_capture_stopped", bundle)
+    }
+
+    /** Summary of a finished capture session: duration, method/source, protocol, connection, end reason. */
+    fun logCaptureSessionSummary(
+        context: Context,
+        durationSeconds: Long,
+        captureMethod: String?,
+        captureSource: String?,
+        protocol: String?,
+        connected: Boolean,
+        endReason: String
+    ) {
+        val bundle = Bundle().apply {
+            putLong("duration_seconds", durationSeconds)
+            putString("duration_bucket", durationBucket(durationSeconds))
+            putString("capture_method", captureMethod ?: "unknown")
+            putString("capture_source", captureSource ?: "unknown")
+            putString("protocol", protocol ?: "unknown")
+            putString("connected", connected.toString())
+            putString("end_reason", endReason)
+        }
+        getAnalytics(context).logEvent("capture_session_summary", bundle)
+    }
+
+    private fun durationBucket(seconds: Long): String = when {
+        seconds < 10 -> "0-10s"
+        seconds < 60 -> "10-60s"
+        seconds < 300 -> "1-5m"
+        seconds < 1800 -> "5-30m"
+        seconds < 7200 -> "30m-2h"
+        else -> "2h+"
     }
 
     /**
@@ -495,6 +562,7 @@ object AnalyticsHelper {
      */
     fun updateProtocolProperty(context: Context, protocol: String) {
         getAnalytics(context).setUserProperty("connection_protocol", protocol)
+        try { FirebaseCrashlytics.getInstance().setCustomKey("connection_protocol", protocol) } catch (_: Exception) {}
     }
 
     /**
@@ -509,6 +577,7 @@ object AnalyticsHelper {
      */
     fun updateAutoReconnectProperty(context: Context, enabled: Boolean) {
         getAnalytics(context).setUserProperty("auto_reconnect_enabled", enabled.toString())
+        try { FirebaseCrashlytics.getInstance().setCustomKey("auto_reconnect_enabled", enabled) } catch (_: Exception) {}
     }
 
     /**
@@ -516,5 +585,6 @@ object AnalyticsHelper {
      */
     fun updateSmoothingProperty(context: Context, enabled: Boolean) {
         getAnalytics(context).setUserProperty("smoothing_enabled", enabled.toString())
+        try { FirebaseCrashlytics.getInstance().setCustomKey("smoothing_enabled", enabled) } catch (_: Exception) {}
     }
 }

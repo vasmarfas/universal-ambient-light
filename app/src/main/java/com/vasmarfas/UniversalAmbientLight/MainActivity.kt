@@ -102,6 +102,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var appUpdateManager: AppUpdateManager
     private var currentEffect by mutableStateOf(EffectMode.RAINBOW)
     private var mSessionStartTime: Long? = null
+    private var mSessionEverConnected: Boolean = false
+    private var mSessionMethod: String? = null
+    private var mSessionSource: String? = null
+    private var mSessionProtocol: String? = null
 
     private var usbPermissionReceiverRegistered = false
     private var usbAttachReceiverRegistered = false
@@ -138,14 +142,19 @@ class MainActivity : ComponentActivity() {
             val wasRunning = mRecorderRunning
             mRecorderRunning = checked
 
-            if (wasRunning && !checked && mSessionStartTime != null) {
-                val durationSeconds = ((System.currentTimeMillis() - mSessionStartTime!!) / 1000).coerceAtLeast(0)
-                AnalyticsHelper.logScreenCaptureStopped(this@MainActivity, durationSeconds)
-                mSessionStartTime = null
-            }
-
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
             val tclBlocked = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
+
+            if (checked) mSessionEverConnected = true
+
+            if (wasRunning && !checked) {
+                val reason = when {
+                    tclBlocked -> "tcl_blocked"
+                    error != null -> "error"
+                    else -> "service_stop"
+                }
+                finishCaptureSession(reason)
+            }
 
             // Defer dialog/toast off LocalBroadcastManager's drain to avoid main-thread stalls.
             if (tclBlocked && !mTclWarningShown) {
@@ -237,6 +246,16 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
 
+        // log battery-opt exemption grant once per install
+        run {
+            val p = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+            val loggedKey = "battery_opt_granted_logged"
+            if (!p.getBoolean(loggedKey, false) && PermissionHelper.isIgnoringBatteryOptimizations(this)) {
+                AnalyticsHelper.logBatteryOptimizationGranted(this)
+                p.edit { putBoolean(loggedKey, true) }
+            }
+        }
+
         appUpdateManager
             .appUpdateInfo
             .addOnSuccessListener { appUpdateInfo ->
@@ -325,6 +344,30 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun beginCaptureSession(source: String, method: String, protocol: String) {
+        mSessionStartTime = System.currentTimeMillis()
+        mSessionEverConnected = false
+        mSessionSource = source
+        mSessionMethod = method
+        mSessionProtocol = protocol
+    }
+
+    private fun finishCaptureSession(endReason: String) {
+        val start = mSessionStartTime ?: return
+        val durationSeconds = ((System.currentTimeMillis() - start) / 1000).coerceAtLeast(0)
+        AnalyticsHelper.logScreenCaptureStopped(this, durationSeconds)
+        AnalyticsHelper.logCaptureSessionSummary(
+            this, durationSeconds,
+            mSessionMethod, mSessionSource, mSessionProtocol,
+            mSessionEverConnected, endReason
+        )
+        mSessionStartTime = null
+        mSessionMethod = null
+        mSessionSource = null
+        mSessionProtocol = null
+        mSessionEverConnected = false
+    }
+
     private fun toggleScreenCapture() {
         if (!mRecorderRunning) {
             val prefs = Preferences(this)
@@ -342,11 +385,7 @@ class MainActivity : ComponentActivity() {
             Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
             stopScreenRecorder()
             mRecorderRunning = false
-            val durationSeconds = mSessionStartTime?.let { startTime ->
-                ((System.currentTimeMillis() - startTime) / 1000).coerceAtLeast(0)
-            }
-            AnalyticsHelper.logScreenCaptureStopped(this, durationSeconds)
-            mSessionStartTime = null
+            finishCaptureSession("user_stop")
         }
     }
 
@@ -367,7 +406,11 @@ class MainActivity : ComponentActivity() {
             // startScreencapRecorder now handles all alternative methods (renaming it to startAlternativeRecorder would be cleaner, but keeping name for compatibility with existing BootActivity method)
             BootActivity.startAlternativeRecorder(this)
             mRecorderRunning = true
-            mSessionStartTime = System.currentTimeMillis()
+            beginCaptureSession(
+                source = "screen",
+                method = method ?: "unknown",
+                protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+            )
             return
         }
 
@@ -434,7 +477,7 @@ class MainActivity : ComponentActivity() {
             startService(intent)
         }
         mRecorderRunning = true
-        mSessionStartTime = System.currentTimeMillis()
+        beginCaptureSession("camera", "camera", protocol)
 
         ReviewHelper.onLightingStarted(this)
     }
@@ -500,8 +543,8 @@ class MainActivity : ComponentActivity() {
                 
                 startScreenRecorder(resultCode, data)
                 mRecorderRunning = true
-                mSessionStartTime = System.currentTimeMillis()
-                
+                beginCaptureSession("screen", "media_projection", protocol)
+
                 ReviewHelper.onLightingStarted(this)
             }
         }
