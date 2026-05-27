@@ -5,7 +5,6 @@ import androidx.annotation.WorkerThread
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.Socket
-import java.util.ArrayList
 import java.util.Arrays
 import java.util.Collections
 import kotlin.math.abs
@@ -98,7 +97,11 @@ class NetworkScanner {
                             } else {
                                 if (!isIPv4) {
                                     val delim = sAddr.indexOf('%') // drop ip6 zone suffix
-                                    val v6Addr = if (delim < 0) sAddr.uppercase() else sAddr.substring(0, delim).uppercase()
+                                    val v6Addr =
+                                        if (delim < 0) sAddr.uppercase() else sAddr.substring(
+                                            0,
+                                            delim
+                                        ).uppercase()
                                     foundAddresses.add(v6Addr)
                                 }
                             }
@@ -121,7 +124,9 @@ class NetworkScanner {
                     val localIpV4Address = localIpV4Addresses[localIpIdx]
                     val ipsToTry = arrayOfNulls<String>(254)
 
-                    val ipParts = localIpV4Address.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                    val ipParts =
+                        localIpV4Address.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }
+                            .toTypedArray()
 
                     val ipPrefix = ipParts[0] + "." + ipParts[1] + "." + ipParts[2] + "."
                     for (i in 1..254) {
@@ -132,8 +137,14 @@ class NetworkScanner {
 
                     // sort in such a way that ips close to the local ip will be tried first
                     Arrays.sort(ipsToTry) { lhs, rhs ->
-                        val lhsNumberInSubnet = Integer.parseInt(lhs!!.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()[3])
-                        val rhsNumberInSubnet = Integer.parseInt(rhs!!.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()[3])
+                        val lhsNumberInSubnet = Integer.parseInt(
+                            lhs!!.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }
+                                .toTypedArray()[3]
+                        )
+                        val rhsNumberInSubnet = Integer.parseInt(
+                            rhs!!.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }
+                                .toTypedArray()[3]
+                        )
                         val lhsDistance = abs(lhsNumberInSubnet - localNumberInSubnet)
                         val rhsDistance = abs(rhsNumberInSubnet - localNumberInSubnet)
                         lhsDistance - rhsDistance

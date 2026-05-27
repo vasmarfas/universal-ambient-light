@@ -2,13 +2,36 @@ package com.vasmarfas.UniversalAmbientLight.ui.settings
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -26,23 +49,23 @@ import kotlinx.coroutines.withContext
 @Composable
 fun DeviceScanDialog(
     onDismiss: () -> Unit,
-    onDeviceSelected: (DeviceDetector.DeviceInfo) -> Unit
+    onDeviceSelected: (DeviceDetector.DeviceInfo) -> Unit,
 ) {
-    val context = LocalContext.current
+    LocalContext.current
     val scope = rememberCoroutineScope()
-    
+
     var isScanning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0f) }
     var foundDevices by remember { mutableStateOf<List<DeviceDetector.DeviceInfo>>(emptyList()) }
     var scanner by remember { mutableStateOf<DeviceScanner?>(null) }
     var currentScanIp by remember { mutableStateOf<String?>(null) }
     var totalIps by remember { mutableStateOf(0) }
-    
+
     fun startScan() {
         isScanning = true
         progress = 0f
         foundDevices = emptyList()
-        
+
         scope.launch {
             withContext(Dispatchers.IO) {
                 var scannerRef: DeviceScanner? = null
@@ -55,31 +78,31 @@ fun DeviceScanDialog(
                 }
                 scannerRef = newScanner
                 scanner = newScanner
-                
+
                 val scannerInfo = newScanner.getScanInfo()
                 withContext(Dispatchers.Main) {
                     totalIps = scannerInfo.totalIps
                 }
-                
+
                 while (newScanner.hasNextAttempt()) {
                     val currentIp = newScanner.getCurrentIp()
                     withContext(Dispatchers.Main) {
                         currentScanIp = currentIp
                         progress = newScanner.progress
                     }
-                    
+
                     val device = newScanner.tryNext()
-                    
+
                     withContext(Dispatchers.Main) {
                         progress = newScanner.progress
                         if (device != null) {
                             foundDevices = newScanner.getFoundDevices()
                         }
                     }
-                    
+
                     kotlinx.coroutines.delay(1)
                 }
-                
+
                 withContext(Dispatchers.Main) {
                     isScanning = false
                     progress = 1f
@@ -88,11 +111,11 @@ fun DeviceScanDialog(
             }
         }
     }
-    
+
     LaunchedEffect(Unit) {
         startScan()
     }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -147,7 +170,7 @@ fun DeviceScanDialog(
                         }
                     }
                 }
-                
+
                 if (foundDevices.isNotEmpty()) {
                     Text(
                         text = stringResource(R.string.scanner_found_devices),
@@ -194,17 +217,17 @@ fun DeviceScanDialog(
 @Composable
 private fun DeviceItem(
     device: DeviceDetector.DeviceInfo,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val deviceTypeName = when (device.type) {
         DeviceDetector.DeviceType.WLED -> stringResource(R.string.scanner_device_wled)
         DeviceDetector.DeviceType.HYPERION -> stringResource(R.string.scanner_device_hyperion)
         DeviceDetector.DeviceType.UNKNOWN -> stringResource(R.string.scanner_device_unknown)
     }
-    
+
     val deviceName = device.name ?: deviceTypeName
     var isFocused by remember { mutableStateOf(false) }
-    
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -212,9 +235,9 @@ private fun DeviceItem(
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (isFocused) 
-                MaterialTheme.colorScheme.primaryContainer 
-            else 
+            containerColor = if (isFocused)
+                MaterialTheme.colorScheme.primaryContainer
+            else
                 MaterialTheme.colorScheme.surfaceVariant
         ),
         border = if (isFocused) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null

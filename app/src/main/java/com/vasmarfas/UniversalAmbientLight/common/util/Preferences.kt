@@ -2,10 +2,10 @@ package com.vasmarfas.UniversalAmbientLight.common.util
 
 import android.content.Context
 import android.content.res.Resources
-import androidx.preference.PreferenceManager
 import androidx.annotation.StringRes
-import java.util.concurrent.ConcurrentHashMap
 import androidx.core.content.edit
+import androidx.preference.PreferenceManager
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Wrapper around SharedPreferences with defaults centralised in resources.
@@ -87,7 +87,8 @@ class Preferences(context: Context) {
         val cacheKey = (keyResourceId.toLong() shl 8) or typeTag(type).toLong()
         sDefaultKeyCache[cacheKey]?.let { return it }
 
-        val name = resources.getResourceEntryName(keyResourceId).replace("pref_key_", "pref_default_")
+        val name =
+            resources.getResourceEntryName(keyResourceId).replace("pref_key_", "pref_default_")
         val pkg = resources.getResourcePackageName(keyResourceId)
         val resolved = resources.getIdentifier(name, type, pkg)
         sDefaultKeyCache[cacheKey] = resolved

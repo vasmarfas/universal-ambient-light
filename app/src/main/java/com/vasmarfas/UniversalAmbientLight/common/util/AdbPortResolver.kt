@@ -46,7 +46,11 @@ object AdbPortResolver {
                     Log.i(TAG, "adbd now in tcpip mode on $TCPIP_PORT")
                     return TCPIP_PORT
                 }
-                try { Thread.sleep(TCPIP_WAIT_STEP_MS) } catch (_: InterruptedException) { return savedPort }
+                try {
+                    Thread.sleep(TCPIP_WAIT_STEP_MS)
+                } catch (_: InterruptedException) {
+                    return savedPort
+                }
             }
             Log.w(TAG, "tcpip:$TCPIP_PORT requested but the port did not come up")
         }
@@ -75,9 +79,18 @@ object AdbPortResolver {
             Log.i(TAG, "Requesting adbd 'tcpip:$port' over TLS…")
             val stream = mgr.openStream("tcpip:$port")
             // Drain the short ack so adbd processes the request; it then restarts (stream closes).
-            try { stream.openInputStream().readBytes() } catch (_: Exception) {}
-            try { stream.close() } catch (_: Exception) {}
-            try { mgr.disconnect() } catch (_: Exception) {} // the TLS link drops on adbd restart anyway
+            try {
+                stream.openInputStream().readBytes()
+            } catch (_: Exception) {
+            }
+            try {
+                stream.close()
+            } catch (_: Exception) {
+            }
+            try {
+                mgr.disconnect()
+            } catch (_: Exception) {
+            } // the TLS link drops on adbd restart anyway
             true
         } catch (e: Throwable) {
             Log.w(TAG, "tcpip switch failed: ${e.message}")

@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -19,16 +20,15 @@ import android.os.PowerManager
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
-import android.net.wifi.WifiManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ServiceCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
+import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
-import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
-import com.vasmarfas.UniversalAmbientLight.R
 import java.util.Objects
 
 class ScreenGrabberService : Service() {
@@ -66,8 +66,10 @@ class ScreenGrabberService : Service() {
 
     // Holds the AppOptions handed to the active encoder, so color-pref edits made
     // mid-capture can push new values into it without restarting the session.
-    @Volatile private var mActiveOptions: AppOptions? = null
-    private var mPrefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
+    @Volatile
+    private var mActiveOptions: AppOptions? = null
+    private var mPrefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? =
+        null
 
     private val mReceiver = object : HyperionThreadBroadcaster {
         override fun onConnected() {
@@ -116,10 +118,10 @@ class ScreenGrabberService : Service() {
                     if (DEBUG) Log.v(TAG, "ACTION_SCREEN_ON intent received")
                     releaseWakeLock()
                     releaseWifiLock()
-                    
+
                     // Reset WLED client data send block after EPERM error to resume sending on screen wake
                     mHyperionThread?.resetBlockedIfWLED()
-                    
+
                     if (mCaptureSource == "camera") {
                         // Camera mode: just resume camera if not capturing
                         if (mCameraEncoder != null && !isCapturing) {
@@ -155,12 +157,16 @@ class ScreenGrabberService : Service() {
                         // If MediaProjection was stopped by system (sleep), resumeRecording() won't help.
                         // Recreate encoder from saved projection data.
                         if (!isCapturing && mScreenEncoder == null && mScreencapEncoder == null && mAdbEncoder == null && mScreenrecordEncoder == null && mScrcpyEncoder == null && mAccessibilityEncoder == null && mMtkThalCaptureEncoder == null) {
-                            if (DEBUG) Log.v(TAG, "No encoder active, trying restartEncoderFromSavedProjection")
+                            if (DEBUG) Log.v(
+                                TAG,
+                                "No encoder active, trying restartEncoderFromSavedProjection"
+                            )
                             restartEncoderFromSavedProjection()
                         }
                     }
                     notifyActivity()
                 }
+
                 Intent.ACTION_SCREEN_OFF -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SCREEN_OFF intent received")
                     // On some TVs CPU goes into deep sleep and keepalive threads stop sending packets,
@@ -176,6 +182,7 @@ class ScreenGrabberService : Service() {
                     if (mMtkThalCaptureEncoder != null) mMtkThalCaptureEncoder!!.clearLights()
                     // Camera mode: keep running — camera captures external TV, screen sleep is irrelevant
                 }
+
                 Intent.ACTION_CONFIGURATION_CHANGED -> {
                     if (DEBUG) Log.v(TAG, "ACTION_CONFIGURATION_CHANGED intent received")
                     if (mScreenEncoder != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -189,6 +196,7 @@ class ScreenGrabberService : Service() {
                     mCameraEncoder?.setOrientation(resources.configuration.orientation)
                     mMtkThalCaptureEncoder?.setOrientation(resources.configuration.orientation)
                 }
+
                 Intent.ACTION_SHUTDOWN, Intent.ACTION_REBOOT -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SHUTDOWN|ACTION_REBOOT intent received")
                     stopAllCapture()
@@ -214,14 +222,17 @@ class ScreenGrabberService : Service() {
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private fun prepared(): Boolean {
         val prefs = Preferences(baseContext)
-        mConnectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        mConnectionType =
+            prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         val host = prefs.getString(R.string.pref_key_host, null)
         val port = prefs.getInt(R.string.pref_key_port, -1)
-        val priority = prefs.getString(R.string.pref_key_priority, "100")?.takeIf { it.isNotBlank() } ?: "100"
+        val priority =
+            prefs.getString(R.string.pref_key_priority, "100")?.takeIf { it.isNotBlank() } ?: "100"
         mFrameRate = prefs.getInt(R.string.pref_key_framerate)
 
         try {
-            val captureQualityStr = prefs.getString(R.string.pref_key_capture_quality, "128")?.takeIf { it.isNotBlank() } ?: "128"
+            val captureQualityStr = prefs.getString(R.string.pref_key_capture_quality, "128")
+                ?.takeIf { it.isNotBlank() } ?: "128"
             mCaptureQuality = Integer.parseInt(captureQualityStr)
         } catch (e: NumberFormatException) {
             mCaptureQuality = 128
@@ -269,10 +280,15 @@ class ScreenGrabberService : Service() {
 
         if (mHorizontalLEDCount <= 0 || mVerticalLEDCount <= 0) {
             mStartError = resources.getString(R.string.error_invalid_led_counts)
-            AnalyticsHelper.logServiceError(baseContext, "invalid_led_counts", "horizontal: $mHorizontalLEDCount, vertical: $mVerticalLEDCount")
+            AnalyticsHelper.logServiceError(
+                baseContext,
+                "invalid_led_counts",
+                "horizontal: $mHorizontalLEDCount, vertical: $mVerticalLEDCount"
+            )
             return false
         }
-        mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+        mMediaProjectionManager =
+            getSystemService(MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
         if (mMediaProjectionManager == null && method == "media_projection") {
             mStartError = resources.getString(R.string.error_media_projection_denied)
@@ -321,12 +337,13 @@ class ScreenGrabberService : Service() {
                 ACTION_START -> if (mHyperionThread == null) {
                     mCaptureSource = "screen"
                     val prefs = Preferences(this)
-                    val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
-                    
+                    val method =
+                        prefs.getString(R.string.pref_key_capture_method, "media_projection")
+
                     val useMediaProjection = method == "media_projection"
-                    val foregroundType = if (useMediaProjection) 
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION 
-                    else 
+                    val foregroundType = if (useMediaProjection)
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    else
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
 
                     // Start foreground with appropriate type
@@ -343,8 +360,13 @@ class ScreenGrabberService : Service() {
                                 startScreenRecord(intent)
                             } catch (e: SecurityException) {
                                 Log.e(TAG, "Failed to start screen recording: " + e.message)
-                                mStartError = resources.getString(R.string.error_media_projection_denied)
-                                AnalyticsHelper.logServiceError(baseContext, "security_exception", e.message)
+                                mStartError =
+                                    resources.getString(R.string.error_media_projection_denied)
+                                AnalyticsHelper.logServiceError(
+                                    baseContext,
+                                    "security_exception",
+                                    e.message
+                                )
                                 haltStartup()
                                 return START_STICKY
                             }
@@ -357,6 +379,7 @@ class ScreenGrabberService : Service() {
                         haltStartup()
                     }
                 }
+
                 ACTION_START_CAMERA -> if (mHyperionThread == null) {
                     mCaptureSource = "camera"
                     val foregroundStarted = tryStartForegroundCamera()
@@ -373,6 +396,7 @@ class ScreenGrabberService : Service() {
                         haltStartup()
                     }
                 }
+
                 ACTION_STOP -> stopAllCapture()
                 ACTION_CLEAR -> {
                     // Send one black frame but keep connection
@@ -405,10 +429,14 @@ class ScreenGrabberService : Service() {
                         mCameraEncoder!!.clearLights()
                     }
                     if (mMtkThalCaptureEncoder != null) {
-                        if (DEBUG) Log.v(TAG, "ACTION_CLEAR: clearing lights once (mtk_thal_capture)")
+                        if (DEBUG) Log.v(
+                            TAG,
+                            "ACTION_CLEAR: clearing lights once (mtk_thal_capture)"
+                        )
                         mMtkThalCaptureEncoder!!.clearLights()
                     }
                 }
+
                 GET_STATUS -> notifyActivity()
                 ACTION_EXIT -> stopSelf()
             }
@@ -451,7 +479,7 @@ class ScreenGrabberService : Service() {
         intentFilter.addAction(Intent.ACTION_SHUTDOWN)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(mEventReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(mEventReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(mEventReceiver, intentFilter)
         }
@@ -621,7 +649,7 @@ class ScreenGrabberService : Service() {
     private fun acquireWakeLock() {
         if (mWakeLock == null) {
             try {
-                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
                 if (pm != null) {
                     mWakeLock = pm.newWakeLock(
                         PowerManager.PARTIAL_WAKE_LOCK,
@@ -650,10 +678,13 @@ class ScreenGrabberService : Service() {
     private fun acquireWifiLock() {
         if (mWifiLock != null && mWifiLock!!.isHeld) return
         try {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val wm = applicationContext.getSystemService(WIFI_SERVICE) as? WifiManager
             if (wm != null) {
                 // HighPerf to prevent UDP throttling during idle (helps on some Android TV firmwares)
-                mWifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ScreenGrabberService::Wifi")
+                mWifiLock = wm.createWifiLock(
+                    WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                    "ScreenGrabberService::Wifi"
+                )
                 mWifiLock?.setReferenceCounted(false)
                 mWifiLock?.acquire()
             }
@@ -714,7 +745,8 @@ class ScreenGrabberService : Service() {
 
     val notification: Notification
         get() {
-            val mgr = mNotificationManager ?: (getSystemService(NOTIFICATION_SERVICE) as? NotificationManager)
+            val mgr = mNotificationManager
+                ?: (getSystemService(NOTIFICATION_SERVICE) as? NotificationManager)
             if (mgr == null) {
                 throw IllegalStateException("NotificationManager is null")
             }
@@ -742,7 +774,7 @@ class ScreenGrabberService : Service() {
             return
         }
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
-        
+
         // Use the passed projection intent directly if available (safer for restricted devices)
         val resultData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
@@ -750,7 +782,7 @@ class ScreenGrabberService : Service() {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(EXTRA_RESULT_DATA)
         }
-        
+
         // Save projection data to restore after sleep/wake on TV
         if (resultData != null) {
             saveProjectionData(resultCode, resultData.extras)
@@ -766,7 +798,7 @@ class ScreenGrabberService : Service() {
             resultCode,
             projectionIntent
         )
-        val window = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val window = getSystemService(WINDOW_SERVICE) as WindowManager
 
         if (projection != null && window != null) {
             sMediaProjection = projection
@@ -776,7 +808,10 @@ class ScreenGrabberService : Service() {
             val prefs = Preferences(this)
             val options = buildAppOptions(prefs)
 
-            if (DEBUG) Log.v(TAG, "Creating encoder: " + metrics.widthPixels + "x" + metrics.heightPixels)
+            if (DEBUG) Log.v(
+                TAG,
+                "Creating encoder: " + metrics.widthPixels + "x" + metrics.heightPixels
+            )
             mScreenEncoder = ScreenEncoder(
                 thread.receiver,
                 projection,
@@ -788,9 +823,16 @@ class ScreenGrabberService : Service() {
             mScreenEncoder!!.sendStatus()
         } else {
             if (projection == null) {
-                Log.e(TAG, "MediaProjection is null (resultCode=$resultCode). Permission likely missing/invalid.")
+                Log.e(
+                    TAG,
+                    "MediaProjection is null (resultCode=$resultCode). Permission likely missing/invalid."
+                )
                 mStartError = resources.getString(R.string.error_media_projection_denied)
-                AnalyticsHelper.logServiceError(baseContext, "media_projection_null", "resultCode: $resultCode")
+                AnalyticsHelper.logServiceError(
+                    baseContext,
+                    "media_projection_null",
+                    "resultCode: $resultCode"
+                )
                 haltStartup()
             }
         }
@@ -806,7 +848,7 @@ class ScreenGrabberService : Service() {
             haltStartup()
             return
         }
-        val window = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val window = getSystemService(WINDOW_SERVICE) as WindowManager
         val metrics = DisplayMetrics()
         @Suppress("DEPRECATION")
         window.defaultDisplay.getRealMetrics(metrics)
@@ -958,8 +1000,9 @@ class ScreenGrabberService : Service() {
         releaseResource()
 
         try {
-            val projection = mMediaProjectionManager!!.getMediaProjection(resultCode, projectionIntent)
-            val window = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val projection =
+                mMediaProjectionManager!!.getMediaProjection(resultCode, projectionIntent)
+            val window = getSystemService(WINDOW_SERVICE) as WindowManager
             if (projection == null || window == null) {
                 return
             }
@@ -1094,16 +1137,23 @@ class ScreenGrabberService : Service() {
             blackLevel = prefs.getInt(R.string.pref_key_color_black_level, 0),
             whiteLevel = prefs.getInt(R.string.pref_key_color_white_level, 100),
             saturation = prefs.getInt(R.string.pref_key_color_saturation, 100),
-            colorProcessingEnabled = prefs.getBoolean(R.string.pref_key_color_processing_enabled, true),
+            colorProcessingEnabled = prefs.getBoolean(
+                R.string.pref_key_color_processing_enabled,
+                true
+            ),
             brightnessR = prefs.getInt(R.string.pref_key_color_brightness_r, 100),
             brightnessG = prefs.getInt(R.string.pref_key_color_brightness_g, 100),
             brightnessB = prefs.getInt(R.string.pref_key_color_brightness_b, 100),
             gammaR = prefs.getInt(R.string.pref_key_color_gamma_r, 100),
             gammaG = prefs.getInt(R.string.pref_key_color_gamma_g, 100),
             gammaB = prefs.getInt(R.string.pref_key_color_gamma_b, 100),
-            borderDetectionEnabled = prefs.getBoolean(R.string.pref_key_border_detection_enabled, false),
+            borderDetectionEnabled = prefs.getBoolean(
+                R.string.pref_key_border_detection_enabled,
+                false
+            ),
             borderThreshold = prefs.getInt(R.string.pref_key_border_threshold, 18).coerceIn(0, 64),
-            borderCheckIntervalFrames = prefs.getInt(R.string.pref_key_border_check_interval, 60).coerceIn(1, 300)
+            borderCheckIntervalFrames = prefs.getInt(R.string.pref_key_border_check_interval, 60)
+                .coerceIn(1, 300)
         )
         mActiveOptions = opts
         registerColorPrefsListener()
@@ -1133,12 +1183,13 @@ class ScreenGrabberService : Service() {
             keyBr, keyBg, keyBb, keyGr, keyGg, keyGb
         )
         val borderKeys = setOf(keyBorderOn, keyBorderTh, keyBorderIv)
-        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == null) return@OnSharedPreferenceChangeListener
-            val prefs = Preferences(this)
-            if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
-            if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
-        }
+        val listener =
+            android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == null) return@OnSharedPreferenceChangeListener
+                val prefs = Preferences(this)
+                if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
+                if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
+            }
         sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
         mPrefsListener = listener
     }
@@ -1183,7 +1234,8 @@ class ScreenGrabberService : Service() {
         private var sMediaProjection: MediaProjection? = null
 
         /** True while the service instance is alive (onCreate→onDestroy). */
-        @Volatile @JvmStatic
+        @Volatile
+        @JvmStatic
         var sInstanceRunning: Boolean = false
             internal set
     }

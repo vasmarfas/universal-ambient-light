@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
+import com.vasmarfas.UniversalAmbientLight.common.util.AdbMdns.TLS_CONNECT
+import com.vasmarfas.UniversalAmbientLight.common.util.AdbMdns.TLS_PAIRING
 import java.net.InetAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -80,7 +82,10 @@ object AdbMdns {
             Log.w(TAG, "discover error: ${e.message}")
             null
         } finally {
-            try { nsd.stopServiceDiscovery(discoveryListener) } catch (_: Exception) {}
+            try {
+                nsd.stopServiceDiscovery(discoveryListener)
+            } catch (_: Exception) {
+            }
         }
     }
 }

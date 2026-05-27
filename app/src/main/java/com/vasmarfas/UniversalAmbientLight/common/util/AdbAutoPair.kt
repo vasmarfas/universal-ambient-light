@@ -59,7 +59,10 @@ object AdbAutoPair {
                     }
                     if (!ok) return Result.Failed("pairing rejected")
                     // Establish the working connection right away (best-effort).
-                    try { mgr.autoConnect(context, 8000) } catch (_: Throwable) {}
+                    try {
+                        mgr.autoConnect(context, 8000)
+                    } catch (_: Throwable) {
+                    }
                     return Result.Paired
                 }
 

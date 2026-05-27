@@ -4,21 +4,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.text.TextUtils
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.core.app.TaskStackBuilder
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.vasmarfas.UniversalAmbientLight.common.BootActivity
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
-import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
-import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 class QuickTileService : TileService() {
     private val REMOVE_LISTENER_DELAY = 1000 * 10 // 10 second delay to remove listener
@@ -118,7 +115,7 @@ class QuickTileService : TileService() {
      * @return true if setup was started
      */
     private fun startSetupIfNeeded(): Boolean {
-            val preferences = Preferences(applicationContext)
+        val preferences = Preferences(applicationContext)
         if (TextUtils.isEmpty(
                 preferences.getString(
                     R.string.pref_key_host,

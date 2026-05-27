@@ -118,8 +118,9 @@ class AccessibilityCaptureService : AccessibilityService() {
 
     private fun findByKeywords(node: AccessibilityNodeInfo?, keywords: List<String>): AccessibilityNodeInfo? {
         if (node == null) return null
-        val hay = ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: ""))
-            .lowercase()
+        val hay =
+            ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: ""))
+                .lowercase()
         if (hay.isNotBlank() && keywords.any { hay.contains(it) }) return node
         for (i in 0 until node.childCount) {
             findByKeywords(node.getChild(i), keywords)?.let { return it }
@@ -158,7 +159,10 @@ class AccessibilityCaptureService : AccessibilityService() {
                     } catch (e: Exception) {
                         Log.e(TAG, "Screenshot conversion failed", e)
                     } finally {
-                        try { screenshot.hardwareBuffer.close() } catch (_: Exception) {}
+                        try {
+                            screenshot.hardwareBuffer.close()
+                        } catch (_: Exception) {
+                        }
                     }
                     callback(copy)
                 }

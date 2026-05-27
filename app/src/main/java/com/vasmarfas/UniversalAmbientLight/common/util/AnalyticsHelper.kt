@@ -34,10 +34,14 @@ object AnalyticsHelper {
         analytics.setUserProperty("android_version", Build.VERSION.SDK_INT.toString())
         analytics.setUserProperty("device_form_factor", deviceFormFactor(context))
 
-        val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection") ?: "media_projection"
+        val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+            ?: "media_projection"
         analytics.setUserProperty("capture_method", captureMethod)
 
-        analytics.setUserProperty("framerate", safeGetInt(prefs, R.string.pref_key_framerate).toString())
+        analytics.setUserProperty(
+            "framerate",
+            safeGetInt(prefs, R.string.pref_key_framerate).toString()
+        )
 
         val useAvgColor = prefs.getBoolean(R.string.pref_key_use_avg_color)
         analytics.setUserProperty("use_avg_color", useAvgColor.toString())
@@ -67,22 +71,45 @@ object AnalyticsHelper {
     }
 
     private fun safeGetInt(prefs: Preferences, keyRes: Int): Int =
-        try { prefs.getInt(keyRes) } catch (e: Exception) { 0 }
+        try {
+            prefs.getInt(keyRes)
+        } catch (e: Exception) {
+            0
+        }
 
     /** Mirrors current config into Crashlytics custom keys so crash/ANR reports carry context. */
     fun syncCrashlyticsContext(context: Context) {
         try {
             val crashlytics = FirebaseCrashlytics.getInstance()
             val prefs = Preferences(context)
-            crashlytics.setCustomKey("connection_protocol", prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion")
-            crashlytics.setCustomKey("capture_method", prefs.getString(R.string.pref_key_capture_method, "media_projection") ?: "media_projection")
+            crashlytics.setCustomKey(
+                "connection_protocol",
+                prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+            )
+            crashlytics.setCustomKey(
+                "capture_method",
+                prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                    ?: "media_projection"
+            )
             crashlytics.setCustomKey("device_form_factor", deviceFormFactor(context))
             crashlytics.setCustomKey("manufacturer", Build.MANUFACTURER ?: "unknown")
             crashlytics.setCustomKey("framerate", safeGetInt(prefs, R.string.pref_key_framerate))
-            crashlytics.setCustomKey("use_avg_color", prefs.getBoolean(R.string.pref_key_use_avg_color))
-            crashlytics.setCustomKey("smoothing_enabled", prefs.getBoolean(R.string.pref_key_smoothing_enabled, false))
-            crashlytics.setCustomKey("auto_reconnect_enabled", prefs.getBoolean(R.string.pref_key_reconnect))
-            crashlytics.setCustomKey("wled_protocol", prefs.getString(R.string.pref_key_wled_protocol, "ddp") ?: "ddp")
+            crashlytics.setCustomKey(
+                "use_avg_color",
+                prefs.getBoolean(R.string.pref_key_use_avg_color)
+            )
+            crashlytics.setCustomKey(
+                "smoothing_enabled",
+                prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
+            )
+            crashlytics.setCustomKey(
+                "auto_reconnect_enabled",
+                prefs.getBoolean(R.string.pref_key_reconnect)
+            )
+            crashlytics.setCustomKey(
+                "wled_protocol",
+                prefs.getString(R.string.pref_key_wled_protocol, "ddp") ?: "ddp"
+            )
             crashlytics.setCustomKey("led_x", safeGetInt(prefs, R.string.pref_key_x_led))
             crashlytics.setCustomKey("led_y", safeGetInt(prefs, R.string.pref_key_y_led))
         } catch (_: Exception) {
@@ -129,7 +156,7 @@ object AnalyticsHelper {
         captureSource: String?,
         protocol: String?,
         connected: Boolean,
-        endReason: String
+        endReason: String,
     ) {
         val bundle = Bundle().apply {
             putLong("duration_seconds", durationSeconds)
@@ -562,7 +589,10 @@ object AnalyticsHelper {
      */
     fun updateProtocolProperty(context: Context, protocol: String) {
         getAnalytics(context).setUserProperty("connection_protocol", protocol)
-        try { FirebaseCrashlytics.getInstance().setCustomKey("connection_protocol", protocol) } catch (_: Exception) {}
+        try {
+            FirebaseCrashlytics.getInstance().setCustomKey("connection_protocol", protocol)
+        } catch (_: Exception) {
+        }
     }
 
     /**
@@ -577,7 +607,10 @@ object AnalyticsHelper {
      */
     fun updateAutoReconnectProperty(context: Context, enabled: Boolean) {
         getAnalytics(context).setUserProperty("auto_reconnect_enabled", enabled.toString())
-        try { FirebaseCrashlytics.getInstance().setCustomKey("auto_reconnect_enabled", enabled) } catch (_: Exception) {}
+        try {
+            FirebaseCrashlytics.getInstance().setCustomKey("auto_reconnect_enabled", enabled)
+        } catch (_: Exception) {
+        }
     }
 
     /**
@@ -585,6 +618,9 @@ object AnalyticsHelper {
      */
     fun updateSmoothingProperty(context: Context, enabled: Boolean) {
         getAnalytics(context).setUserProperty("smoothing_enabled", enabled.toString())
-        try { FirebaseCrashlytics.getInstance().setCustomKey("smoothing_enabled", enabled) } catch (_: Exception) {}
+        try {
+            FirebaseCrashlytics.getInstance().setCustomKey("smoothing_enabled", enabled)
+        } catch (_: Exception) {
+        }
     }
 }

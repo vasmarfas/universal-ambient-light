@@ -7,15 +7,14 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.Socket
-import java.util.*
-import kotlin.math.abs
+import java.util.Collections
 
 /**
  * Расширенный сканер сети для поиска WLED и Hyperion устройств
  * Оптимизирован: сначала быстрый пинг, потом детальное определение только для доступных хостов
  */
 class DeviceScanner(
-    private val onDeviceFound: ((DeviceDetector.DeviceInfo) -> Unit)? = null
+    private val onDeviceFound: ((DeviceDetector.DeviceInfo) -> Unit)? = null,
 ) {
     private val ipsToTry: Array<String>
     private var lastTriedIndex = -1
@@ -46,7 +45,7 @@ class DeviceScanner(
             return false
         }
     }
-    
+
     /**
      * Быстрая проверка открытых портов для определения типа устройства
      * Проверяет TCP 19400 (Hyperion) и UDP 4048, 19446 (WLED)
@@ -56,7 +55,7 @@ class DeviceScanner(
     private fun checkDevicePorts(host: String): Pair<Boolean, Boolean> {
         var hasHyperionPort = false
         var hasWledPort = false
-        
+
         try {
             val socket = Socket()
             socket.connect(InetSocketAddress(host, 19400), PORT_CHECK_TIMEOUT_MS)
@@ -64,7 +63,7 @@ class DeviceScanner(
             socket.close()
         } catch (e: Exception) {
         }
-        
+
         try {
             val datagramSocket = DatagramSocket()
             datagramSocket.connect(InetAddress.getByName(host), 4048)
@@ -79,10 +78,10 @@ class DeviceScanner(
             } catch (e: Exception) {
             }
         }
-        
+
         return Pair(hasHyperionPort, hasWledPort)
     }
-    
+
     /**
      * Определяет hostname для IP адреса через reverse DNS lookup
      */
@@ -112,38 +111,44 @@ class DeviceScanner(
         }
 
         val ip = ipsToTry[++lastTriedIndex]
-        
+
         if (lastTriedIndex % 50 == 0) {
-            Log.d(TAG, "Scanning IP $ip (${lastTriedIndex + 1}/${ipsToTry.size}, ${(progress * 100).toInt()}%)")
+            Log.d(
+                TAG,
+                "Scanning IP $ip (${lastTriedIndex + 1}/${ipsToTry.size}, ${(progress * 100).toInt()}%)"
+            )
         }
-        
+
         if (!isHostResponsive(ip)) {
             return null
         }
-        
+
         Log.d(TAG, "Host $ip is responsive, checking ports...")
         responsiveHosts.add(ip)
-        
+
         val (hasHyperionPort, hasWledPort) = checkDevicePorts(ip)
-        
+
         if (!hasHyperionPort && !hasWledPort) {
             Log.d(TAG, "Host $ip is responsive but no device ports found")
             return null
         }
-        
+
         val hostname = getHostname(ip)
-        
+
         val deviceInfo = DeviceDetector.detectDevice(ip)
-        
+
         if (deviceInfo != null) {
-            val alreadyFound = foundDevices.any { 
+            val alreadyFound = foundDevices.any {
                 it.host == deviceInfo.host
             }
-            
+
             if (!alreadyFound) {
                 val deviceInfoWithHostname = deviceInfo.copy(hostname = hostname)
                 foundDevices.add(deviceInfoWithHostname)
-                Log.d(TAG, "Found device: ${deviceInfoWithHostname.type} at ${deviceInfoWithHostname.host}:${deviceInfoWithHostname.port} (hostname: ${hostname ?: "N/A"})")
+                Log.d(
+                    TAG,
+                    "Found device: ${deviceInfoWithHostname.type} at ${deviceInfoWithHostname.host}:${deviceInfoWithHostname.port} (hostname: ${hostname ?: "N/A"})"
+                )
                 onDeviceFound?.invoke(deviceInfoWithHostname)
                 return deviceInfoWithHostname
             } else {
@@ -189,14 +194,14 @@ class DeviceScanner(
         foundDevices.clear()
         responsiveHosts.clear()
     }
-    
+
     /**
      * Получить текущий индекс сканирования
      */
     fun getCurrentIndex(): Int {
         return lastTriedIndex
     }
-    
+
     /**
      * Получить текущий IP адрес
      */
@@ -207,16 +212,16 @@ class DeviceScanner(
             null
         }
     }
-    
+
     /**
      * Информация о сканировании
      */
     data class ScanInfo(
         val totalIps: Int,
         val firstIp: String?,
-        val lastIp: String?
+        val lastIp: String?,
     )
-    
+
     /**
      * Получить информацию о сканировании
      */
@@ -253,7 +258,11 @@ class DeviceScanner(
                             } else {
                                 if (!isIPv4 && sAddr != null) {
                                     val delim = sAddr.indexOf('%') // drop ip6 zone suffix
-                                    val v6Addr = if (delim < 0) sAddr.uppercase() else sAddr.substring(0, delim).uppercase()
+                                    val v6Addr =
+                                        if (delim < 0) sAddr.uppercase() else sAddr.substring(
+                                            0,
+                                            delim
+                                        ).uppercase()
                                     foundAddresses.add(v6Addr)
                                 }
                             }
@@ -269,20 +278,25 @@ class DeviceScanner(
         private fun getIPsToTry(): Array<String> {
             try {
                 val localIpV4Addresses = getIPAddresses(true)
-                Log.d(TAG, "Found ${localIpV4Addresses.size} local IP addresses: $localIpV4Addresses")
-                
+                Log.d(
+                    TAG,
+                    "Found ${localIpV4Addresses.size} local IP addresses: $localIpV4Addresses"
+                )
+
                 if (localIpV4Addresses.isEmpty()) {
                     Log.w(TAG, "No local IP addresses found! Cannot scan network.")
                     return emptyArray()
                 }
-                
+
                 val allIpsToTry = arrayOfNulls<String>(localIpV4Addresses.size * 254)
 
                 for (localIpIdx in localIpV4Addresses.indices) {
                     val localIpV4Address = localIpV4Addresses[localIpIdx]
                     val ipsToTry = arrayOfNulls<String>(254)
 
-                    val ipParts = localIpV4Address.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                    val ipParts =
+                        localIpV4Address.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }
+                            .toTypedArray()
                     if (ipParts.size != 4) continue
 
                     val ipPrefix = "${ipParts[0]}.${ipParts[1]}.${ipParts[2]}."

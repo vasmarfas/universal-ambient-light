@@ -30,7 +30,8 @@ object UsbSerialPermissionHelper {
     private var lastRequestedDeviceId: Int? = null
 
     fun hasAnySerialDevice(context: Context): Boolean {
-        val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
+        val usbManager =
+            context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
         return UsbSerialProber.getDefaultProber().findAllDrivers(usbManager).isNotEmpty()
     }
 
@@ -41,7 +42,8 @@ object UsbSerialPermissionHelper {
     }
 
     fun isSerialDevice(context: Context, device: UsbDevice): Boolean {
-        val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
+        val usbManager =
+            context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
         return UsbSerialProber.getDefaultProber()
             .findAllDrivers(usbManager)
             .any { it.device.deviceId == device.deviceId }
@@ -61,18 +63,26 @@ object UsbSerialPermissionHelper {
         onReady: () -> Unit,
         onDenied: (() -> Unit)? = null,
         showToast: Boolean = true,
-        force: Boolean = false
+        force: Boolean = false,
     ): Boolean {
         val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
         if (usbManager == null) {
-            if (showToast) Toast.makeText(context, "USB service is not available on this device", Toast.LENGTH_LONG).show()
+            if (showToast) Toast.makeText(
+                context,
+                "USB service is not available on this device",
+                Toast.LENGTH_LONG
+            ).show()
             onDenied?.invoke()
             return false
         }
 
         val target = device ?: findFirstSerialDevice(context)
         if (target == null) {
-            if (showToast) Toast.makeText(context, "No USB serial devices found. Connect your device via USB OTG", Toast.LENGTH_LONG).show()
+            if (showToast) Toast.makeText(
+                context,
+                "No USB serial devices found. Connect your device via USB OTG",
+                Toast.LENGTH_LONG
+            ).show()
             onDenied?.invoke()
             return false
         }
@@ -141,7 +151,8 @@ object UsbSerialPermissionHelper {
                     intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                 }
                 val targetDevice = deviceFromIntent ?: target
-                val grantedByBroadcast = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                val grantedByBroadcast =
+                    intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
                 // OEM fallback: some firmware can provide incorrect/missing EXTRA_PERMISSION_GRANTED.
                 val grantedByManager = usbManager.hasPermission(targetDevice)
                 val granted = grantedByBroadcast || grantedByManager
@@ -173,7 +184,11 @@ object UsbSerialPermissionHelper {
 
         try {
             usbManager.requestPermission(target, permissionIntent)
-            if (showToast) Toast.makeText(context, "Подтвердите доступ к USB устройству", Toast.LENGTH_LONG).show()
+            if (showToast) Toast.makeText(
+                context,
+                "Подтвердите доступ к USB устройству",
+                Toast.LENGTH_LONG
+            ).show()
         } catch (e: Exception) {
             Log.e(TAG, "requestPermission failed: ${e.message}", e)
             onDenied?.invoke()

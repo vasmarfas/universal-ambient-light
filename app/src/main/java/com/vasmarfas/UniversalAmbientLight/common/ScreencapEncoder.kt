@@ -12,7 +12,6 @@ import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
@@ -37,10 +36,12 @@ class ScreencapEncoder(
     private val mScreenHeight: Int,
     private val mOptions: AppOptions,
     private val mUseRoot: Boolean = false,
-    private val onFatalError: ((String) -> Unit)? = null
+    private val onFatalError: ((String) -> Unit)? = null,
 ) {
-    @Volatile private var mRunning = false
-    @Volatile private var mCapturing = false
+    @Volatile
+    private var mRunning = false
+    @Volatile
+    private var mCapturing = false
 
     private var mThread: HandlerThread? = null
     private var mHandler: Handler? = null
@@ -51,7 +52,7 @@ class ScreencapEncoder(
     private var mRgbBuffer: ByteArray? = null
     private var mPixelBuffer: IntArray? = null
     private val mBorderCropper = com.vasmarfas.UniversalAmbientLight.common.util.BorderProcessor()
-    
+
     private var mUseRawScreencap = false
     private var mUseFileMode = false
     private var mFailCount = 0
@@ -144,18 +145,21 @@ class ScreencapEncoder(
                 // File-based capture (fallback for SELinux blocked stdout)
                 val cacheDir = mContext.externalCacheDir ?: mContext.cacheDir
                 val file = File(cacheDir, "cap_${System.currentTimeMillis()}.png")
-                
+
                 // "screencap -p /path/to/file"
                 val cmd = if (mUseRoot) {
                     arrayOf("su", "-c", "screencap -p ${file.absolutePath}")
                 } else {
                     arrayOf("screencap", "-p", file.absolutePath)
                 }
-                
+
                 process = Runtime.getRuntime().exec(cmd)
                 if (!process.waitFor(CAPTURE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                     Log.w(TAG, "screencap (file mode) timed out after ${CAPTURE_TIMEOUT_MS}ms")
-                    try { process.destroyForcibly() } catch (_: Exception) {}
+                    try {
+                        process.destroyForcibly()
+                    } catch (_: Exception) {
+                    }
                     runCatching { file.delete() }
                     mFailCount++
                     return
@@ -190,7 +194,10 @@ class ScreencapEncoder(
                 val err = process.errorStream.bufferedReader().use { it.readText() }
                 if (!process.waitFor(CAPTURE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                     Log.w(TAG, "screencap (stdout mode) timed out after ${CAPTURE_TIMEOUT_MS}ms")
-                    try { process.destroyForcibly() } catch (_: Exception) {}
+                    try {
+                        process.destroyForcibly()
+                    } catch (_: Exception) {
+                    }
                     mFailCount++
                     return
                 }
@@ -198,7 +205,7 @@ class ScreencapEncoder(
                 if (data.isNotEmpty()) {
                     val opts = BitmapFactory.Options().apply { inSampleSize = computeSampleSize() }
                     bitmap = BitmapFactory.decodeByteArray(data, 0, data.size, opts)
-                    
+
                     if (bitmap == null) {
                         // Check for RAW data fallback
                         if (data.size > 12) {
@@ -208,21 +215,26 @@ class ScreencapEncoder(
                             val f = bb.int
                             val pixelSize = 4
                             val expectedDataSize = w * h * pixelSize
-                            
+
                             if (w in 100..4096 && h in 100..4096 && (data.size - 12) >= expectedDataSize) {
                                 if (mUseRawScreencap) Log.d(TAG, "Raw frame: ${w}x${h}, format=$f")
-                                else Log.w(TAG, "Detected raw frame despite -p flag: ${w}x${h}, format=$f")
-                                
+                                else Log.w(
+                                    TAG,
+                                    "Detected raw frame despite -p flag: ${w}x${h}, format=$f"
+                                )
+
                                 try {
-                                    val rawBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                    val rawBitmap =
+                                        Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                                     val pixelBuf = ByteBuffer.wrap(data, 12, expectedDataSize)
                                     rawBitmap.copyPixelsFromBuffer(pixelBuf)
-                                    
+
                                     if (mOptions.captureQuality < h) {
                                         val scale = mOptions.captureQuality.toFloat() / h.toFloat()
                                         val newW = (w * scale).toInt()
                                         val newH = (h * scale).toInt()
-                                        val scaled = Bitmap.createScaledBitmap(rawBitmap, newW, newH, true)
+                                        val scaled =
+                                            Bitmap.createScaledBitmap(rawBitmap, newW, newH, true)
                                         rawBitmap.recycle()
                                         bitmap = scaled
                                     } else {
@@ -234,12 +246,15 @@ class ScreencapEncoder(
                                 }
                             }
                         }
-                        
+
                         if (bitmap == null) {
                             mFailCount++
                             // Log unexpected format
-                             val headerHex = data.take(16).joinToString(" ") { "%02X".format(it) }
-                             Log.e(TAG, "decodeByteArray failed (root=$mUseRoot). Header: $headerHex")
+                            val headerHex = data.take(16).joinToString(" ") { "%02X".format(it) }
+                            Log.e(
+                                TAG,
+                                "decodeByteArray failed (root=$mUseRoot). Header: $headerHex"
+                            )
                         }
                     } else {
                         mFailCount = 0
@@ -266,7 +281,10 @@ class ScreencapEncoder(
                         mFailCount = 0
                     } else if (mUseFileMode && mFailCount > 8) {
                         // All 3 modes exhausted — screencap is completely blocked on this device
-                        Log.e(TAG, "All screencap modes failed (root=$mUseRoot). Device likely blocks screencap via SELinux.")
+                        Log.e(
+                            TAG,
+                            "All screencap modes failed (root=$mUseRoot). Device likely blocks screencap via SELinux."
+                        )
                         mRunning = false
                         mCapturing = false
                         val msg = if (mUseRoot)
@@ -340,7 +358,10 @@ class ScreencapEncoder(
     private fun sendAvgColor(bitmap: Bitmap) {
         val w = bitmap.width
         val h = bitmap.height
-        var r = 0L; var g = 0L; var b = 0L; var count = 0
+        var r = 0L
+        var g = 0L
+        var b = 0L
+        var count = 0
         var y = 0
         while (y < h) {
             var x = 0

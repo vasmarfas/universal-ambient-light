@@ -14,10 +14,12 @@ class AccessibilityEncoder(
     private val mListener: HyperionThread.HyperionThreadListener,
     private val mScreenWidth: Int,
     private val mScreenHeight: Int,
-    private val mOptions: AppOptions
+    private val mOptions: AppOptions,
 ) {
-    @Volatile private var mRunning = false
-    @Volatile private var mCapturing = false
+    @Volatile
+    private var mRunning = false
+    @Volatile
+    private var mCapturing = false
 
     private var mThread: HandlerThread? = null
     private var mHandler: Handler? = null
@@ -33,13 +35,13 @@ class AccessibilityEncoder(
         override fun run() {
             if (!mRunning) return
             val start = System.currentTimeMillis()
-            
+
             mService.takeScreenshot { bitmap ->
                 if (bitmap != null) {
                     processBitmap(bitmap)
                     bitmap.recycle()
                 }
-                
+
                 val elapsed = System.currentTimeMillis() - start
                 if (mRunning) {
                     val delay = max(50L, mFrameIntervalMs - elapsed)
@@ -112,19 +114,19 @@ class AccessibilityEncoder(
         var bmp = bitmap
         val w = bmp.width
         val h = bmp.height
-        
+
         // Simple downscale logic if bitmap is too huge compared to setting
         // Note: Accessibility screenshots are usually full res.
         val targetDim = mOptions.captureQuality.coerceAtLeast(64)
         if (w > targetDim && h > targetDim) {
-             val scale = targetDim.toFloat() / max(w, h).toFloat()
-             val newW = (w * scale).toInt()
-             val newH = (h * scale).toInt()
-             val scaled = Bitmap.createScaledBitmap(bmp, newW, newH, true)
-             // We don't recycle input bitmap here because it comes from callback which might reuse/recycle it (but we got a copy so it is fine to recycle our input)
-             // Actually input is "copy" from Service, so we own it.
-             // Wait, processBitmap receives a bitmap. If we scale it, we should use the scaled one.
-             bmp = scaled
+            val scale = targetDim.toFloat() / max(w, h).toFloat()
+            val newW = (w * scale).toInt()
+            val newH = (h * scale).toInt()
+            val scaled = Bitmap.createScaledBitmap(bmp, newW, newH, true)
+            // We don't recycle input bitmap here because it comes from callback which might reuse/recycle it (but we got a copy so it is fine to recycle our input)
+            // Actually input is "copy" from Service, so we own it.
+            // Wait, processBitmap receives a bitmap. If we scale it, we should use the scaled one.
+            bmp = scaled
         }
 
         val fw = bmp.width
@@ -152,7 +154,7 @@ class AccessibilityEncoder(
         ColorProcessor.processRgbData(mRgbBuffer!!, mOptions)
         val cropped = mBorderCropper.applyForEncoder(mRgbBuffer!!, fw, fh, mOptions)
         mListener.sendFrame(cropped.rgb, cropped.width, cropped.height)
-        
+
         if (bmp != bitmap) {
             bmp.recycle()
         }
@@ -161,7 +163,10 @@ class AccessibilityEncoder(
     private fun sendAvgColor(bitmap: Bitmap) {
         val w = bitmap.width
         val h = bitmap.height
-        var r = 0L; var g = 0L; var b = 0L; var count = 0
+        var r = 0L
+        var g = 0L
+        var b = 0L
+        var count = 0
         var y = 0
         while (y < h) {
             var x = 0

@@ -20,7 +20,6 @@ import androidx.lifecycle.LifecycleRegistry
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
-import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
@@ -35,7 +34,7 @@ class CameraEncoder(
     private val context: Context,
     private val listener: HyperionThread.HyperionThreadListener,
     private val options: AppOptions,
-    corners: FloatArray // 8 floats: tl_x, tl_y, tr_x, tr_y, br_x, br_y, bl_x, bl_y (normalized 0..1)
+    corners: FloatArray, // 8 floats: tl_x, tl_y, tr_x, tr_y, br_x, br_y, bl_x, bl_y (normalized 0..1)
 ) : LifecycleOwner {
 
     // --- Lifecycle для CameraX ---
@@ -48,6 +47,7 @@ class CameraEncoder(
 
     @Volatile
     private var mRunning = false
+
     @Volatile
     private var mCapturing = false
 
@@ -78,7 +78,10 @@ class CameraEncoder(
         outputWidth = max(32, min(q, 512))
         outputHeight = max(32, (outputWidth * 9f / 16f).toInt())
 
-        if (DEBUG) Log.d(TAG, "CameraEncoder init: output=${outputWidth}x${outputHeight}, fps=${options.frameRate}")
+        if (DEBUG) Log.d(
+            TAG,
+            "CameraEncoder init: output=${outputWidth}x${outputHeight}, fps=${options.frameRate}"
+        )
     }
 
     // ======================== Public API ========================
@@ -137,12 +140,14 @@ class CameraEncoder(
             try {
                 imageAnalysisUseCase?.let { cameraProvider?.unbind(it) }
                 imageAnalysisUseCase = null
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
             cameraProvider = null
             try {
                 lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
                 lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
 
         clearLights()
@@ -182,7 +187,10 @@ class CameraEncoder(
         // Unbind only our previous ImageAnalysis (if any), not everything.
         // This preserves the Activity's Preview use case.
         imageAnalysisUseCase?.let {
-            try { provider.unbind(it) } catch (_: Exception) {}
+            try {
+                provider.unbind(it)
+            } catch (_: Exception) {
+            }
         }
 
         val imageAnalysis = ImageAnalysis.Builder()
@@ -315,7 +323,8 @@ class CameraEncoder(
         // 6. Draw source bitmap with perspective correction into output
         if (correctedBitmap == null || correctedBitmap!!.width != outputWidth || correctedBitmap!!.height != outputHeight) {
             correctedBitmap?.recycle()
-            correctedBitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+            correctedBitmap =
+                Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
         }
 
         val canvas = Canvas(correctedBitmap!!)
@@ -342,7 +351,8 @@ class CameraEncoder(
         ColorProcessor.processRgbData(rgbBuffer!!, options)
 
         // 9. Send frame (with optional letterbox crop)
-        val cropped = mBorderCropper.applyForEncoder(rgbBuffer!!, outputWidth, outputHeight, options)
+        val cropped =
+            mBorderCropper.applyForEncoder(rgbBuffer!!, outputWidth, outputHeight, options)
         listener.sendFrame(cropped.rgb, cropped.width, cropped.height)
     }
 

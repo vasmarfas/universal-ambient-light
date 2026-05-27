@@ -1,7 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common.util
 
 import android.util.Log
-import java.util.ArrayList
 
 class AppOptions(
     horizontalLED: Int,
@@ -25,36 +24,70 @@ class AppOptions(
     @Volatile var gammaB: Int = 100,
     @Volatile var borderDetectionEnabled: Boolean = false,
     @Volatile var borderThreshold: Int = 18,
-    @Volatile var borderCheckIntervalFrames: Int = 60
+    @Volatile var borderCheckIntervalFrames: Int = 60,
 ) {
 
     /** Reload border-detection fields from preferences. */
     fun refreshBorderSettings(prefs: Preferences) {
-        borderDetectionEnabled = prefs.getBoolean(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_detection_enabled, false)
-        borderThreshold = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_threshold, 18)
-            .coerceIn(0, 64)
-        borderCheckIntervalFrames = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_check_interval, 60)
+        borderDetectionEnabled = prefs.getBoolean(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_detection_enabled,
+            false
+        )
+        borderThreshold =
+            prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_threshold, 18)
+                .coerceIn(0, 64)
+        borderCheckIntervalFrames = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_check_interval,
+            60
+        )
             .coerceIn(1, 300)
     }
 
     /** Reload all color-correction fields from preferences. Cheap; safe to call from any thread. */
     fun refreshColorSettings(prefs: Preferences) {
-        brightness = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness, 100)
-        contrast = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_contrast, 100)
-        blackLevel = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_black_level, 0)
-        whiteLevel = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_white_level, 100)
-        saturation = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_saturation, 100)
-        colorProcessingEnabled = prefs.getBoolean(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_processing_enabled, true)
-        brightnessR = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness_r, 100)
-        brightnessG = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness_g, 100)
-        brightnessB = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness_b, 100)
-        gammaR = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_gamma_r, 100)
-        gammaG = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_gamma_g, 100)
-        gammaB = prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_gamma_b, 100)
+        brightness = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness,
+            100
+        )
+        contrast =
+            prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_contrast, 100)
+        blackLevel =
+            prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_black_level, 0)
+        whiteLevel = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_white_level,
+            100
+        )
+        saturation = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_saturation,
+            100
+        )
+        colorProcessingEnabled = prefs.getBoolean(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_processing_enabled,
+            true
+        )
+        brightnessR = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness_r,
+            100
+        )
+        brightnessG = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness_g,
+            100
+        )
+        brightnessB = prefs.getInt(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_brightness_b,
+            100
+        )
+        gammaR =
+            prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_gamma_r, 100)
+        gammaG =
+            prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_gamma_g, 100)
+        gammaB =
+            prefs.getInt(com.vasmarfas.UniversalAmbientLight.R.string.pref_key_color_gamma_b, 100)
     }
 
     private val minimumImagePacketSize: Int
-    val blackThreshold: Int = 5 // The limit each RGB value must be under to be considered a black pixel [0-255]
+    val blackThreshold: Int =
+        5 // The limit each RGB value must be under to be considered a black pixel [0-255]
 
     init {
         /*

@@ -1,33 +1,55 @@
 package com.vasmarfas.UniversalAmbientLight.ui.led
 
+import android.content.Context
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -38,10 +60,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
-import android.content.Context
-import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
-import kotlin.math.min
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 private const val MAX_LEDS_VISUALIZATION = 5000
 
@@ -50,7 +70,7 @@ private const val MAX_LEDS_PER_SIDE = 5000
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LedLayoutScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -79,7 +99,11 @@ fun LedLayoutScreen(
             prefs.getInt(R.string.pref_key_led_count_left, legacyY).toString()
         )
     }
-    var bottomGapText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_bottom_gap, 0).toString()) }
+    var bottomGapText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_bottom_gap, 0).toString()
+        )
+    }
     val legacyMargin = prefs.getInt(R.string.pref_key_capture_margin, -1)
     val marginH = prefs.getInt(R.string.pref_key_capture_margin_horizontal, -1)
     val marginV = prefs.getInt(R.string.pref_key_capture_margin_vertical, -1)
@@ -120,8 +144,16 @@ fun LedLayoutScreen(
             }
         )
     }
-    var ledOffsetText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_led_offset, 0).toString()) }
-    var scanDepthText by remember { mutableStateOf(prefs.getInt(R.string.pref_key_scan_depth, 1).toString()) }
+    var ledOffsetText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_led_offset, 0).toString()
+        )
+    }
+    var scanDepthText by remember {
+        mutableStateOf(
+            prefs.getInt(R.string.pref_key_scan_depth, 1).toString()
+        )
+    }
 
     val topLed = topLedText.toIntOrNull() ?: 0
     val rightLed = rightLedText.toIntOrNull() ?: 0
@@ -136,16 +168,46 @@ fun LedLayoutScreen(
     val scanDepth = scanDepthText.toIntOrNull() ?: 1
 
     var startCorner by remember {
-        mutableStateOf(prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left")
+        mutableStateOf(
+            prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left"
+        )
     }
     var direction by remember {
         mutableStateOf(prefs.getString(R.string.pref_key_led_direction, "clockwise") ?: "clockwise")
     }
 
-    var sideTop by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_top, "enabled") ?: "enabled") }
-    var sideRight by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_right, "enabled") ?: "enabled") }
-    var sideBottom by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_bottom, "enabled") ?: "enabled") }
-    var sideLeft by remember { mutableStateOf(prefs.getString(R.string.pref_key_led_side_left, "enabled") ?: "enabled") }
+    var sideTop by remember {
+        mutableStateOf(
+            prefs.getString(
+                R.string.pref_key_led_side_top,
+                "enabled"
+            ) ?: "enabled"
+        )
+    }
+    var sideRight by remember {
+        mutableStateOf(
+            prefs.getString(
+                R.string.pref_key_led_side_right,
+                "enabled"
+            ) ?: "enabled"
+        )
+    }
+    var sideBottom by remember {
+        mutableStateOf(
+            prefs.getString(
+                R.string.pref_key_led_side_bottom,
+                "enabled"
+            ) ?: "enabled"
+        )
+    }
+    var sideLeft by remember {
+        mutableStateOf(
+            prefs.getString(
+                R.string.pref_key_led_side_left,
+                "enabled"
+            ) ?: "enabled"
+        )
+    }
 
     val isPortrait = configuration.screenHeightDp > configuration.screenWidthDp
 
@@ -258,7 +320,10 @@ fun LedLayoutScreen(
                             topLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_top, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_top,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -267,7 +332,10 @@ fun LedLayoutScreen(
                             rightLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_right, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_right,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -276,7 +344,10 @@ fun LedLayoutScreen(
                             bottomLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_bottom, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_bottom,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -285,7 +356,10 @@ fun LedLayoutScreen(
                             leftLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_left, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_left,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -472,7 +546,10 @@ fun LedLayoutScreen(
                             topLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_top, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_top,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -481,7 +558,10 @@ fun LedLayoutScreen(
                             rightLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_right, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_right,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -490,7 +570,10 @@ fun LedLayoutScreen(
                             bottomLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_bottom, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_bottom,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -499,7 +582,10 @@ fun LedLayoutScreen(
                             leftLedText = newText
                             newText.toIntOrNull()?.let { value ->
                                 if (value >= 0) {
-                                    prefs.putInt(R.string.pref_key_led_count_left, value.coerceAtMost(MAX_LEDS_PER_SIDE))
+                                    prefs.putInt(
+                                        R.string.pref_key_led_count_left,
+                                        value.coerceAtMost(MAX_LEDS_PER_SIDE)
+                                    )
                                 }
                             }
                         },
@@ -636,7 +722,7 @@ private fun LedLayoutSettingsContent(
     startCorner: String,
     onStartCornerChange: (String) -> Unit,
     direction: String,
-    onDirectionChange: (String) -> Unit
+    onDirectionChange: (String) -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -1006,12 +1092,13 @@ private fun LedLayoutSettingsContent(
     }
 
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SideSelectorCard(
     title: String,
     selectedMode: String,
-    onModeSelected: (String) -> Unit
+    onModeSelected: (String) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1072,9 +1159,14 @@ fun LedVisualization(
     captureMarginLeft: Int,
     ledOffset: Int,
     scanDepth: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val (safeTop, safeRight, safeBottom, safeLeft) = remember(topLed, rightLed, bottomLed, leftLed) {
+    val (safeTop, safeRight, safeBottom, safeLeft) = remember(
+        topLed,
+        rightLed,
+        bottomLed,
+        leftLed
+    ) {
         val t = topLed.coerceIn(0, MAX_LEDS_PER_SIDE)
         val r = rightLed.coerceIn(0, MAX_LEDS_PER_SIDE)
         val b = bottomLed.coerceIn(0, MAX_LEDS_PER_SIDE)
@@ -1265,7 +1357,7 @@ fun LedVisualization(
 data class LedData(
     val position: Offset,
     val enabled: Boolean,
-    val rectSize: androidx.compose.ui.geometry.Size = androidx.compose.ui.geometry.Size(0f, 0f)
+    val rectSize: androidx.compose.ui.geometry.Size = androidx.compose.ui.geometry.Size(0f, 0f),
 )
 
 fun calculateLedPositions(
@@ -1283,7 +1375,7 @@ fun calculateLedPositions(
     width: Float,
     height: Float,
     padding: Float,
-    scanDepth: Int // Percent 1-50
+    scanDepth: Int, // Percent 1-50
 ): List<LedData> {
     val positions = mutableListOf<LedData>()
 
@@ -1340,13 +1432,16 @@ fun calculateLedPositions(
                         padding + i * stepTop + stepTop / 2f
                     }
                     // For top edge, rect is centered at x, starts at padding (top), height scanDepthV
-                    positions.add(LedData(
-                        position = Offset(x, padding + scanDepthV / 2f), // Center of rect
-                        enabled = sideMode == "enabled",
-                        rectSize = androidx.compose.ui.geometry.Size(stepTop, scanDepthV)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(x, padding + scanDepthV / 2f), // Center of rect
+                            enabled = sideMode == "enabled",
+                            rectSize = androidx.compose.ui.geometry.Size(stepTop, scanDepthV)
+                        )
+                    )
                 }
             }
+
             "top_rl" -> {
                 // Top edge (right to left)
                 for (i in 0 until topCount) {
@@ -1356,13 +1451,16 @@ fun calculateLedPositions(
                     } else {
                         padding + ledIndex * stepTop + stepTop / 2f
                     }
-                    positions.add(LedData(
-                        position = Offset(x, padding + scanDepthV / 2f),
-                        enabled = sideMode == "enabled",
-                        rectSize = androidx.compose.ui.geometry.Size(stepTop, scanDepthV)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(x, padding + scanDepthV / 2f),
+                            enabled = sideMode == "enabled",
+                            rectSize = androidx.compose.ui.geometry.Size(stepTop, scanDepthV)
+                        )
+                    )
                 }
             }
+
             "right_tb" -> {
                 // Right edge (top to bottom)
                 for (i in 0 until rightCount) {
@@ -1372,13 +1470,16 @@ fun calculateLedPositions(
                         padding + i * stepRight + stepRight / 2f
                     }
                     // Right edge: rect starts at width-padding-scanDepthH
-                    positions.add(LedData(
-                        position = Offset(padding + screenWidth - scanDepthH / 2f, y),
-                        enabled = sideMode == "enabled",
-                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepRight)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(padding + screenWidth - scanDepthH / 2f, y),
+                            enabled = sideMode == "enabled",
+                            rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepRight)
+                        )
+                    )
                 }
             }
+
             "right_bt" -> {
                 // Right edge (bottom to top)
                 for (i in 0 until rightCount) {
@@ -1388,31 +1489,38 @@ fun calculateLedPositions(
                     } else {
                         padding + ledIndex * stepRight + stepRight / 2f
                     }
-                    positions.add(LedData(
-                        position = Offset(padding + screenWidth - scanDepthH / 2f, y),
-                        enabled = sideMode == "enabled",
-                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepRight)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(padding + screenWidth - scanDepthH / 2f, y),
+                            enabled = sideMode == "enabled",
+                            rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepRight)
+                        )
+                    )
                 }
             }
+
             "bottom_rl" -> {
                 // Bottom edge (right to left)
                 for (i in 0 until bottomCount) {
                     val ledIndex = bottomCount - 1 - i
-                    val isInGap = bottomGap > 0 && bottomCount > 0 && ledIndex >= gapStart && ledIndex < gapEnd
+                    val isInGap =
+                        bottomGap > 0 && bottomCount > 0 && ledIndex >= gapStart && ledIndex < gapEnd
                     val x = if (bottomCount <= 1) {
                         padding + screenWidth / 2f
                     } else {
                         padding + ledIndex * stepBottom + stepBottom / 2f
                     }
                     // Bottom edge: rect starts at height-padding-scanDepthV
-                    positions.add(LedData(
-                        position = Offset(x, padding + screenHeight - scanDepthV / 2f),
-                        enabled = sideMode == "enabled" && !isInGap,
-                        rectSize = androidx.compose.ui.geometry.Size(stepBottom, scanDepthV)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(x, padding + screenHeight - scanDepthV / 2f),
+                            enabled = sideMode == "enabled" && !isInGap,
+                            rectSize = androidx.compose.ui.geometry.Size(stepBottom, scanDepthV)
+                        )
+                    )
                 }
             }
+
             "bottom_lr" -> {
                 // Bottom edge (left to right)
                 for (i in 0 until bottomCount) {
@@ -1422,13 +1530,16 @@ fun calculateLedPositions(
                     } else {
                         padding + i * stepBottom + stepBottom / 2f
                     }
-                    positions.add(LedData(
-                        position = Offset(x, padding + screenHeight - scanDepthV / 2f),
-                        enabled = sideMode == "enabled" && !isInGap,
-                        rectSize = androidx.compose.ui.geometry.Size(stepBottom, scanDepthV)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(x, padding + screenHeight - scanDepthV / 2f),
+                            enabled = sideMode == "enabled" && !isInGap,
+                            rectSize = androidx.compose.ui.geometry.Size(stepBottom, scanDepthV)
+                        )
+                    )
                 }
             }
+
             "left_bt" -> {
                 // Left edge (bottom to top)
                 for (i in 0 until leftCount) {
@@ -1439,13 +1550,16 @@ fun calculateLedPositions(
                         padding + ledIndex * stepLeft + stepLeft / 2f
                     }
                     // Left edge: rect starts at padding
-                    positions.add(LedData(
-                        position = Offset(padding + scanDepthH / 2f, y),
-                        enabled = sideMode == "enabled",
-                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepLeft)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(padding + scanDepthH / 2f, y),
+                            enabled = sideMode == "enabled",
+                            rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepLeft)
+                        )
+                    )
                 }
             }
+
             "left_tb" -> {
                 // Left edge (top to bottom)
                 for (i in 0 until leftCount) {
@@ -1454,11 +1568,13 @@ fun calculateLedPositions(
                     } else {
                         padding + i * stepLeft + stepLeft / 2f
                     }
-                    positions.add(LedData(
-                        position = Offset(padding + scanDepthH / 2f, y),
-                        enabled = sideMode == "enabled",
-                        rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepLeft)
-                    ))
+                    positions.add(
+                        LedData(
+                            position = Offset(padding + scanDepthH / 2f, y),
+                            enabled = sideMode == "enabled",
+                            rectSize = androidx.compose.ui.geometry.Size(scanDepthH, stepLeft)
+                        )
+                    )
                 }
             }
         }
@@ -1483,6 +1599,7 @@ fun getEdgeOrder(startCorner: String, direction: String): List<String> {
                 listOf("left_tb", "bottom_lr", "right_bt", "top_rl")
             }
         }
+
         "top_right" -> {
             if (direction == "clockwise") {
                 listOf("right_tb", "bottom_rl", "left_bt", "top_lr")
@@ -1490,6 +1607,7 @@ fun getEdgeOrder(startCorner: String, direction: String): List<String> {
                 listOf("top_rl", "left_tb", "bottom_lr", "right_bt")
             }
         }
+
         "bottom_right" -> {
             if (direction == "clockwise") {
                 listOf("bottom_rl", "left_bt", "top_lr", "right_tb")
@@ -1497,6 +1615,7 @@ fun getEdgeOrder(startCorner: String, direction: String): List<String> {
                 listOf("right_bt", "top_rl", "left_tb", "bottom_lr")
             }
         }
+
         "bottom_left" -> {
             if (direction == "clockwise") {
                 listOf("left_bt", "top_lr", "right_tb", "bottom_rl")
@@ -1504,6 +1623,7 @@ fun getEdgeOrder(startCorner: String, direction: String): List<String> {
                 listOf("bottom_lr", "right_bt", "top_rl", "left_tb")
             }
         }
+
         else -> listOf("top_lr", "right_tb", "bottom_rl", "left_bt")
     }
 }
@@ -1512,7 +1632,7 @@ fun getEdgeOrder(startCorner: String, direction: String): List<String> {
 fun SettingCard(
     title: String,
     value: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val indication = LocalIndication.current

@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
-import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -34,7 +34,7 @@ class HyperionThread(
     private val mSmoothingPreset: String = "balanced",
     private val mSettlingTime: Int = 200,
     private val mOutputDelayMs: Long = 80L,
-    private val mUpdateFrequency: Int = 25
+    private val mUpdateFrequency: Int = 25,
 ) : Thread(TAG) {
 
     private val mReconnectDelayMs: Long = (delaySeconds * 1000).toLong()
@@ -44,14 +44,18 @@ class HyperionThread(
     private val mConnected = AtomicBoolean(false)
     private val mClient = AtomicReference<HyperionClient?>()
     private val mExecutor = Executors.newSingleThreadExecutor()
+
     @Volatile
     private var mPendingTask: Future<*>? = null
+
     @Volatile
     private var mPendingFrame: FrameData? = null
+
     @Volatile
     private var mLastSentFrame: FrameData? = null
     private val mSendLock = Any()
-    private val mKeepAliveExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+    private val mKeepAliveExecutor: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor()
 
     // ColorSmoothing
     private val mSmoothing: ColorSmoothing? = null // Smoothing теперь внутри клиентов
@@ -84,7 +88,13 @@ class HyperionThread(
 
             try {
                 synchronized(mSendLock) {
-                    client.setImage(frame.data, frame.width, frame.height, mPriority, FRAME_DURATION)
+                    client.setImage(
+                        frame.data,
+                        frame.width,
+                        frame.height,
+                        mPriority,
+                        FRAME_DURATION
+                    )
                 }
                 // Keep a stable copy for keepalive resends.
                 mLastSentFrame = FrameData(frame.data.copyOf(), frame.width, frame.height)
@@ -211,16 +221,29 @@ class HyperionThread(
         if (mPort < 1 || mPort > 65535) {
             throw IOException("Port out of range: $mPort (must be between 1 and 65535)")
         }
-        
+
         val host = mHost ?: "localhost"
         return if ("wled".equals(mConnectionType, ignoreCase = true)) {
             // WLEDClient (context, host, port, priority, colorOrder, protocol, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
-            WLEDClient(mContext, host, mPort, mPriority, mWledColorOrder,
-                mWledProtocol, mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
+            WLEDClient(
+                mContext,
+                host,
+                mPort,
+                mPriority,
+                mWledColorOrder,
+                mWledProtocol,
+                mSmoothingEnabled,
+                mSmoothingPreset,
+                mSettlingTime,
+                mOutputDelayMs,
+                mUpdateFrequency
+            )
         } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
             // AdalightClient (context, priority, baudrate, protocol, smoothingEnabled, smoothingPreset, settlingTime, outputDelayMs, updateFrequency)
-            AdalightClient(mContext, mPriority, mBaudRate, mAdalightProtocol,
-                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency)
+            AdalightClient(
+                mContext, mPriority, mBaudRate, mAdalightProtocol,
+                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency
+            )
         } else {
             // Default to Hyperion
             HyperionFlatBuffers(host, mPort, mPriority)
@@ -269,7 +292,7 @@ class HyperionThread(
         @JvmStatic
         fun fromPreferences(
             callback: ScreenGrabberService.HyperionThreadBroadcaster,
-            context: Context
+            context: Context,
         ): HyperionThread {
             val prefs = Preferences(context)
 
@@ -286,12 +309,15 @@ class HyperionThread(
             val wledRgbw = prefs.getBoolean(R.string.pref_key_wled_rgbw, false)
             val wledBrightness = prefs.getInt(R.string.pref_key_wled_brightness, 255)
 
-            val adalightProtocol = prefs.getString(R.string.pref_key_adalight_protocol, "ada") ?: "ada"
+            val adalightProtocol =
+                prefs.getString(R.string.pref_key_adalight_protocol, "ada") ?: "ada"
 
             val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
-            val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
+            val smoothingPreset =
+                prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
             val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 50)
-            val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 0).toLong() // Теперь в миллисекундах
+            val outputDelayMs =
+                prefs.getInt(R.string.pref_key_output_delay, 0).toLong() // Теперь в миллисекундах
             val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 60)
 
             return HyperionThread(

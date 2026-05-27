@@ -17,7 +17,7 @@ import java.nio.ByteBuffer
 class HyperionFlatBuffers(
     address: String,
     port: Int,
-    private val mPriority: Int
+    private val mPriority: Int,
 ) : HyperionClient {
     private val TIMEOUT = 1000
     private var mSocket: Socket? = null
@@ -27,7 +27,7 @@ class HyperionFlatBuffers(
         if (port < 1 || port > 65535) {
             throw IllegalArgumentException("Port out of range: $port (must be between 1 and 65535)")
         }
-        
+
         mSocket = Socket()
         mSocket!!.tcpNoDelay = true // Disable Nagle's algorithm for low latency
         mSocket!!.sendBufferSize = 8192 // Smaller buffer for faster sends
@@ -96,11 +96,18 @@ class HyperionFlatBuffers(
     }
 
     @Throws(IOException::class)
-    override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
+    override fun setImage(
+        data: ByteArray,
+        width: Int,
+        height: Int,
+        priority: Int,
+        duration_ms: Int,
+    ) {
         val builder = newBuilder()
         val dataOffset = RawImage.createDataVector(builder, data)
         val rawImageOffset = RawImage.createRawImage(builder, dataOffset, width, height)
-        val imageOffset = Image.createImage(builder, ImageType.RawImage, rawImageOffset, duration_ms)
+        val imageOffset =
+            Image.createImage(builder, ImageType.RawImage, rawImageOffset, duration_ms)
         val requestOffset = Request.createRequest(builder, Command.Image, imageOffset)
         Request.finishRequestBuffer(builder, requestOffset)
         sendRequest(builder.dataBuffer())

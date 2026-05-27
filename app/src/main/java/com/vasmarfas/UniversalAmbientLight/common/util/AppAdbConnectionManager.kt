@@ -18,7 +18,7 @@ class AppAdbConnectionManager private constructor(context: Context) : AbsAdbConn
 
     init {
         api = Build.VERSION.SDK_INT
-        setHostAddress("127.0.0.1")
+        hostAddress = "127.0.0.1"
     }
 
     override fun getPrivateKey(): PrivateKey = material.privateKey
@@ -33,7 +33,9 @@ class AppAdbConnectionManager private constructor(context: Context) : AbsAdbConn
 
         @Synchronized
         fun getInstance(context: Context): AppAdbConnectionManager {
-            return instance ?: AppAdbConnectionManager(context.applicationContext).also { instance = it }
+            return instance ?: AppAdbConnectionManager(context.applicationContext).also {
+                instance = it
+            }
         }
     }
 }

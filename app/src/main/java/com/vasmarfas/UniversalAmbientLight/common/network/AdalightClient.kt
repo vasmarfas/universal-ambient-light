@@ -19,7 +19,7 @@ class AdalightClient(
     smoothingPreset: String = "balanced",
     settlingTime: Int = 200,
     outputDelayMs: Long = 80L,
-    updateFrequency: Int = 25
+    updateFrequency: Int = 25,
 ) : HyperionClient {
 
     enum class ProtocolType {
@@ -36,6 +36,7 @@ class AdalightClient(
     }
 
     private var mPort: UsbSerialPort? = null
+
     @Volatile
     private var mConnected = false
 
@@ -44,8 +45,10 @@ class AdalightClient(
 
     // Сохраняем исходно запрошенную частоту, чтобы auto-throttle никогда не повышал её выше пользовательской
     private val mRequestedUpdateFrequency: Int = updateFrequency
+
     @Volatile
     private var mEffectiveUpdateFrequency: Int = updateFrequency
+
     @Volatile
     private var mLastAutoThrottlePacketSize: Int = -1
 
@@ -133,8 +136,14 @@ class AdalightClient(
             mConnected = false
             // Release the underlying USB connection before failing — otherwise the device
             // stays "busy" and subsequent reconnect attempts fail until the app restarts.
-            try { mPort?.close() } catch (_: Exception) {}
-            try { connection.close() } catch (_: Exception) {}
+            try {
+                mPort?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                connection.close()
+            } catch (_: Exception) {
+            }
             mPort = null
             throw IOException(
                 "Failed to configure USB serial port: " + e.message +
@@ -198,13 +207,20 @@ class AdalightClient(
     }
 
     @Throws(IOException::class)
-    override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
+    override fun setImage(
+        data: ByteArray,
+        width: Int,
+        height: Int,
+        priority: Int,
+        duration_ms: Int,
+    ) {
         if (!isConnected()) {
             throw IOException("Not connected to Adalight device")
         }
 
         // Extract LED data reusing buffer
-        mLedDataBuffer = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
+        mLedDataBuffer =
+            LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
         if (mLedDataBuffer!!.isEmpty()) return
 
         // Pass to smoothing
@@ -263,7 +279,10 @@ class AdalightClient(
         if (desiredHz != mEffectiveUpdateFrequency) {
             mEffectiveUpdateFrequency = desiredHz
             mSmoothing.setUpdateFrequency(desiredHz)
-            Log.i(TAG, "Auto-throttle smoothing: ${desiredHz}Hz (baud=$mBaudRate, packet=$packetSizeBytes bytes)")
+            Log.i(
+                TAG,
+                "Auto-throttle smoothing: ${desiredHz}Hz (baud=$mBaudRate, packet=$packetSizeBytes bytes)"
+            )
         }
     }
 
@@ -373,17 +392,17 @@ class AdalightClient(
 
         for (i in 0 until dataSize) {
             val `val` = packet[6 + i].toInt() and 0xFF
-            
+
             fletcherExt = (fletcherExt + (`val` xor position)) % 255
             fletcher1 = (fletcher1 + `val`) % 255
             fletcher2 = (fletcher2 + fletcher1) % 255
-            
+
             position = (position + 1) % 256
         }
 
         packet[offset++] = fletcher1.toByte()
         packet[offset++] = fletcher2.toByte()
-        
+
         // Handle special case 0x41 ('A') to avoid confusion with header
         packet[offset] = if (fletcherExt == 0x41) 0xaa.toByte() else fletcherExt.toByte()
 
@@ -393,7 +412,7 @@ class AdalightClient(
     private data class PresetValues(
         val settlingTime: Int,
         val outputDelayMs: Long,
-        val updateFrequency: Int
+        val updateFrequency: Int,
     )
 
     private fun getPresetValues(preset: String): PresetValues {

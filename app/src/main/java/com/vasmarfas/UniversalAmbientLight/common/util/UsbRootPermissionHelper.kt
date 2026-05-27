@@ -1,12 +1,12 @@
 package com.vasmarfas.UniversalAmbientLight.common.util
 
 import android.content.Context
-import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.util.Log
-import com.hoho.android.usbserial.driver.UsbSerialProber
-import java.util.concurrent.TimeUnit
 import androidx.annotation.WorkerThread
+import com.hoho.android.usbserial.driver.UsbSerialProber
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbRootPermissionHelper.grantPermissionViaRootAsync
+import java.util.concurrent.TimeUnit
 
 /**
  * Grants USB device permission via root (su + app_process) so that
@@ -59,7 +59,8 @@ object UsbRootPermissionHelper {
      */
     @WorkerThread
     fun grantPermissionViaRoot(context: Context): Boolean {
-        val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
+        val usbManager =
+            context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
         val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
         if (drivers.isEmpty()) {
             Log.w(TAG, "No USB serial devices found")
@@ -96,8 +97,14 @@ object UsbRootPermissionHelper {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
             if (!process.waitFor(GRANT_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-                try { process.destroy() } catch (_: Exception) {}
-                Log.w(TAG, "app_process grant timed out after ${GRANT_TIMEOUT_SEC}s for $deviceName")
+                try {
+                    process.destroy()
+                } catch (_: Exception) {
+                }
+                Log.w(
+                    TAG,
+                    "app_process grant timed out after ${GRANT_TIMEOUT_SEC}s for $deviceName"
+                )
                 return false
             }
             val stdout = process.inputStream.bufferedReader().readText()

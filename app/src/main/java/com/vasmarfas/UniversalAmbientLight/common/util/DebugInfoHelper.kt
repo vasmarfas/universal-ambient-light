@@ -42,36 +42,36 @@ object DebugInfoHelper {
 
         sb.append("=== PERMISSIONS ===\n")
         sb.append("Overlay (Settings): ${Settings.canDrawOverlays(context)}\n")
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             try {
                 val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-                
+
                 val overlayOp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW
                 } else {
                     "android:system_alert_window"
                 }
-                
+
                 val modeOverlay = appOps.checkOpNoThrow(
                     overlayOp,
-                    Process.myUid(), 
+                    Process.myUid(),
                     context.packageName
                 )
                 sb.append("Overlay (AppOps): ${modeToName(modeOverlay)} ($modeOverlay)\n")
-                
+
                 val modeProjectMedia = appOps.checkOpNoThrow(
                     "android:project_media",
-                    Process.myUid(), 
+                    Process.myUid(),
                     context.packageName
                 )
                 sb.append("Project Media (AppOps): ${modeToName(modeProjectMedia)} ($modeProjectMedia)\n")
-                
+
             } catch (e: Exception) {
                 sb.append("AppOps Check Failed: ${e.message}\n")
             }
         }
-        
+
         sb.append("TCL/Restricted Bypass: ${TclBypass.isRestrictedManufacturer()}\n")
         sb.append("Is TCL Device: ${TclBypass.isTclDevice()}\n")
 
@@ -201,7 +201,12 @@ object DebugInfoHelper {
         } catch (e: Exception) {
             return null
         } finally {
-            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+            EGL14.eglMakeCurrent(
+                display,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_CONTEXT
+            )
             if (surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, surface)
             if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context)
             EGL14.eglTerminate(display)
@@ -219,7 +224,8 @@ object DebugInfoHelper {
             val hwDecoderTypes = sortedSetOf<String>()
 
             for (info in codecs) {
-                val videoTypes = info.supportedTypes.filter { it.startsWith("video/", ignoreCase = true) }
+                val videoTypes =
+                    info.supportedTypes.filter { it.startsWith("video/", ignoreCase = true) }
                 if (videoTypes.isEmpty()) continue
 
                 val hw = isHardwareCodec(info)
@@ -248,7 +254,13 @@ object DebugInfoHelper {
                 sb.append("SW encoders:\n")
                 for (l in swEncoders) sb.append("  [sw] $l\n")
             }
-            sb.append("HW decoders: ${if (hwDecoderTypes.isEmpty()) "none" else hwDecoderTypes.joinToString(", ")}\n")
+            sb.append(
+                "HW decoders: ${
+                    if (hwDecoderTypes.isEmpty()) "none" else hwDecoderTypes.joinToString(
+                        ", "
+                    )
+                }\n"
+            )
         } catch (e: Exception) {
             sb.append("Codec query failed: ${e.message}\n")
         }

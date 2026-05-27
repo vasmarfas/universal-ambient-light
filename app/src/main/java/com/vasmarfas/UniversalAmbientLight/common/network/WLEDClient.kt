@@ -7,7 +7,6 @@ import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
-import java.util.ArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -24,7 +23,7 @@ class WLEDClient(
     smoothingPreset: String = "balanced",
     settlingTime: Int = 200,
     outputDelayMs: Long = 80L,
-    updateFrequency: Int = 25
+    updateFrequency: Int = 25,
 ) : HyperionClient {
 
     enum class Protocol {
@@ -52,6 +51,7 @@ class WLEDClient(
     private val mResumeExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "WLEDClient-resume").apply { isDaemon = true }
     }
+
     @Volatile
     private var mLastLeds: Array<ColorRgb>? = null
     private val mLastReconnectAttemptMs = AtomicLong(0L)
@@ -64,7 +64,7 @@ class WLEDClient(
         if (port > 65535) {
             throw IllegalArgumentException("Port out of range: $port (must be between 1 and 65535)")
         }
-        
+
         // Use default port based on protocol if not specified
         if (port <= 0 || port == 80) {
             mPort = if (mProtocol == Protocol.DDP) DEFAULT_PORT_DDP else DEFAULT_PORT_DRGB
@@ -123,7 +123,8 @@ class WLEDClient(
         try {
             try {
                 mSocket?.close()
-            } catch (ignored: Exception) {}
+            } catch (ignored: Exception) {
+            }
             mSocket = null
             mConnected = false
 
@@ -150,7 +151,10 @@ class WLEDClient(
         mBlockedUntilMs.set(0L)
 
         if (logsEnabled) {
-            Log.d(TAG, "resetBlocked: wasBlocked=$wasBlocked, connection=${isConnected()}, mLastLeds=${mLastLeds != null}")
+            Log.d(
+                TAG,
+                "resetBlocked: wasBlocked=$wasBlocked, connection=${isConnected()}, mLastLeds=${mLastLeds != null}"
+            )
         }
 
         val hadConnection = isConnected()
@@ -229,13 +233,20 @@ class WLEDClient(
     }
 
     @Throws(IOException::class)
-    override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
+    override fun setImage(
+        data: ByteArray,
+        width: Int,
+        height: Int,
+        priority: Int,
+        duration_ms: Int,
+    ) {
         if (!isConnected()) {
             throw IOException("Not connected to WLED")
         }
 
         // Extract LED data reusing buffer
-        mLedDataBuffer = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
+        mLedDataBuffer =
+            LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
         if (mLedDataBuffer!!.isEmpty()) return
 
         mSmoothing.setTargetColors(mLedDataBuffer)
@@ -255,16 +266,19 @@ class WLEDClient(
         try {
             // Log occasionally for debugging
             if (System.currentTimeMillis() % 2000 < 100) {
-                if (logsEnabled) Log.d(TAG, "sendLedData: sending ${leds.size} LEDs via ${if (mProtocol == Protocol.DDP) "DDP" else "UDP Raw"} to $mAddress:$mPort")
+                if (logsEnabled) Log.d(
+                    TAG,
+                    "sendLedData: sending ${leds.size} LEDs via ${if (mProtocol == Protocol.DDP) "DDP" else "UDP Raw"} to $mAddress:$mPort"
+                )
                 // Sample first few LEDs
                 if (leds.isNotEmpty()) {
-                    val sample = leds.take(5).mapIndexed { idx, led -> 
-                        "[$idx: R=${led.red}, G=${led.green}, B=${led.blue}]" 
+                    val sample = leds.take(5).mapIndexed { idx, led ->
+                        "[$idx: R=${led.red}, G=${led.green}, B=${led.blue}]"
                     }.joinToString(", ")
                     if (logsEnabled) Log.v(TAG, "Sample LEDs: $sample")
                 }
             }
-            
+
             if (mProtocol == Protocol.DDP) {
                 val packets = createDdpPackets(leds)
                 for (packet in packets) {
@@ -280,7 +294,11 @@ class WLEDClient(
             mBlockedUntilMs.set(0L)
         } catch (e: IOException) {
             val msg = e.message ?: ""
-            if (msg.contains("EPERM", ignoreCase = true) || msg.contains("Operation not permitted", ignoreCase = true)) {
+            if (msg.contains("EPERM", ignoreCase = true) || msg.contains(
+                    "Operation not permitted",
+                    ignoreCase = true
+                )
+            ) {
                 mBlockedUntilMs.set(System.currentTimeMillis() + 3_000L)
             }
 
@@ -352,7 +370,10 @@ class WLEDClient(
 
             if (logsEnabled && System.currentTimeMillis() % 1000 < 50) {
                 val hexHeader = packet.take(10).joinToString(" ") { String.format("%02X", it) }
-                Log.v(TAG, "DDP Header [$packetIndex/$packetCount]: $hexHeader (Seq=${packet[1]}, Push=${packet[0].toInt() and 1}, Len=$packetDataSize)")
+                Log.v(
+                    TAG,
+                    "DDP Header [$packetIndex/$packetCount]: $hexHeader (Seq=${packet[1]}, Push=${packet[0].toInt() and 1}, Len=$packetDataSize)"
+                )
             }
 
             // Data
@@ -459,26 +480,31 @@ class WLEDClient(
                 result[1] = r
                 result[2] = b
             }
+
             "brg" -> {
                 result[0] = b
                 result[1] = r
                 result[2] = g
             }
+
             "rbg" -> {
                 result[0] = r
                 result[1] = b
                 result[2] = g
             }
+
             "gbr" -> {
                 result[0] = g
                 result[1] = b
                 result[2] = r
             }
+
             "bgr" -> {
                 result[0] = b
                 result[1] = g
                 result[2] = r
             }
+
             else -> {
                 result[0] = r
                 result[1] = g
@@ -491,7 +517,7 @@ class WLEDClient(
     private data class PresetValues(
         val settlingTime: Int,
         val outputDelayMs: Long,
-        val updateFrequency: Int
+        val updateFrequency: Int,
     )
 
     private fun getPresetValues(preset: String): PresetValues {

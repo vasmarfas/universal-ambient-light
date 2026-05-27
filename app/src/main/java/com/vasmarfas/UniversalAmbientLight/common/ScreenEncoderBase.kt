@@ -7,8 +7,8 @@ import android.os.HandlerThread
 import android.os.Process
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
-import com.vasmarfas.UniversalAmbientLight.common.util.BorderProcessor
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
+import com.vasmarfas.UniversalAmbientLight.common.util.BorderProcessor
 
 abstract class ScreenEncoderBase(
     protected val mListener: HyperionThread.HyperionThreadListener,
@@ -16,7 +16,7 @@ abstract class ScreenEncoderBase(
     width: Int,
     height: Int,
     protected val mDensity: Int,
-    options: AppOptions
+    options: AppOptions,
 ) {
 
     // Configuration (immutable after construction)
@@ -26,7 +26,7 @@ abstract class ScreenEncoderBase(
     private val mInitOrientation: Int
     private val mWidthScaled: Int
     private val mHeightScaled: Int
-    
+
     // Store real screen dimensions
     private val mScreenWidth: Int = width
     private val mScreenHeight: Int = height
@@ -39,6 +39,7 @@ abstract class ScreenEncoderBase(
     // Mutable state
     @Volatile
     protected var mCurrentOrientation: Int = 0
+
     @Volatile
     private var mIsCapturing: Boolean = false
 
@@ -46,7 +47,8 @@ abstract class ScreenEncoderBase(
         mBorderProcessor = BorderProcessor(options.blackThreshold)
 
         // Determine orientation
-        mInitOrientation = if (width > height) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+        mInitOrientation =
+            if (width > height) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
         mCurrentOrientation = mInitOrientation
 
         // Calculate scaled dimensions
@@ -61,7 +63,10 @@ abstract class ScreenEncoderBase(
         mHandler = Handler(thread.looper)
 
         if (DEBUG) {
-            Log.d(TAG, "Init: " + width + "x" + height + " -> " + mWidthScaled + "x" + mHeightScaled)
+            Log.d(
+                TAG,
+                "Init: " + width + "x" + height + " -> " + mWidthScaled + "x" + mHeightScaled
+            )
         }
     }
 
@@ -103,12 +108,12 @@ abstract class ScreenEncoderBase(
     protected fun getGrabberHeight(): Int {
         return if (mInitOrientation != mCurrentOrientation) mWidthScaled else mHeightScaled
     }
-    
+
     // Get real screen dimensions (not scaled down by divisor)
     protected fun getScreenWidth(): Int {
         return if (mInitOrientation != mCurrentOrientation) mScreenHeight else mScreenWidth
     }
-    
+
     protected fun getScreenHeight(): Int {
         return if (mInitOrientation != mCurrentOrientation) mScreenWidth else mScreenHeight
     }

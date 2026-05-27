@@ -56,11 +56,14 @@ class ScrcpyEncoder(
     private val mScreenHeight: Int,
     private val mOptions: AppOptions,
     private val mAdbPort: Int = 5555,
-    private val onFatalError: ((String) -> Unit)? = null
+    private val onFatalError: ((String) -> Unit)? = null,
 ) {
-    @Volatile private var mRunning = false
-    @Volatile private var mCapturing = false
-    @Volatile private var mRgbBuffer: ByteArray? = null
+    @Volatile
+    private var mRunning = false
+    @Volatile
+    private var mCapturing = false
+    @Volatile
+    private var mRgbBuffer: ByteArray? = null
 
     /** Each entry = one complete H264 frame + metadata. */
     private data class Frame(val data: ByteArray, val pts: Long, val codecFlags: Int)
@@ -86,10 +89,16 @@ class ScrcpyEncoder(
     fun clearLights() {
         Thread { repeat(CLEAR_FRAMES) { Thread.sleep(CLEAR_DELAY_MS); mListener.clear() } }.start()
     }
+
     fun stopRecording() = stopInternal(disconnect = true)
     fun stopRecordingKeepConnection() = stopInternal(disconnect = false)
-    fun resumeRecording() { if (!mRunning) startCapture() }
-    @Suppress("UNUSED_PARAMETER") fun setOrientation(o: Int) {}
+    fun resumeRecording() {
+        if (!mRunning) startCapture()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun setOrientation(o: Int) {
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Version detection — scan binary AndroidManifest.xml for versionName
@@ -115,6 +124,7 @@ class ScrcpyEncoder(
                                 return v
                             }
                         }
+
                         "AndroidManifest.xml" -> {
                             val data = zis.readBytes()
                             val v = scanBinaryManifestForVersion(data)
@@ -210,7 +220,7 @@ class ScrcpyEncoder(
         var cleanExit = false
         val framesDecoded = AtomicInteger(0)
         var bytesReceived = 0L
-        val sessionActive = java.util.concurrent.atomic.AtomicBoolean(true)
+        val sessionActive = AtomicBoolean(true)
         val watchdogTriggered = AtomicBoolean(false)
 
         try {
@@ -232,7 +242,8 @@ class ScrcpyEncoder(
             // ── 3. Push server every time (avoid stale/corrupted remote binary) ─
             Log.i(TAG, "Pushing scrcpy-server to device…")
             val tmp = File(mContext.cacheDir, ASSET_NAME)
-            mContext.assets.open(ASSET_NAME).use { src -> tmp.outputStream().use { src.copyTo(it) } }
+            mContext.assets.open(ASSET_NAME)
+                .use { src -> tmp.outputStream().use { src.copyTo(it) } }
             dadb.push(tmp, REMOTE_PATH)
             tmp.delete()
             Log.i(TAG, "Server pushed to $REMOTE_PATH")
@@ -251,30 +262,32 @@ class ScrcpyEncoder(
                     useFramedMode = true
                     // tunnel_forward=true → server creates LocalServerSocket, we connect to it
                     startCmd = "shell:CLASSPATH=$REMOTE_PATH app_process / " +
-                        "com.genymobile.scrcpy.Server $version " +
-                        "scid=$scid log_level=info " +
-                        "video=true audio=false control=false " +
-                        "tunnel_forward=true video_codec=h264 " +
-                        "max_size=$mCapW video_bit_rate=2000000 send_dummy_byte=false"
+                            "com.genymobile.scrcpy.Server $version " +
+                            "scid=$scid log_level=info " +
+                            "video=true audio=false control=false " +
+                            "tunnel_forward=true video_codec=h264 " +
+                            "max_size=$mCapW video_bit_rate=2000000 send_dummy_byte=false"
                 }
+
                 major >= 2 -> {
                     scid = null
                     socketName = SOCKET_NAME
                     useFramedMode = true
                     startCmd = "shell:CLASSPATH=$REMOTE_PATH app_process / " +
-                        "com.genymobile.scrcpy.Server $version " +
-                        "log_level=info video=true audio=false control=false " +
-                        "tunnel_forward=true video_codec=h264 " +
-                        "max_size=$mCapW video_bit_rate=2000000 send_dummy_byte=false"
+                            "com.genymobile.scrcpy.Server $version " +
+                            "log_level=info video=true audio=false control=false " +
+                            "tunnel_forward=true video_codec=h264 " +
+                            "max_size=$mCapW video_bit_rate=2000000 send_dummy_byte=false"
                 }
+
                 else -> {
                     // v1.x positional: max_size bit_rate max_fps tunnel_forward crop send_frame_meta control
                     scid = null
                     socketName = SOCKET_NAME
                     useFramedMode = true
                     startCmd = "shell:CLASSPATH=$REMOTE_PATH app_process / " +
-                        "com.genymobile.scrcpy.Server " +
-                        "$mCapW 2000000 30 true - true false"
+                            "com.genymobile.scrcpy.Server " +
+                            "$mCapW 2000000 30 true - true false"
                 }
             }
             Log.i(TAG, "Starting: $startCmd")
@@ -289,13 +302,14 @@ class ScrcpyEncoder(
                         val line = reader.readLine() ?: break
                         Log.i(TAG, "[server] $line")
                     }
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }, "scrcpy-shell-reader").also { it.isDaemon = true; it.start() }
 
             // ── 5. Connect to abstract socket via ADB tunnel ──────────────
             // With tunnel_forward=true, the server creates a LocalServerSocket.
             // We connect to it through the ADB daemon (localabstract: service).
-            
+
             // Give server time to start JVM + bind socket
             for (attempt in 1..30) {
                 Thread.sleep(200)
@@ -308,29 +322,35 @@ class ScrcpyEncoder(
                     if (attempt % 5 == 0) Log.d(TAG, "Socket attempt $attempt: ${e.message}")
                 }
             }
-            
+
             if (videoStream == null) {
-                 throw Exception(
+                throw Exception(
                     "Could not connect to socket '$socketName' via ADB after 30 attempts.\n" +
-                        "Check [server] log lines above for errors."
+                            "Check [server] log lines above for errors."
                 )
             }
 
             val socketInput = videoStream.source.inputStream()
             val lastActivity = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
             val finalVideoStream = videoStream
-            
+
             // Watchdog: only detect startup stall (no frames at all).
             // Do NOT restart active sessions on temporary no-data periods:
             // scrcpy may legitimately send nothing on static scenes.
-            val watchdog = Thread({
+            Thread({
                 while (mRunning && !cleanExit) {
                     Thread.sleep(2000)
                     val noDataTooLong = System.currentTimeMillis() - lastActivity.get() > 15000
                     if (framesDecoded.get() == 0 && noDataTooLong) {
                         watchdogTriggered.set(true)
-                        Log.w(TAG, "Watchdog: scrcpy startup timeout (no first frame in 15s), restarting…")
-                        try { finalVideoStream.close() } catch(_:Exception){}
+                        Log.w(
+                            TAG,
+                            "Watchdog: scrcpy startup timeout (no first frame in 15s), restarting…"
+                        )
+                        try {
+                            finalVideoStream.close()
+                        } catch (_: Exception) {
+                        }
                         break
                     }
                 }
@@ -353,7 +373,10 @@ class ScrcpyEncoder(
             lastActivity.set(System.currentTimeMillis())
             val codecId = ByteBuffer.wrap(codecMeta, 0, 4).order(ByteOrder.BIG_ENDIAN).getInt()
             if (major >= 4) {
-                Log.i(TAG, "Device: '$deviceName', codecId=$codecId (v4 stream header; size via session meta)")
+                Log.i(
+                    TAG,
+                    "Device: '$deviceName', codecId=$codecId (v4 stream header; size via session meta)"
+                )
             } else {
                 val streamW = ByteBuffer.wrap(codecMeta, 4, 4).order(ByteOrder.BIG_ENDIAN).getInt()
                 val streamH = ByteBuffer.wrap(codecMeta, 8, 4).order(ByteOrder.BIG_ENDIAN).getInt()
@@ -407,8 +430,10 @@ class ScrcpyEncoder(
                         when {
                             idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED ->
                                 Log.i(TAG, "Output format: ${finalDecoder.outputFormat}")
+
                             idx >= 0 -> {
-                                val isConfig = (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
+                                val isConfig =
+                                    (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                                 if (!isConfig && info.size > 0) {
                                     val img = finalDecoder.getOutputImage(idx)
                                     if (img != null) {
@@ -416,9 +441,17 @@ class ScrcpyEncoder(
                                             if (!sessionActive.get()) break
                                             processImageDirect(img)
                                             val decoded = framesDecoded.incrementAndGet()
-                                            if (decoded == 1) Log.i(TAG, "✓ First frame (${img.width}×${img.height})")
-                                            if (decoded % 100 == 0) Log.d(TAG, "Frames: $decoded bytes: $bytesReceived queue: ${mFrameQueue.size}")
-                                        } finally { img.close() }
+                                            if (decoded == 1) Log.i(
+                                                TAG,
+                                                "✓ First frame (${img.width}×${img.height})"
+                                            )
+                                            if (decoded % 100 == 0) Log.d(
+                                                TAG,
+                                                "Frames: $decoded bytes: $bytesReceived queue: ${mFrameQueue.size}"
+                                            )
+                                        } finally {
+                                            img.close()
+                                        }
                                     }
                                 }
                                 finalDecoder.releaseOutputBuffer(idx, false)
@@ -429,7 +462,10 @@ class ScrcpyEncoder(
                     } catch (_: IllegalStateException) {
                         break
                     } catch (e: Exception) {
-                        Log.w(TAG, "Codec-out error f$framesDecoded: ${e.javaClass.simpleName}: ${e.message}")
+                        Log.w(
+                            TAG,
+                            "Codec-out error f$framesDecoded: ${e.javaClass.simpleName}: ${e.message}"
+                        )
                     }
                 }
             }, "scrcpy-codec-out").also { it.isDaemon = true; it.start() }
@@ -449,8 +485,10 @@ class ScrcpyEncoder(
                 Log.i(TAG, "Reading in framed mode (v$major.x)")
                 while (mRunning) {
                     readFully(socketInput, metaBuf)
-                    val ptsAndFlags = ByteBuffer.wrap(metaBuf, 0, 8).order(ByteOrder.BIG_ENDIAN).getLong()
-                    val frameLen = ByteBuffer.wrap(metaBuf, 8, 4).order(ByteOrder.BIG_ENDIAN).getInt()
+                    val ptsAndFlags =
+                        ByteBuffer.wrap(metaBuf, 0, 8).order(ByteOrder.BIG_ENDIAN).getLong()
+                    val frameLen =
+                        ByteBuffer.wrap(metaBuf, 8, 4).order(ByteOrder.BIG_ENDIAN).getInt()
 
                     // v4 session-meta packet (bit63): no payload follows — just the size.
                     if (isV4 && (ptsAndFlags and Long.MIN_VALUE) != 0L) {
@@ -463,7 +501,10 @@ class ScrcpyEncoder(
                     }
 
                     if (frameLen <= 0 || frameLen > MAX_FRAME_BYTES) {
-                        Log.e(TAG, "Invalid frame length: $frameLen (ptsAndFlags=$ptsAndFlags) — stream likely corrupt")
+                        Log.e(
+                            TAG,
+                            "Invalid frame length: $frameLen (ptsAndFlags=$ptsAndFlags) — stream likely corrupt"
+                        )
                         break
                     }
 
@@ -493,16 +534,19 @@ class ScrcpyEncoder(
                     mFrameQueue.offer(Frame(chunk.copyOf(n), 0L, 0), 200, TimeUnit.MILLISECONDS)
                 }
             }
-            Log.i(TAG, "Socket EOF after $bytesReceived bytes, ${framesDecoded.get()} frames decoded")
+            Log.i(
+                TAG,
+                "Socket EOF after $bytesReceived bytes, ${framesDecoded.get()} frames decoded"
+            )
             cleanExit = true
         } catch (e: Exception) {
             if (mRunning && !watchdogTriggered.get()) {
                 Log.e(TAG, "Session error: ${e.message}", e)
                 onFatalError?.invoke(
                     "Scrcpy error: ${e.message}\n\n" +
-                        "Make sure:\n• Wireless Debugging is ON in Developer Options\n" +
-                        "• Tap Allow on the TV when asked\n" +
-                        "• Port matches (use Test ADB Connection)"
+                            "Make sure:\n• Wireless Debugging is ON in Developer Options\n" +
+                            "• Tap Allow on the TV when asked\n" +
+                            "• Port matches (use Test ADB Connection)"
                 )
                 mRunning = false
             } else if (watchdogTriggered.get()) {
@@ -517,10 +561,22 @@ class ScrcpyEncoder(
             codecOutThread?.interrupt()
             joinQuietly(codecInThread, 300)
             joinQuietly(codecOutThread, 300)
-            try { decoder?.stop(); decoder?.release() } catch (_: Exception) {}
-            try { videoStream?.close() } catch (_: Exception) {}
-            try { shellStream?.close() } catch (_: Exception) {}
-            try { dadb?.close() } catch (_: Exception) {}
+            try {
+                decoder?.stop(); decoder?.release()
+            } catch (_: Exception) {
+            }
+            try {
+                videoStream?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                shellStream?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                dadb?.close()
+            } catch (_: Exception) {
+            }
             if (!mRunning) mCapturing = false
         }
         return cleanExit
@@ -531,15 +587,23 @@ class ScrcpyEncoder(
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun processImageDirect(image: Image) {
-        val w = image.width; val h = image.height
+        val w = image.width
+        val h = image.height
         if (w <= 0 || h <= 0 || image.planes.size < 3) return
-        val yP = image.planes[0]; val uP = image.planes[1]; val vP = image.planes[2]
-        val yBuf = yP.buffer; val uBuf = uP.buffer; val vBuf = vP.buffer
-        val yRS = yP.rowStride; val yPS = yP.pixelStride
-        val uvRS = uP.rowStride; val uvPS = uP.pixelStride
+        val yP = image.planes[0]
+        val uP = image.planes[1]
+        val vP = image.planes[2]
+        val yBuf = yP.buffer
+        val uBuf = uP.buffer
+        val vBuf = vP.buffer
+        val yRS = yP.rowStride
+        val yPS = yP.pixelStride
+        val uvRS = uP.rowStride
+        val uvPS = uP.pixelStride
         val targetW = mOptions.captureQuality.coerceIn(64, w)
         val step = max(1, w / targetW)
-        val sw = (w / step).coerceAtLeast(1); val sh = (h / step).coerceAtLeast(1)
+        val sw = (w / step).coerceAtLeast(1)
+        val sh = (h / step).coerceAtLeast(1)
         if (mOptions.useAverageColor) {
             sendAvgDirect(yBuf, uBuf, vBuf, step, sw, sh, yRS, yPS, uvRS, uvPS)
         } else {
@@ -548,22 +612,28 @@ class ScrcpyEncoder(
     }
 
     private fun sendRgbDirect(
-        yBuf: java.nio.ByteBuffer, uBuf: java.nio.ByteBuffer, vBuf: java.nio.ByteBuffer,
-        step: Int, sw: Int, sh: Int, yRS: Int, yPS: Int, uvRS: Int, uvPS: Int
+        yBuf: ByteBuffer, uBuf: ByteBuffer, vBuf: ByteBuffer,
+        step: Int, sw: Int, sh: Int, yRS: Int, yPS: Int, uvRS: Int, uvPS: Int,
     ) {
         val rgbSize = sw * sh * 3
         val existing = mRgbBuffer
-        val rgb = if (existing != null && existing.size >= rgbSize) existing else ByteArray(rgbSize).also { mRgbBuffer = it }
+        val rgb =
+            if (existing != null && existing.size >= rgbSize) existing else ByteArray(rgbSize).also {
+                mRgbBuffer = it
+            }
         var dst = 0
         for (sy in 0 until sh) {
-            val srcY = sy * step; val uvRow = srcY / 2
+            val srcY = sy * step
+            val uvRow = srcY / 2
             for (sx in 0 until sw) {
                 val srcX = sx * step
                 val y = yBuf.get(srcY * yRS + srcX * yPS).toInt() and 0xFF
                 val uvOff = uvRow * uvRS + (srcX / 2) * uvPS
                 val u = uBuf.get(uvOff).toInt() and 0xFF
                 val v = vBuf.get(uvOff).toInt() and 0xFF
-                val c = y - 16; val d = u - 128; val e = v - 128
+                val c = y - 16
+                val d = u - 128
+                val e = v - 128
                 rgb[dst++] = ((298 * c + 409 * e + 128) shr 8).coerceIn(0, 255).toByte()
                 rgb[dst++] = ((298 * c - 100 * d - 208 * e + 128) shr 8).coerceIn(0, 255).toByte()
                 rgb[dst++] = ((298 * c + 516 * d + 128) shr 8).coerceIn(0, 255).toByte()
@@ -575,19 +645,25 @@ class ScrcpyEncoder(
     }
 
     private fun sendAvgDirect(
-        yBuf: java.nio.ByteBuffer, uBuf: java.nio.ByteBuffer, vBuf: java.nio.ByteBuffer,
-        step: Int, sw: Int, sh: Int, yRS: Int, yPS: Int, uvRS: Int, uvPS: Int
+        yBuf: ByteBuffer, uBuf: ByteBuffer, vBuf: ByteBuffer,
+        step: Int, sw: Int, sh: Int, yRS: Int, yPS: Int, uvRS: Int, uvPS: Int,
     ) {
-        var rSum = 0L; var gSum = 0L; var bSum = 0L; var cnt = 0
+        var rSum = 0L
+        var gSum = 0L
+        var bSum = 0L
+        var cnt = 0
         for (sy in 0 until sh) {
-            val srcY = sy * step; val uvRow = srcY / 2
+            val srcY = sy * step
+            val uvRow = srcY / 2
             for (sx in 0 until sw) {
                 val srcX = sx * step
                 val y = yBuf.get(srcY * yRS + srcX * yPS).toInt() and 0xFF
                 val uvOff = uvRow * uvRS + (srcX / 2) * uvPS
                 val u = uBuf.get(uvOff).toInt() and 0xFF
                 val v = vBuf.get(uvOff).toInt() and 0xFF
-                val c = y - 16; val d = u - 128; val e = v - 128
+                val c = y - 16
+                val d = u - 128
+                val e = v - 128
                 rSum += ((298 * c + 409 * e + 128) shr 8).coerceIn(0, 255)
                 gSum += ((298 * c - 100 * d - 208 * e + 128) shr 8).coerceIn(0, 255)
                 bSum += ((298 * c + 516 * d + 128) shr 8).coerceIn(0, 255)

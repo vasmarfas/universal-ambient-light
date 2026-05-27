@@ -36,11 +36,13 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
 
     // Очередь вывода (Output Delay) - хранит пары (время добавления, кадр)
     private data class TimedFrame(val timestamp: Long, val colors: Array<ColorRgb>)
+
     private val mOutputQueue = ArrayDeque<TimedFrame>()
 
     // Таймер
     private var mHandlerThread: HandlerThread? = null
     private var mHandler: Handler? = null
+
     @Volatile
     private var mRunning = false
 
@@ -129,7 +131,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
         val now = System.currentTimeMillis()
         val deltaTime = mTargetTime - now
 
-            if (deltaTime <= 0) {
+        if (deltaTime <= 0) {
             // Время истекло, использовать целевые значения
             // Update mPreviousValues in-place
             for (i in mTargetValues!!.indices) mPreviousValues!![i].set(mTargetValues!![i])
@@ -170,7 +172,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
             synchronized(mOutputQueue) {
                 // Добавляем кадр с текущим временем
                 mOutputQueue.addLast(TimedFrame(now, ledColors))
-                
+
                 // Проверяем, прошло ли достаточно времени с момента добавления самого старого кадра
                 while (mOutputQueue.isNotEmpty()) {
                     val oldestFrame = mOutputQueue.first
@@ -242,7 +244,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     fun setEnabled(enabled: Boolean) {
         val wasEnabled = mEnabled
         mEnabled = enabled
-        
+
         // Если сглаживание выключено, останавливаем таймер
         if (!enabled && wasEnabled && mRunning) {
             stop()
@@ -269,24 +271,28 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
                 mOutputDelayMs = 0L
                 mUpdateFrequencyHz = 60
             }
+
             "responsive" -> {
                 mEnabled = true
                 mSettlingTimeMs = 50
                 mOutputDelayMs = 0L
                 mUpdateFrequencyHz = 60
             }
+
             "balanced" -> {
                 mEnabled = true
                 mSettlingTimeMs = 200
                 mOutputDelayMs = 80L // ~2 кадра при 25 FPS
                 mUpdateFrequencyHz = 25
             }
+
             "smooth" -> {
                 mEnabled = true
                 mSettlingTimeMs = 500
                 mOutputDelayMs = 200L // ~5 кадров при 25 FPS
                 mUpdateFrequencyHz = 20
             }
+
             else -> {
                 // По умолчанию "balanced"
                 mEnabled = true

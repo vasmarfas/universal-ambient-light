@@ -1,5 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common.util
 
+import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor.processColor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -30,7 +31,7 @@ object ColorProcessor {
         brightnessB: Int = 100,
         gammaR: Int = 100,
         gammaG: Int = 100,
-        gammaB: Int = 100
+        gammaB: Int = 100,
     ): Triple<Int, Int, Int> {
         var rf = applyGamma(r.toFloat(), gammaR)
         var gf = applyGamma(g.toFloat(), gammaG)
@@ -97,7 +98,7 @@ object ColorProcessor {
             var i = 0
             val n = rgbData.size - 2
             while (i < n) {
-                rgbData[i]     = rLut[rgbData[i].toInt() and 0xFF]
+                rgbData[i] = rLut[rgbData[i].toInt() and 0xFF]
                 rgbData[i + 1] = gLut[rgbData[i + 1].toInt() and 0xFF]
                 rgbData[i + 2] = bLut[rgbData[i + 2].toInt() and 0xFF]
                 i += 3
@@ -170,7 +171,11 @@ object ColorProcessor {
      * Per-channel LUT used by the fast path. Encodes: gamma → channel × global brightness
      * → contrast → black/white levels. Saturation is NOT included (channel-mixing op).
      */
-    private fun buildChannelLut(options: AppOptions, channelBrightness: Int, channelGamma: Int): ByteArray {
+    private fun buildChannelLut(
+        options: AppOptions,
+        channelBrightness: Int,
+        channelGamma: Int,
+    ): ByteArray {
         val lut = ByteArray(256)
         val gammaTable = buildGammaLut(channelGamma)
         val factor = (options.brightness / 100f) * (channelBrightness / 100f)

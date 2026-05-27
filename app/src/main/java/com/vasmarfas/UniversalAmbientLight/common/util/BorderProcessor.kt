@@ -21,12 +21,14 @@ import java.nio.ByteBuffer
  */
 class BorderProcessor(
     initialBlackThreshold: Int = 18,
-    initialStabilityDetections: Int = 3
+    initialStabilityDetections: Int = 3,
 ) {
-    @Volatile var blackThreshold: Int = initialBlackThreshold
+    @Volatile
+    var blackThreshold: Int = initialBlackThreshold
 
     /** Consecutive matching detections required before switching to a new border. */
-    @Volatile var stabilityDetections: Int = initialStabilityDetections
+    @Volatile
+    var stabilityDetections: Int = initialStabilityDetections
 
     private var mPreviousBorder: BorderRect? = null
     var currentBorder: BorderRect? = null
@@ -128,7 +130,7 @@ class BorderProcessor(
      *  - keeps [AppOptions.borderThreshold] in sync with this processor.
      */
     fun applyForEncoder(
-        rgb: ByteArray, width: Int, height: Int, options: AppOptions
+        rgb: ByteArray, width: Int, height: Int, options: AppOptions,
     ): CropResult {
         if (!options.borderDetectionEnabled) {
             mDetectCounter = 0
@@ -164,19 +166,27 @@ class BorderProcessor(
 
         var top = -1
         for (y in 0 until maxV) {
-            if (!isRowBlack(rgb, rowBytes, y, width, xStep)) { top = y; break }
+            if (!isRowBlack(rgb, rowBytes, y, width, xStep)) {
+                top = y; break
+            }
         }
         var bottom = -1
         for (y in height - 1 downTo height - maxV) {
-            if (!isRowBlack(rgb, rowBytes, y, width, xStep)) { bottom = height - 1 - y; break }
+            if (!isRowBlack(rgb, rowBytes, y, width, xStep)) {
+                bottom = height - 1 - y; break
+            }
         }
         var left = -1
         for (x in 0 until maxH) {
-            if (!isColBlack(rgb, rowBytes, x, height, yStep)) { left = x; break }
+            if (!isColBlack(rgb, rowBytes, x, height, yStep)) {
+                left = x; break
+            }
         }
         var right = -1
         for (x in width - 1 downTo width - maxH) {
-            if (!isColBlack(rgb, rowBytes, x, height, yStep)) { right = width - 1 - x; break }
+            if (!isColBlack(rgb, rowBytes, x, height, yStep)) {
+                right = width - 1 - x; break
+            }
         }
 
         // Quantize each edge to ~3% bands so single-pixel jitter at the edges
@@ -212,7 +222,13 @@ class BorderProcessor(
         return samples > 0 && blacks * 100 >= samples * BLACK_PERCENT
     }
 
-    private fun isColBlack(rgb: ByteArray, rowBytes: Int, x: Int, height: Int, yStep: Int): Boolean {
+    private fun isColBlack(
+        rgb: ByteArray,
+        rowBytes: Int,
+        x: Int,
+        height: Int,
+        yStep: Int,
+    ): Boolean {
         var samples = 0
         var blacks = 0
         var y = 0
@@ -225,7 +241,7 @@ class BorderProcessor(
     }
 
     private fun findBorderRgba(
-        buffer: ByteBuffer, width: Int, height: Int, rowStride: Int, pixelStride: Int
+        buffer: ByteBuffer, width: Int, height: Int, rowStride: Int, pixelStride: Int,
     ): BorderRect {
         val xa = width / 4
         val xb = width / 2
@@ -252,7 +268,9 @@ class BorderProcessor(
             if (probeNonBlack(base + xa * pixelStride) ||
                 probeNonBlack(base + xb * pixelStride) ||
                 probeNonBlack(base + xc * pixelStride)
-            ) { top = y; break }
+            ) {
+                top = y; break
+            }
         }
         var bottom = -1
         for (y in height - 1 downTo height - maxV) {
@@ -260,21 +278,27 @@ class BorderProcessor(
             if (probeNonBlack(base + xa * pixelStride) ||
                 probeNonBlack(base + xb * pixelStride) ||
                 probeNonBlack(base + xc * pixelStride)
-            ) { bottom = height - 1 - y; break }
+            ) {
+                bottom = height - 1 - y; break
+            }
         }
         var left = -1
         for (x in 0 until maxH) {
             if (probeNonBlack(ya * rowStride + x * pixelStride) ||
                 probeNonBlack(yb * rowStride + x * pixelStride) ||
                 probeNonBlack(yc * rowStride + x * pixelStride)
-            ) { left = x; break }
+            ) {
+                left = x; break
+            }
         }
         var right = -1
         for (x in width - 1 downTo width - maxH) {
             if (probeNonBlack(ya * rowStride + x * pixelStride) ||
                 probeNonBlack(yb * rowStride + x * pixelStride) ||
                 probeNonBlack(yc * rowStride + x * pixelStride)
-            ) { right = width - 1 - x; break }
+            ) {
+                right = width - 1 - x; break
+            }
         }
 
         buffer.reset()
@@ -297,6 +321,7 @@ class BorderProcessor(
     companion object {
         /** How many points to sample per row/column. */
         private const val NUM_SAMPLES = 32
+
         /** Row/column counts as "black" when ≥ this fraction (in percent) of sampled pixels are black. */
         private const val BLACK_PERCENT = 85
     }

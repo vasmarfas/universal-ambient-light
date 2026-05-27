@@ -22,10 +22,12 @@ class AdbEncoder(
     private val mScreenWidth: Int,
     private val mScreenHeight: Int,
     private val mOptions: AppOptions,
-    private val mAdbPort: Int = 5555
+    private val mAdbPort: Int = 5555,
 ) {
-    @Volatile private var mRunning = false
-    @Volatile private var mCapturing = false
+    @Volatile
+    private var mRunning = false
+    @Volatile
+    private var mCapturing = false
     private var mDadb: Dadb? = null
 
     private var mThread: HandlerThread? = null
@@ -162,7 +164,10 @@ class AdbEncoder(
             }
         } catch (e: Exception) {
             Log.w(TAG, "ADB capture error: ${e.message}")
-            try { mDadb?.close() } catch (_: Exception) {}
+            try {
+                mDadb?.close()
+            } catch (_: Exception) {
+            }
             mDadb = null
         }
     }
@@ -182,7 +187,10 @@ class AdbEncoder(
             val expectedSize = w * h * 4
 
             if (w !in 100..7680 || h !in 100..4320 || data.size < 12 + expectedSize) {
-                Log.w(TAG, "Raw screencap invalid header: ${w}x${h} fmt=$format dataLen=${data.size}")
+                Log.w(
+                    TAG,
+                    "Raw screencap invalid header: ${w}x${h} fmt=$format dataLen=${data.size}"
+                )
                 return null
             }
 
@@ -265,7 +273,10 @@ class AdbEncoder(
     private fun sendAvgColor(bitmap: Bitmap) {
         val w = bitmap.width
         val h = bitmap.height
-        var r = 0L; var g = 0L; var b = 0L; var count = 0
+        var r = 0L
+        var g = 0L
+        var b = 0L
+        var count = 0
         var y = 0
         while (y < h) {
             var x = 0
@@ -302,9 +313,10 @@ class AdbEncoder(
         mPixelBuffer = null
         try {
             mDadb?.close()
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+        }
         mDadb = null
-        
+
         if (disconnect) {
             Thread {
                 repeat(CLEAR_FRAMES) {

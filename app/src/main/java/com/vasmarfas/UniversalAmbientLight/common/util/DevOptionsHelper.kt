@@ -18,7 +18,11 @@ object DevOptionsHelper {
 
     fun isDeveloperOptionsEnabled(context: Context): Boolean {
         return try {
-            Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+            Settings.Global.getInt(
+                context.contentResolver,
+                Settings.Global.DEVELOPMENT_SETTINGS_ENABLED,
+                0
+            ) == 1
         } catch (_: Exception) {
             false
         }
@@ -42,10 +46,16 @@ object DevOptionsHelper {
                 ComponentName("com.android.settings", "com.android.settings.DevelopmentSettings")
             ),
             Intent().setComponent(
-                ComponentName("com.android.tv.settings", "com.android.tv.settings.system.development.DevelopmentActivity")
+                ComponentName(
+                    "com.android.tv.settings",
+                    "com.android.tv.settings.system.development.DevelopmentActivity"
+                )
             ),
             Intent().setComponent(
-                ComponentName("com.android.tv.settings", "com.android.tv.settings.system.DevelopmentFragment")
+                ComponentName(
+                    "com.android.tv.settings",
+                    "com.android.tv.settings.system.DevelopmentFragment"
+                )
             )
         )
     }
@@ -119,7 +129,10 @@ object DevOptionsHelper {
                 ComponentName("com.android.settings", "com.android.settings.DeviceInfoSettings")
             ),
             Intent().setComponent(
-                ComponentName("com.android.tv.settings", "com.android.tv.settings.about.AboutFragment")
+                ComponentName(
+                    "com.android.tv.settings",
+                    "com.android.tv.settings.about.AboutFragment"
+                )
             )
         )
     }

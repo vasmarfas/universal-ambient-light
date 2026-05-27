@@ -5,11 +5,11 @@ import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.network.ColorRgb
 import kotlin.math.max
-import kotlin.math.min
 
 object LedDataExtractor {
     private const val TAG = "LedDataExtractor"
     private val logsEnabled = false
+
     /**
      * Extract LED data reusing an existing buffer to avoid GC overhead.
      * @param reuseBuffer Optional buffer to reuse. If null or wrong size, a new one is allocated.
@@ -20,7 +20,7 @@ object LedDataExtractor {
         screenData: ByteArray,
         width: Int,
         height: Int,
-        reuseBuffer: Array<ColorRgb>?
+        reuseBuffer: Array<ColorRgb>?,
     ): Array<ColorRgb> {
         var xLed = 0
         var yLed = 0
@@ -50,7 +50,8 @@ object LedDataExtractor {
             rightLed = prefs.getInt(R.string.pref_key_led_count_right, yLed)
             bottomLed = prefs.getInt(R.string.pref_key_led_count_bottom, xLed)
             leftLed = prefs.getInt(R.string.pref_key_led_count_left, yLed)
-            startCorner = prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left"
+            startCorner =
+                prefs.getString(R.string.pref_key_led_start_corner, "bottom_left") ?: "bottom_left"
             direction = prefs.getString(R.string.pref_key_led_direction, "clockwise") ?: "clockwise"
             sideTop = prefs.getString(R.string.pref_key_led_side_top, "enabled") ?: "enabled"
             sideRight = prefs.getString(R.string.pref_key_led_side_right, "enabled") ?: "enabled"
@@ -100,7 +101,7 @@ object LedDataExtractor {
         context: Context,
         screenData: ByteArray,
         width: Int,
-        height: Int
+        height: Int,
     ): Array<ColorRgb> {
         return extractLEDData(context, screenData, width, height, null)
     }
@@ -152,7 +153,7 @@ object LedDataExtractor {
         captureMarginLeft: Int,
         ledOffset: Int,
         scanDepth: Int,
-        reuseBuffer: Array<ColorRgb>?
+        reuseBuffer: Array<ColorRgb>?,
     ): Array<ColorRgb> {
         val topCount = topLed.coerceAtLeast(0)
         val rightCount = rightLed.coerceAtLeast(0)
@@ -169,12 +170,18 @@ object LedDataExtractor {
 
         // Diagnostic logging
         val expectedSize = width * height * 3
-        if (logsEnabled) Log.d(TAG, "extractPerimeterPixels: width=$width, height=$height, top=$topCount, right=$rightCount, bottom=$bottomCount, left=$leftCount, totalLEDs=$totalLEDs")
+        if (logsEnabled) Log.d(
+            TAG,
+            "extractPerimeterPixels: width=$width, height=$height, top=$topCount, right=$rightCount, bottom=$bottomCount, left=$leftCount, totalLEDs=$totalLEDs"
+        )
         if (logsEnabled) Log.d(TAG, "startCorner=$startCorner, direction=$direction")
         if (logsEnabled) Log.d(TAG, "screenData.size=${screenData.size}, expected=$expectedSize")
 
         if (screenData.size < expectedSize) {
-            if (logsEnabled) Log.e(TAG, "screenData is too small! Expected at least $expectedSize bytes, got ${screenData.size}")
+            if (logsEnabled) Log.e(
+                TAG,
+                "screenData is too small! Expected at least $expectedSize bytes, got ${screenData.size}"
+            )
         }
 
         val ledData: Array<ColorRgb>
@@ -247,12 +254,22 @@ object LedDataExtractor {
                             val w = ((captureLeft + (i + 1) * stepTop).toInt() - x).coerceAtLeast(1)
                             val y = captureTop.toInt()
                             val h = scanDepthV
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "top_rl" -> {
                     // Top edge (right to left)
                     for (i in 0 until topCount) {
@@ -262,15 +279,28 @@ object LedDataExtractor {
                             // LED i corresponds to segment at (topCount - 1 - i).
                             val segmentIdx = topCount - 1 - i
                             val x = (captureLeft + segmentIdx * stepTop).toInt()
-                            val w = ((captureLeft + (segmentIdx + 1) * stepTop).toInt() - x).coerceAtLeast(1)
+                            val w =
+                                ((captureLeft + (segmentIdx + 1) * stepTop).toInt() - x).coerceAtLeast(
+                                    1
+                                )
                             val y = captureTop.toInt()
                             val h = scanDepthV
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "right_tb" -> {
                     // Right edge (top to bottom)
                     for (i in 0 until rightCount) {
@@ -278,13 +308,24 @@ object LedDataExtractor {
                             val x = (captureRight - scanDepthH).toInt()
                             val w = scanDepthH
                             val y = (captureTop + i * stepRight).toInt()
-                            val h = ((captureTop + (i + 1) * stepRight).toInt() - y).coerceAtLeast(1)
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            val h =
+                                ((captureTop + (i + 1) * stepRight).toInt() - y).coerceAtLeast(1)
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "right_bt" -> {
                     // Right edge (bottom to top)
                     for (i in 0 until rightCount) {
@@ -293,13 +334,26 @@ object LedDataExtractor {
                             val x = (captureRight - scanDepthH).toInt()
                             val w = scanDepthH
                             val y = (captureTop + segmentIdx * stepRight).toInt()
-                            val h = ((captureTop + (segmentIdx + 1) * stepRight).toInt() - y).coerceAtLeast(1)
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            val h =
+                                ((captureTop + (segmentIdx + 1) * stepRight).toInt() - y).coerceAtLeast(
+                                    1
+                                )
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "bottom_rl" -> {
                     // Bottom edge (right to left)
                     for (i in 0 until bottomCount) {
@@ -308,30 +362,54 @@ object LedDataExtractor {
                         if (sideMode == "enabled" && !isInGap) {
                             val segmentIdx = bottomCount - 1 - i
                             val x = (captureLeft + segmentIdx * stepBottom).toInt()
-                            val w = ((captureLeft + (segmentIdx + 1) * stepBottom).toInt() - x).coerceAtLeast(1)
+                            val w =
+                                ((captureLeft + (segmentIdx + 1) * stepBottom).toInt() - x).coerceAtLeast(
+                                    1
+                                )
                             val y = (captureBottom - scanDepthV).toInt()
                             val h = scanDepthV
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "bottom_lr" -> {
                     // Bottom edge (left to right)
                     for (i in 0 until bottomCount) {
                         val isInGap = bottomGap > 0 && i >= gapStart && i < gapEnd
                         if (sideMode == "enabled" && !isInGap) {
                             val x = (captureLeft + i * stepBottom).toInt()
-                            val w = ((captureLeft + (i + 1) * stepBottom).toInt() - x).coerceAtLeast(1)
+                            val w =
+                                ((captureLeft + (i + 1) * stepBottom).toInt() - x).coerceAtLeast(1)
                             val y = (captureBottom - scanDepthV).toInt()
                             val h = scanDepthV
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "left_bt" -> {
                     // Left edge (bottom to top)
                     for (i in 0 until leftCount) {
@@ -340,13 +418,26 @@ object LedDataExtractor {
                             val x = captureLeft.toInt()
                             val w = scanDepthH
                             val y = (captureTop + segmentIdx * stepLeft).toInt()
-                            val h = ((captureTop + (segmentIdx + 1) * stepLeft).toInt() - y).coerceAtLeast(1)
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            val h =
+                                ((captureTop + (segmentIdx + 1) * stepLeft).toInt() - y).coerceAtLeast(
+                                    1
+                                )
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
                     }
                 }
+
                 "left_tb" -> {
                     // Left edge (top to bottom)
                     for (i in 0 until leftCount) {
@@ -355,7 +446,16 @@ object LedDataExtractor {
                             val w = scanDepthH
                             val y = (captureTop + i * stepLeft).toInt()
                             val h = ((captureTop + (i + 1) * stepLeft).toInt() - y).coerceAtLeast(1)
-                            setAverageColorFromRect(ledData[ledIdx++], screenData, width, height, x, y, w, h)
+                            setAverageColorFromRect(
+                                ledData[ledIdx++],
+                                screenData,
+                                width,
+                                height,
+                                x,
+                                y,
+                                w,
+                                h
+                            )
                         } else {
                             ledData[ledIdx++].set(0, 0, 0)
                         }
@@ -398,6 +498,7 @@ object LedDataExtractor {
                     listOf("left_tb", "bottom_lr", "right_bt", "top_rl")
                 }
             }
+
             "top_right" -> {
                 if (direction == "clockwise") {
                     // Start top-right, go clockwise: down right side, left along bottom, up left side, right along top
@@ -407,6 +508,7 @@ object LedDataExtractor {
                     listOf("top_rl", "left_tb", "bottom_lr", "right_bt")
                 }
             }
+
             "bottom_right" -> {
                 if (direction == "clockwise") {
                     // Start bottom-right, go clockwise: left along bottom, up left side, right along top, down right side
@@ -416,6 +518,7 @@ object LedDataExtractor {
                     listOf("right_bt", "top_rl", "left_tb", "bottom_lr")
                 }
             }
+
             "bottom_left" -> {
                 if (direction == "clockwise") {
                     // Start bottom-left, go clockwise: up left side, right along top, down right side, left along bottom
@@ -425,6 +528,7 @@ object LedDataExtractor {
                     listOf("bottom_lr", "right_bt", "top_rl", "left_tb")
                 }
             }
+
             else -> {
                 // Default to top_left clockwise
                 if (logsEnabled) Log.w(TAG, "Unknown start corner: $startCorner, using default")
@@ -441,7 +545,7 @@ object LedDataExtractor {
         rectX: Int,
         rectY: Int,
         rectW: Int,
-        rectH: Int
+        rectH: Int,
     ) {
         var rSum = 0L
         var gSum = 0L
@@ -466,7 +570,7 @@ object LedDataExtractor {
                 // Should not happen if width/height match screenData
                 continue
             }
-            
+
             for (x in startX until endX) {
                 rSum += screenData[idx].toInt() and 0xFF
                 gSum += screenData[idx + 1].toInt() and 0xFF

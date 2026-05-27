@@ -41,13 +41,16 @@ class ScreenrecordEncoder(
     private val mScreenHeight: Int,
     private val mOptions: AppOptions,
     private val mAdbPort: Int = 5555,
-    private val onFatalError: ((String) -> Unit)? = null
+    private val onFatalError: ((String) -> Unit)? = null,
 ) {
-    @Volatile private var mRunning = false
-    @Volatile private var mCapturing = false
+    @Volatile
+    private var mRunning = false
+    @Volatile
+    private var mCapturing = false
 
     // Reused across frames — no allocations in the hot path
-    @Volatile private var mRgbBuffer: ByteArray? = null
+    @Volatile
+    private var mRgbBuffer: ByteArray? = null
     private val mBorderCropper = com.vasmarfas.UniversalAmbientLight.common.util.BorderProcessor()
 
     // Bounded queue: read thread produces, codec-input thread consumes.
@@ -84,7 +87,8 @@ class ScreenrecordEncoder(
     }
 
     @Suppress("UNUSED_PARAMETER")
-    fun setOrientation(o: Int) {}
+    fun setOrientation(o: Int) {
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Lifecycle
@@ -160,8 +164,10 @@ class ScreenrecordEncoder(
             mCapturing = true
             Log.i(TAG, "MediaCodec started (${mCapW}×${mCapH})")
 
-            val lastDataActivity = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
-            val lastDecodeActivity = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+            val lastDataActivity =
+                java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+            val lastDecodeActivity =
+                java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
             val finalDecoder = decoder
 
             // ── Thread 2: codec input ──────────────────────────────────────
@@ -186,9 +192,13 @@ class ScreenrecordEncoder(
                     if (mRunning) {
                         codecFailureFlag.set(true)
                         Log.w(TAG, "Codec-in failed (IllegalState), restarting session")
-                        try { openedShell.close() } catch (_: Exception) {}
+                        try {
+                            openedShell.close()
+                        } catch (_: Exception) {
+                        }
                     }
-                } catch (_: InterruptedException) {}
+                } catch (_: InterruptedException) {
+                }
             }, "screenrecord-codec-in").also { it.isDaemon = true; it.start() }
 
             // ── Thread 3: codec output ────────────────────────────────────
@@ -200,8 +210,10 @@ class ScreenrecordEncoder(
                         when {
                             idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED ->
                                 Log.i(TAG, "Output format changed: ${finalDecoder.outputFormat}")
+
                             idx >= 0 -> {
-                                val isConfig = (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
+                                val isConfig =
+                                    (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                                 if (!isConfig && info.size > 0) {
                                     val img = finalDecoder.getOutputImage(idx)
                                     if (img != null) {
@@ -210,8 +222,14 @@ class ScreenrecordEncoder(
                                             val decoded = framesDecoded.incrementAndGet()
                                             hasDecodedFrame.set(true)
                                             lastDecodeActivity.set(System.currentTimeMillis())
-                                            if (decoded == 1) Log.i(TAG, "✓ First frame decoded (${img.width}×${img.height})")
-                                            if (decoded % 100 == 0) Log.d(TAG, "Frames: $decoded, bytes in: ${bytesReceived.get()}, queue: ${mDataQueue.size}")
+                                            if (decoded == 1) Log.i(
+                                                TAG,
+                                                "✓ First frame decoded (${img.width}×${img.height})"
+                                            )
+                                            if (decoded % 100 == 0) Log.d(
+                                                TAG,
+                                                "Frames: $decoded, bytes in: ${bytesReceived.get()}, queue: ${mDataQueue.size}"
+                                            )
                                         } finally {
                                             img.close()
                                         }
@@ -225,9 +243,13 @@ class ScreenrecordEncoder(
                     if (mRunning) {
                         codecFailureFlag.set(true)
                         Log.w(TAG, "Codec-out failed (IllegalState), restarting session")
-                        try { openedShell.close() } catch (_: Exception) {}
+                        try {
+                            openedShell.close()
+                        } catch (_: Exception) {
+                        }
                     }
-                } catch (_: InterruptedException) {}
+                } catch (_: InterruptedException) {
+                }
             }, "screenrecord-codec-out").also { it.isDaemon = true; it.start() }
 
             // ── Thread 1 (this): read ADB stream into queue ───────────────
@@ -238,20 +260,28 @@ class ScreenrecordEncoder(
             // - startup: if first frame never appears, restart
             // - runtime: restart only on prolonged lack of input bytes
             // Do NOT restart only on decode-gap; this causes false positives on some devices/scenes.
-            val watchdog = Thread({
+            Thread({
                 while (mRunning && !cleanExit) {
                     Thread.sleep(2000)
                     val now = System.currentTimeMillis()
-                    val startupStall = !hasDecodedFrame.get() && (now - lastDataActivity.get() > 20000)
-                    val hardInputStall = hasDecodedFrame.get() && (now - lastDataActivity.get() > 45000)
+                    val startupStall =
+                        !hasDecodedFrame.get() && (now - lastDataActivity.get() > 20000)
+                    val hardInputStall =
+                        hasDecodedFrame.get() && (now - lastDataActivity.get() > 45000)
                     if (startupStall || hardInputStall) {
                         if (startupStall) {
-                            Log.w(TAG, "Watchdog: startup stall (no first frame for 20s), restarting session…")
+                            Log.w(
+                                TAG,
+                                "Watchdog: startup stall (no first frame for 20s), restarting session…"
+                            )
                         } else {
                             Log.w(TAG, "Watchdog: no input data for 45s, restarting session…")
                         }
                         watchdogFlag.set(true)
-                        try { openedShell.close() } catch (_: Exception) {}
+                        try {
+                            openedShell.close()
+                        } catch (_: Exception) {
+                        }
                         break
                     }
                 }
@@ -268,7 +298,10 @@ class ScreenrecordEncoder(
                 bytesReceived.addAndGet(firstRead.toLong())
                 mDataQueue.put(chunk.copyOf(firstRead))
             } else {
-                Log.e(TAG, "screenrecord returned no data (firstRead=$firstRead). Command not supported?")
+                Log.e(
+                    TAG,
+                    "screenrecord returned no data (firstRead=$firstRead). Command not supported?"
+                )
             }
 
             while (mRunning) {
@@ -284,7 +317,10 @@ class ScreenrecordEncoder(
                 }
                 val n = inputStream.read(chunk)
                 if (n < 0) {
-                    Log.i(TAG, "ADB stream EOF after ${bytesReceived.get()} bytes, ${framesDecoded.get()} frames decoded")
+                    Log.i(
+                        TAG,
+                        "ADB stream EOF after ${bytesReceived.get()} bytes, ${framesDecoded.get()} frames decoded"
+                    )
                     break
                 }
                 if (n == 0) continue
@@ -321,9 +357,18 @@ class ScreenrecordEncoder(
             codecInThread?.interrupt()
             codecOutThread?.interrupt()
             // Wait for codec threads to notice the interruption / mRunning=false
-            try { Thread.sleep(150) } catch (_: Exception) {}
-            try { decoder?.stop(); decoder?.release() } catch (_: Exception) {}
-            try { shell?.close() } catch (_: Exception) {}
+            try {
+                Thread.sleep(150)
+            } catch (_: Exception) {
+            }
+            try {
+                decoder?.stop(); decoder?.release()
+            } catch (_: Exception) {
+            }
+            try {
+                shell?.close()
+            } catch (_: Exception) {
+            }
             if (!wasRunning) mCapturing = false
         }
         return cleanExit
@@ -361,13 +406,21 @@ class ScreenrecordEncoder(
                 val stream = m.openStream(cmd)
                 return object : AdbShell {
                     override val input: java.io.InputStream = stream.openInputStream()
-                    override fun close() { try { stream.close() } catch (_: Exception) {} }
+                    override fun close() {
+                        try {
+                            stream.close()
+                        } catch (_: Exception) {
+                        }
+                    }
                 }
             } catch (e: AdbPairingRequiredException) {
                 throw e
             } catch (e: Throwable) {
                 // Includes NoClassDefFoundError etc. — wrap so the session handler treats it gracefully.
-                try { mgr?.disconnect() } catch (_: Throwable) {}
+                try {
+                    mgr?.disconnect()
+                } catch (_: Throwable) {
+                }
                 throw java.io.IOException("ADB connect failed: ${e.message}", e)
             }
         } else {
@@ -379,8 +432,14 @@ class ScreenrecordEncoder(
             return object : AdbShell {
                 override val input: java.io.InputStream = stream.source.inputStream()
                 override fun close() {
-                    try { stream.close() } catch (_: Exception) {}
-                    try { d.close() } catch (_: Exception) {}
+                    try {
+                        stream.close()
+                    } catch (_: Exception) {
+                    }
+                    try {
+                        d.close()
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -427,22 +486,47 @@ class ScreenrecordEncoder(
         val sh = (h / step).coerceAtLeast(1)
 
         if (mOptions.useAverageColor) {
-            sendAvgDirect(yBuf, uBuf, vBuf, step, sw, sh, yRowStride, yPixStride, uvRowStride, uvPixStride)
+            sendAvgDirect(
+                yBuf,
+                uBuf,
+                vBuf,
+                step,
+                sw,
+                sh,
+                yRowStride,
+                yPixStride,
+                uvRowStride,
+                uvPixStride
+            )
         } else {
-            sendRgbDirect(yBuf, uBuf, vBuf, step, sw, sh, yRowStride, yPixStride, uvRowStride, uvPixStride)
+            sendRgbDirect(
+                yBuf,
+                uBuf,
+                vBuf,
+                step,
+                sw,
+                sh,
+                yRowStride,
+                yPixStride,
+                uvRowStride,
+                uvPixStride
+            )
         }
     }
 
     private fun sendRgbDirect(
         yBuf: java.nio.ByteBuffer, uBuf: java.nio.ByteBuffer, vBuf: java.nio.ByteBuffer,
         step: Int, sw: Int, sh: Int,
-        yRowStride: Int, yPixStride: Int, uvRowStride: Int, uvPixStride: Int
+        yRowStride: Int, yPixStride: Int, uvRowStride: Int, uvPixStride: Int,
     ) {
         val rgbSize = sw * sh * 3
         // Use local reference — safe even if stopInternal nulls mRgbBuffer concurrently
         val rgb: ByteArray
         val existing = mRgbBuffer
-        rgb = if (existing != null && existing.size >= rgbSize) existing else ByteArray(rgbSize).also { mRgbBuffer = it }
+        rgb =
+            if (existing != null && existing.size >= rgbSize) existing else ByteArray(rgbSize).also {
+                mRgbBuffer = it
+            }
         var dst = 0
 
         for (sy in 0 until sh) {
@@ -454,7 +538,9 @@ class ScreenrecordEncoder(
                 val uvOff = uvRow * uvRowStride + (srcX / 2) * uvPixStride
                 val u = uBuf.get(uvOff).toInt() and 0xFF
                 val v = vBuf.get(uvOff).toInt() and 0xFF
-                val c = y - 16; val d = u - 128; val e = v - 128
+                val c = y - 16
+                val d = u - 128
+                val e = v - 128
                 rgb[dst++] = ((298 * c + 409 * e + 128) shr 8).coerceIn(0, 255).toByte()
                 rgb[dst++] = ((298 * c - 100 * d - 208 * e + 128) shr 8).coerceIn(0, 255).toByte()
                 rgb[dst++] = ((298 * c + 516 * d + 128) shr 8).coerceIn(0, 255).toByte()
@@ -469,9 +555,12 @@ class ScreenrecordEncoder(
     private fun sendAvgDirect(
         yBuf: java.nio.ByteBuffer, uBuf: java.nio.ByteBuffer, vBuf: java.nio.ByteBuffer,
         step: Int, sw: Int, sh: Int,
-        yRowStride: Int, yPixStride: Int, uvRowStride: Int, uvPixStride: Int
+        yRowStride: Int, yPixStride: Int, uvRowStride: Int, uvPixStride: Int,
     ) {
-        var rSum = 0L; var gSum = 0L; var bSum = 0L; var cnt = 0
+        var rSum = 0L
+        var gSum = 0L
+        var bSum = 0L
+        var cnt = 0
         for (sy in 0 until sh) {
             val srcY = sy * step
             val uvRow = srcY / 2
@@ -481,7 +570,9 @@ class ScreenrecordEncoder(
                 val uvOff = uvRow * uvRowStride + (srcX / 2) * uvPixStride
                 val u = uBuf.get(uvOff).toInt() and 0xFF
                 val v = vBuf.get(uvOff).toInt() and 0xFF
-                val c = y - 16; val d = u - 128; val e = v - 128
+                val c = y - 16
+                val d = u - 128
+                val e = v - 128
                 rSum += ((298 * c + 409 * e + 128) shr 8).coerceIn(0, 255)
                 gSum += ((298 * c - 100 * d - 208 * e + 128) shr 8).coerceIn(0, 255)
                 bSum += ((298 * c + 516 * d + 128) shr 8).coerceIn(0, 255)

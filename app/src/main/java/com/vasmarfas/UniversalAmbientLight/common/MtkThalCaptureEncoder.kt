@@ -3,13 +3,13 @@ package com.vasmarfas.UniversalAmbientLight.common
 import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.Process
 import android.util.Log
+import android.widget.Toast
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
-import android.os.Looper
-import android.widget.Toast
 import java.io.DataInputStream
 import java.io.File
 import java.io.IOException
@@ -42,10 +42,12 @@ class MtkThalCaptureEncoder(
     private val mScreenWidth: Int,
     private val mScreenHeight: Int,
     private val mOptions: AppOptions,
-    private val onFatalError: ((String) -> Unit)? = null
+    private val onFatalError: ((String) -> Unit)? = null,
 ) {
-    @Volatile private var mRunning = false
-    @Volatile private var mCapturing = false
+    @Volatile
+    private var mRunning = false
+    @Volatile
+    private var mCapturing = false
 
     private var mThread: HandlerThread? = null
     private var mHandler: Handler? = null
@@ -143,7 +145,10 @@ class MtkThalCaptureEncoder(
         try {
             val chmod = Runtime.getRuntime().exec(arrayOf("su", "-c", "chmod 666 $DMA_HEAP_PATH"))
             if (!chmod.waitFor(CHMOD_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-                try { chmod.destroyForcibly() } catch (_: Exception) {}
+                try {
+                    chmod.destroyForcibly()
+                } catch (_: Exception) {
+                }
                 Log.w(TAG, "chmod dma_heap timed out")
             }
         } catch (e: Exception) {
@@ -151,9 +156,11 @@ class MtkThalCaptureEncoder(
         }
 
         val fps = max(1, mOptions.frameRate)
-        val cmd = arrayOf("su", "-c",
+        val cmd = arrayOf(
+            "su", "-c",
             "LD_LIBRARY_PATH=/vendor/lib:/system/lib " +
-            "${binary.absolutePath} $mCaptureWidth $mCaptureHeight $fps")
+                    "${binary.absolutePath} $mCaptureWidth $mCaptureHeight $fps"
+        )
 
         try {
             mProcess = Runtime.getRuntime().exec(cmd)
@@ -168,7 +175,10 @@ class MtkThalCaptureEncoder(
 
         if (!mRunning) {
             // stopRecording fired before the process launched.
-            try { mProcess?.destroy() } catch (_: Exception) {}
+            try {
+                mProcess?.destroy()
+            } catch (_: Exception) {
+            }
             mProcess = null
             return
         }
@@ -191,7 +201,8 @@ class MtkThalCaptureEncoder(
         private const val AVAILABILITY_CHECK_TIMEOUT_SEC = 3L
         private const val CHMOD_TIMEOUT_SEC = 2L
 
-        @Volatile private var sCachedAvailable: Boolean? = null
+        @Volatile
+        private var sCachedAvailable: Boolean? = null
         private val sCheckInProgress = AtomicBoolean(false)
 
         /**
@@ -221,12 +232,22 @@ class MtkThalCaptureEncoder(
         private fun checkAvailableBlocking(): Boolean {
             return try {
                 val process = Runtime.getRuntime().exec(
-                    arrayOf("su", "-c", "test -f $THAL_LIB_PATH && test -e $DMA_HEAP_PATH && echo OK")
+                    arrayOf(
+                        "su",
+                        "-c",
+                        "test -f $THAL_LIB_PATH && test -e $DMA_HEAP_PATH && echo OK"
+                    )
                 )
                 val completed = process.waitFor(AVAILABILITY_CHECK_TIMEOUT_SEC, TimeUnit.SECONDS)
                 if (!completed) {
-                    try { process.destroy() } catch (_: Exception) {}
-                    Log.w(TAG, "Availability probe timed out after ${AVAILABILITY_CHECK_TIMEOUT_SEC}s")
+                    try {
+                        process.destroy()
+                    } catch (_: Exception) {
+                    }
+                    Log.w(
+                        TAG,
+                        "Availability probe timed out after ${AVAILABILITY_CHECK_TIMEOUT_SEC}s"
+                    )
                     return false
                 }
                 val result = process.inputStream.bufferedReader().readText().trim()
@@ -253,10 +274,12 @@ class MtkThalCaptureEncoder(
                 val hdmiPatchAvailable = (flags and 1) != 0
                 if (!hdmiPatchAvailable) {
                     Log.w(TAG, "HDMI patch pattern not found on this firmware")
-                    android.os.Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(mContext,
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(
+                            mContext,
                             "MTK Capture: HDMI input capture unavailable on this firmware",
-                            Toast.LENGTH_LONG).show()
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             } else {
@@ -302,7 +325,8 @@ class MtkThalCaptureEncoder(
                 try {
                     val stderr = process.errorStream.bufferedReader().readText()
                     if (stderr.isNotEmpty()) Log.e(TAG, "Process stderr: $stderr")
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
         } catch (e: Exception) {
             if (mRunning) Log.e(TAG, "Unexpected error", e)
@@ -351,8 +375,14 @@ class MtkThalCaptureEncoder(
         mCapturing = false
 
         mProcess?.let { proc ->
-            try { proc.outputStream.close() } catch (_: Exception) {}
-            try { proc.destroy() } catch (_: Exception) {}
+            try {
+                proc.outputStream.close()
+            } catch (_: Exception) {
+            }
+            try {
+                proc.destroy()
+            } catch (_: Exception) {
+            }
         }
         mProcess = null
 

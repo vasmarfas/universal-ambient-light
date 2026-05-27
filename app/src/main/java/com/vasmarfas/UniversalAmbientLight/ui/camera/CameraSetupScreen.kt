@@ -18,16 +18,40 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -85,9 +109,30 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
         )
     }
     var topLeft by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.1f, 0.1f)) }
-    var topRight by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.9f, 0.1f)) }
-    var bottomRight by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.9f, 0.9f)) }
-    var bottomLeft by rememberSaveable(stateSaver = offsetSaver) { mutableStateOf(Offset(0.1f, 0.9f)) }
+    var topRight by rememberSaveable(stateSaver = offsetSaver) {
+        mutableStateOf(
+            Offset(
+                0.9f,
+                0.1f
+            )
+        )
+    }
+    var bottomRight by rememberSaveable(stateSaver = offsetSaver) {
+        mutableStateOf(
+            Offset(
+                0.9f,
+                0.9f
+            )
+        )
+    }
+    var bottomLeft by rememberSaveable(stateSaver = offsetSaver) {
+        mutableStateOf(
+            Offset(
+                0.1f,
+                0.9f
+            )
+        )
+    }
 
     // Load saved corners
     LaunchedEffect(Unit) {
@@ -119,7 +164,10 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                         bottomRight = Offset(0.9f, 0.9f)
                         bottomLeft = Offset(0.1f, 0.9f)
                     }) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.camera_setup_reset))
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.camera_setup_reset)
+                        )
                     }
                     // Save button
                     IconButton(onClick = {
@@ -135,7 +183,10 @@ fun CameraSetupScreen(onBackClick: () -> Unit) {
                         )
                         onBackClick()
                     }) {
-                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.camera_setup_save))
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = stringResource(R.string.camera_setup_save)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -263,7 +314,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCornersOverlay(
     topRight: Offset,
     bottomRight: Offset,
     bottomLeft: Offset,
-    dragCorner: Int = -1
+    dragCorner: Int = -1,
 ) {
     val w = size.width
     val h = size.height
@@ -332,7 +383,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCornersOverlay(
  */
 @Composable
 fun CameraPreviewView(
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner = LocalLifecycleOwner.current
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner = LocalLifecycleOwner.current,
 ) {
     val context = LocalContext.current
 
@@ -373,7 +424,8 @@ fun CameraPreviewView(
             previewUseCase?.let { uc ->
                 try {
                     boundProvider?.unbind(uc)
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
         }
     }

@@ -3,18 +3,17 @@ package com.vasmarfas.UniversalAmbientLight.common
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbManager
-import android.provider.Settings
-import android.widget.Toast
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
@@ -33,12 +32,17 @@ class BootActivity : AppCompatActivity() {
         }
 
         val prefs = Preferences(this)
-        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        val connectionType =
+            prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
 
         if (captureMethod == "accessibility") {
             if (AccessibilityCaptureService.getInstance() == null) {
-                Toast.makeText(this, getString(R.string.accessibility_enable_prompt), Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.accessibility_enable_prompt),
+                    Toast.LENGTH_LONG
+                ).show()
                 openAccessibilitySettings(this)
                 finish()
                 return
@@ -75,7 +79,8 @@ class BootActivity : AppCompatActivity() {
      */
     private fun handleUsbDeviceAttached() {
         val prefs = Preferences(this)
-        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        val connectionType =
+            prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
 
         if (!"adalight".equals(connectionType, ignoreCase = true)) {
             finish()
@@ -97,7 +102,8 @@ class BootActivity : AppCompatActivity() {
                 val autoStart = prefs.getBoolean(R.string.pref_key_boot)
                 val wasActive = prefs.getBoolean(R.string.pref_key_lighting_was_active)
                 if (autoStart && wasActive) {
-                    val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                    val captureMethod =
+                        prefs.getString(R.string.pref_key_capture_method, "media_projection")
                     if (captureMethod != "media_projection") {
                         startAlternativeRecorder(this)
                         finish()
@@ -115,12 +121,19 @@ class BootActivity : AppCompatActivity() {
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private fun requestMediaProjection() {
-        val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         if (manager != null) {
             try {
-                startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+                startActivityForResult(
+                    manager.createScreenCaptureIntent(),
+                    REQUEST_MEDIA_PROJECTION
+                )
             } catch (e: android.content.ActivityNotFoundException) {
-                android.widget.Toast.makeText(this, R.string.error_screen_recording_not_available, android.widget.Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    R.string.error_screen_recording_not_available,
+                    Toast.LENGTH_LONG
+                ).show()
                 finish()
             }
         } else {
@@ -137,7 +150,7 @@ class BootActivity : AppCompatActivity() {
             // SuperNotCalledException. Patch mCalled via reflection and finish cleanly.
             Log.w(TAG, "onResume: super threw IAE, recovering: ${e.message}")
             try {
-                val field = android.app.Activity::class.java.getDeclaredField("mCalled")
+                val field = Activity::class.java.getDeclaredField("mCalled")
                 field.isAccessible = true
                 field.setBoolean(this, true)
             } catch (refEx: Throwable) {
@@ -150,7 +163,7 @@ class BootActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
-            if (resultCode == Activity.RESULT_OK && data != null) {
+            if (resultCode == RESULT_OK && data != null) {
                 startScreenRecorder(this, resultCode, data)
             }
             finish()
@@ -193,12 +206,19 @@ class BootActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                     e is android.app.ForegroundServiceStartNotAllowedException
                 ) {
-                    Log.w(TAG, "startForegroundService not allowed yet, retrying on next loop: ${e.message}")
+                    Log.w(
+                        TAG,
+                        "startForegroundService not allowed yet, retrying on next loop: ${e.message}"
+                    )
                     Handler(Looper.getMainLooper()).postDelayed({
                         try {
                             context.startForegroundService(intent)
                         } catch (e2: Exception) {
-                            Log.e(TAG, "startForegroundService retry failed, falling back to startService", e2)
+                            Log.e(
+                                TAG,
+                                "startForegroundService retry failed, falling back to startService",
+                                e2
+                            )
                             context.startService(intent)
                         }
                     }, 200)

@@ -163,16 +163,22 @@ object TclBypass {
                 )
 
                 for (cmd in commands) {
-                    var process: java.lang.Process? = null
+                    var process: Process? = null
                     try {
                         process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
                         if (!process.waitFor(SHELL_CMD_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-                            try { process.destroyForcibly() } catch (_: Exception) {}
+                            try {
+                                process.destroyForcibly()
+                            } catch (_: Exception) {
+                            }
                             continue
                         }
                         if (process.exitValue() == 0) Log.d(TAG, "Success: $cmd")
                     } catch (_: Exception) {
-                        try { process?.destroyForcibly() } catch (_: Exception) {}
+                        try {
+                            process?.destroyForcibly()
+                        } catch (_: Exception) {
+                        }
                     }
                 }
             } finally {

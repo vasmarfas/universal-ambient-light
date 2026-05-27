@@ -23,14 +23,14 @@ object PermissionHelper {
     fun canDrawOverlays(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (Settings.canDrawOverlays(context)) return true
-            
+
             // On some Android TV devices (e.g. Yandex TV), Settings.canDrawOverlays returns false
             // even if permission is granted via ADB/AppOps. We check AppOps directly.
             try {
                 val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
                 val mode = appOps.checkOpNoThrow(
                     "android:system_alert_window", // AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW
-                    Process.myUid(), 
+                    Process.myUid(),
                     context.packageName
                 )
                 if (mode == AppOpsManager.MODE_ALLOWED) return true
@@ -133,12 +133,18 @@ object PermissionHelper {
                     try {
                         process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
                         if (!process.waitFor(SHELL_CMD_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-                            try { process.destroyForcibly() } catch (_: Exception) {}
+                            try {
+                                process.destroyForcibly()
+                            } catch (_: Exception) {
+                            }
                             continue
                         }
                         Log.d(TAG, "Executed: $cmd (exit: ${process.exitValue()})")
                     } catch (e: Exception) {
-                        try { process?.destroyForcibly() } catch (_: Exception) {}
+                        try {
+                            process?.destroyForcibly()
+                        } catch (_: Exception) {
+                        }
                         Log.w(TAG, "Command failed: $cmd")
                     }
                 }

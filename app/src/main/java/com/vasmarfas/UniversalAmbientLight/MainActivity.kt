@@ -2,41 +2,65 @@ package com.vasmarfas.UniversalAmbientLight
 
 import android.Manifest
 import android.app.Activity
-import android.app.ActivityManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.hardware.usb.UsbManager
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.hardware.usb.UsbManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.view.WindowCompat
-import android.view.WindowManager
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -44,50 +68,43 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
-import android.graphics.Bitmap
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.view.WindowCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.navigation.compose.rememberNavController
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
-import com.vasmarfas.UniversalAmbientLight.common.BootActivity
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
+import com.vasmarfas.UniversalAmbientLight.common.BootActivity
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
-import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
-import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
-import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
-import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
-import android.content.ActivityNotFoundException
-import android.net.Uri
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
 import kotlin.math.sqrt
-import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
 
@@ -115,11 +132,15 @@ class MainActivity : ComponentActivity() {
             if (UsbManager.ACTION_USB_DEVICE_ATTACHED != intent.action) return
 
             val prefs = Preferences(this@MainActivity)
-            val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+            val connectionType =
+                prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
             if (!"adalight".equals(connectionType, ignoreCase = true)) return
 
             val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, android.hardware.usb.UsbDevice::class.java)
+                intent.getParcelableExtra(
+                    UsbManager.EXTRA_DEVICE,
+                    android.hardware.usb.UsbDevice::class.java
+                )
             } else {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
@@ -143,7 +164,8 @@ class MainActivity : ComponentActivity() {
             mRecorderRunning = checked
 
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
-            val tclBlocked = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
+            val tclBlocked =
+                intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
 
             if (checked) mSessionEverConnected = true
 
@@ -179,14 +201,17 @@ class MainActivity : ComponentActivity() {
         // This mode is available from Android 11 (API 30).
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            window.attributes.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            window.attributes.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
         AnalyticsHelper.logAppLaunched(this)
 
-        mMediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        mMediaProjectionManager =
+            getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
         // Defer the Play update check to the next main-loop cycle — keeps onCreate cheap on TV.
         appUpdateManager = AppUpdateManagerFactory.create(this)
@@ -215,9 +240,12 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         isRunning = mRecorderRunning,
                         onToggleClick = { toggleScreenCapture() },
-                        onEffectsClick = { 
+                        onEffectsClick = {
                             currentEffect = currentEffect.next()
-                            AnalyticsHelper.logEffectChanged(this@MainActivity, currentEffect.name.lowercase())
+                            AnalyticsHelper.logEffectChanged(
+                                this@MainActivity,
+                                currentEffect.name.lowercase()
+                            )
                         },
                         effectMode = currentEffect
                     )
@@ -250,7 +278,10 @@ class MainActivity : ComponentActivity() {
         run {
             val p = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
             val loggedKey = "battery_opt_granted_logged"
-            if (!p.getBoolean(loggedKey, false) && PermissionHelper.isIgnoringBatteryOptimizations(this)) {
+            if (!p.getBoolean(loggedKey, false) && PermissionHelper.isIgnoringBatteryOptimizations(
+                    this
+                )
+            ) {
                 AnalyticsHelper.logBatteryOptimizationGranted(this)
                 p.edit { putBoolean(loggedKey, true) }
             }
@@ -274,7 +305,8 @@ class MainActivity : ComponentActivity() {
 
         // Auto-request USB permission when a USB-Serial device is already connected while app is open.
         val prefs = Preferences(this)
-        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        val connectionType =
+            prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         if ("adalight".equals(connectionType, ignoreCase = true)) {
             UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
                 context = this,
@@ -372,7 +404,8 @@ class MainActivity : ComponentActivity() {
         if (!mRecorderRunning) {
             val prefs = Preferences(this)
             prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
-            val captureSource = prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
+            val captureSource =
+                prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
 
             if (captureSource == "camera") {
                 requestCameraCapture()
@@ -392,10 +425,14 @@ class MainActivity : ComponentActivity() {
     private fun requestScreenCapture() {
         val prefs = Preferences(this)
         val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
-        
+
         if (method == "accessibility") {
             if (AccessibilityCaptureService.getInstance() == null) {
-                Toast.makeText(this, getString(R.string.accessibility_enable_prompt), Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.accessibility_enable_prompt),
+                    Toast.LENGTH_LONG
+                ).show()
                 openAccessibilitySettings(this)
                 return
             }
@@ -409,7 +446,8 @@ class MainActivity : ComponentActivity() {
             beginCaptureSession(
                 source = "screen",
                 method = method ?: "unknown",
-                protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+                protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion")
+                    ?: "hyperion"
             )
             return
         }
@@ -444,7 +482,11 @@ class MainActivity : ComponentActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to request screen capture: " + e.message)
-            Toast.makeText(this, "Failed to request screen recording: " + e.message, Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "Failed to request screen recording: " + e.message,
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -488,7 +530,8 @@ class MainActivity : ComponentActivity() {
      */
     private fun ensureUsbPermissionForAdalight(onReady: () -> Unit) {
         val prefs = Preferences(this)
-        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        val connectionType =
+            prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
 
         if (connectionType != "adalight") {
             onReady()
@@ -508,7 +551,7 @@ class MainActivity : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_UPDATE_CODE) {
-            if (resultCode == Activity.RESULT_OK) {
+            if (resultCode == RESULT_OK) {
                 AnalyticsHelper.logAppUpdateCompleted(this)
             } else {
                 Log.e(TAG, "Update flow failed! Result code: $resultCode")
@@ -518,7 +561,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
-            if (resultCode != Activity.RESULT_OK) {
+            if (resultCode != RESULT_OK) {
                 mPermissionDeniedCount++
                 mRecorderRunning = false
                 if (mPermissionDeniedCount >= 2) {
@@ -528,7 +571,11 @@ class MainActivity : ComponentActivity() {
                         PermissionHelper.showFullPermissionDialog(this) { requestScreenCapture() }
                     }
                 } else {
-                    Toast.makeText(this, "Screen recording permission was denied. Tap again to retry.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        "Screen recording permission was denied. Tap again to retry.",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
                 return
             }
@@ -537,10 +584,11 @@ class MainActivity : ComponentActivity() {
             Log.i(TAG, "Starting screen capture")
             if (data != null) {
                 val prefs = Preferences(this)
-                val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+                val protocol =
+                    prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
                 AnalyticsHelper.logProtocolStarted(this, protocol)
                 AnalyticsHelper.logScreenCaptureStarted(this, protocol)
-                
+
                 startScreenRecorder(resultCode, data)
                 mRecorderRunning = true
                 beginCaptureSession("screen", "media_projection", protocol)
@@ -558,7 +606,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
             if (grantResults.isNotEmpty()) {
@@ -566,7 +618,11 @@ class MainActivity : ComponentActivity() {
                     AnalyticsHelper.logPermissionGranted(this, "POST_NOTIFICATIONS")
                 } else {
                     AnalyticsHelper.logPermissionDenied(this, "POST_NOTIFICATIONS")
-                    Toast.makeText(this, "Notification permission is needed for the foreground service", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        "Notification permission is needed for the foreground service",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -576,7 +632,11 @@ class MainActivity : ComponentActivity() {
                 startCameraGrabber()
             } else {
                 AnalyticsHelper.logPermissionDenied(this, "CAMERA")
-                Toast.makeText(this, getString(R.string.camera_permission_required), Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.camera_permission_required),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
@@ -604,7 +664,7 @@ class MainActivity : ComponentActivity() {
     private fun checkForUpdates() {
         val appUpdateInfoTask = appUpdateManager.appUpdateInfo
         appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
-                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
                 // This example applies an immediate update. To apply a flexible update
                 // instead, pass in AppUpdateType.FLEXIBLE
                 && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
@@ -704,7 +764,8 @@ fun MainScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .drawBehind {
-                                val diagonal = sqrt(size.width * size.width + size.height * size.height)
+                                val diagonal =
+                                    sqrt(size.width * size.width + size.height * size.height)
 
                                 rotate(angle) {
                                     drawCircle(
@@ -743,7 +804,10 @@ fun MainScreen(
                                 // Bottom - Blue
                                 drawRect(
                                     color = Color.Blue,
-                                    topLeft = androidx.compose.ui.geometry.Offset(0f, h - thickness),
+                                    topLeft = androidx.compose.ui.geometry.Offset(
+                                        0f,
+                                        h - thickness
+                                    ),
                                     size = androidx.compose.ui.geometry.Size(w, thickness)
                                 )
                                 // Left - Yellow
@@ -755,7 +819,10 @@ fun MainScreen(
                                 // Right - Green
                                 drawRect(
                                     color = Color.Green,
-                                    topLeft = androidx.compose.ui.geometry.Offset(w - thickness, 0f),
+                                    topLeft = androidx.compose.ui.geometry.Offset(
+                                        w - thickness,
+                                        0f
+                                    ),
                                     size = androidx.compose.ui.geometry.Size(thickness, h)
                                 )
                             }
@@ -784,7 +851,14 @@ fun MainScreen(
 
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta)
+                                        listOf(
+                                            Color.Red,
+                                            Color.Yellow,
+                                            Color.Green,
+                                            Color.Cyan,
+                                            Color.Blue,
+                                            Color.Magenta
+                                        )
                                     ),
                                     topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
                                     size = androidx.compose.ui.geometry.Size(barWidth, h)
@@ -848,7 +922,10 @@ fun MainScreen(
                                 colors.forEachIndexed { index, c ->
                                     drawRect(
                                         color = c,
-                                        topLeft = androidx.compose.ui.geometry.Offset(index * barWidth, 0f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(
+                                            index * barWidth,
+                                            0f
+                                        ),
                                         size = androidx.compose.ui.geometry.Size(barWidth, h)
                                     )
                                 }
@@ -875,7 +952,10 @@ fun MainScreen(
                                 colors.forEachIndexed { index, c ->
                                     drawRect(
                                         color = c,
-                                        topLeft = androidx.compose.ui.geometry.Offset(0f, index * barHeight),
+                                        topLeft = androidx.compose.ui.geometry.Offset(
+                                            0f,
+                                            index * barHeight
+                                        ),
                                         size = androidx.compose.ui.geometry.Size(w, barHeight)
                                     )
                                 }
@@ -1045,22 +1125,22 @@ fun MainScreen(
                     Text(stringResource(R.string.help))
                 }
 
-                 var supportFocused by remember { mutableStateOf(false) }
-                 OutlinedButton(
-                     onClick = onSupportClick,
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .onFocusChanged { supportFocused = it.isFocused }
-                 ) {
-                     Icon(
-                         imageVector = Icons.Default.Favorite,
-                         contentDescription = stringResource(R.string.support_project),
-                         modifier = Modifier.size(20.dp),
-                         tint = MaterialTheme.colorScheme.error
-                     )
-                     Spacer(modifier = Modifier.width(8.dp))
-                     Text(stringResource(R.string.support_project))
-                 }
+                var supportFocused by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = onSupportClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { supportFocused = it.isFocused }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = stringResource(R.string.support_project),
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.support_project))
+                }
 
                 var reportIssueFocused by remember { mutableStateOf(false) }
                 OutlinedButton(
@@ -1102,7 +1182,7 @@ fun MainScreen(
 @Composable
 fun HelpDialog(
     onDismiss: () -> Unit,
-    onOpenGitHub: () -> Unit
+    onOpenGitHub: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1132,7 +1212,7 @@ fun openGitHubIssues(context: Context) {
     val url = context.getString(R.string.github_issues_url)
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    
+
     try {
         context.startActivity(intent)
     } catch (e: Exception) {
@@ -1145,8 +1225,12 @@ fun openGitHubIssues(context: Context) {
         } catch (e2: Exception) {
             // SecurityException or ActivityNotFoundException
             // If all else fails, show toast or log
-            android.util.Log.e("MainActivity", "Failed to open GitHub issues: ${e2.message}")
-            Toast.makeText(context, "Could not open browser. Please visit GitHub manually.", Toast.LENGTH_LONG).show()
+            Log.e("MainActivity", "Failed to open GitHub issues: ${e2.message}")
+            Toast.makeText(
+                context,
+                "Could not open browser. Please visit GitHub manually.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }
@@ -1166,10 +1250,10 @@ fun openGooglePlayReview(context: Context) {
 @Composable
 fun RatingDialog(
     onDismiss: () -> Unit,
-    onRatingSelected: (Int) -> Unit
+    onRatingSelected: (Int) -> Unit,
 ) {
     var selectedRating by remember { mutableStateOf(0) }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1233,7 +1317,7 @@ fun RatingDialog(
 @Composable
 fun LowRatingDialog(
     onDismiss: () -> Unit,
-    onReportIssue: () -> Unit
+    onReportIssue: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1259,7 +1343,7 @@ fun LowRatingDialog(
 @Composable
 fun SupportDialog(
     onDismiss: () -> Unit,
-    onOpenSupport: () -> Unit
+    onOpenSupport: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1286,10 +1370,10 @@ fun SupportDialog(
 fun UrlDialog(
     url: String,
     onDismiss: () -> Unit,
-    onOpenLink: (() -> Unit)? = null
+    onOpenLink: (() -> Unit)? = null,
 ) {
     val qrBitmap = remember(url) { generateQRCode(url, 400) }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1305,7 +1389,7 @@ fun UrlDialog(
                     text = stringResource(R.string.url_dialog_message),
                     textAlign = TextAlign.Center
                 )
-                
+
                 if (qrBitmap != null) {
                     Image(
                         bitmap = qrBitmap,
@@ -1313,7 +1397,7 @@ fun UrlDialog(
                         modifier = Modifier.size(250.dp)
                     )
                 }
-                
+
                 SelectionContainer {
                     Text(
                         text = url,
@@ -1349,17 +1433,21 @@ private fun generateQRCode(content: String, size: Int): ImageBitmap? {
             put(EncodeHintType.CHARACTER_SET, "UTF-8")
             put(EncodeHintType.MARGIN, 1)
         }
-        
+
         val writer = QRCodeWriter()
         val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size, hints)
-        
+
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
         for (x in 0 until size) {
             for (y in 0 until size) {
-                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.Black.toArgb() else Color.White.toArgb())
+                bitmap.setPixel(
+                    x,
+                    y,
+                    if (bitMatrix[x, y]) Color.Black.toArgb() else Color.White.toArgb()
+                )
             }
         }
-        
+
         bitmap.asImageBitmap()
     } catch (e: Exception) {
         Log.e("UrlDialog", "Failed to generate QR code", e)

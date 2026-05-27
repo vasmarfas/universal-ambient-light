@@ -33,7 +33,7 @@ class ToggleActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
-            if (resultCode == Activity.RESULT_OK && data != null) {
+            if (resultCode == RESULT_OK && data != null) {
                 startScreenRecorder(this, resultCode, data)
             }
 
@@ -59,19 +59,25 @@ class ToggleActivity : AppCompatActivity() {
 
     private fun requestPermission() {
         val prefs = Preferences(this)
-        val connectionType = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        val connectionType =
+            prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
 
         val requestMediaProjection = {
-            val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+            val manager =
+                getSystemService(MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
             if (manager != null) {
                 try {
-                    startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_MEDIA_PROJECTION)
+                    startActivityForResult(
+                        manager.createScreenCaptureIntent(),
+                        REQUEST_MEDIA_PROJECTION
+                    )
                 } catch (e: ActivityNotFoundException) {
                     // Some custom Android TV firmware doesn't ship the standard SystemUI
                     // MediaProjectionPermissionActivity. Fall back to launching the service
                     // directly without MediaProjection if the configured method supports it.
                     Log.w(TAG, "MediaProjection permission dialog unavailable: ${e.message}")
-                    val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                    val captureMethod =
+                        prefs.getString(R.string.pref_key_capture_method, "media_projection")
                     if (captureMethod != "media_projection") {
                         startScreenRecorderDirect(this)
                     }

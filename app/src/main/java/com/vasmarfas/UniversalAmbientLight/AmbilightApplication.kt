@@ -3,8 +3,8 @@ package com.vasmarfas.UniversalAmbientLight
 import android.app.Application
 import android.content.Context
 import android.util.Log
-import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 class AmbilightApplication : Application() {
@@ -78,7 +78,11 @@ class AmbilightApplication : Application() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             if (isMediaCodecDisplayListenerNpe(throwable)) {
-                Log.w("AmbilightApplication", "Swallowed MediaCodec.onDisplayChanged NPE on ${thread.name}", throwable)
+                Log.w(
+                    "AmbilightApplication",
+                    "Swallowed MediaCodec.onDisplayChanged NPE on ${thread.name}",
+                    throwable
+                )
                 return@setDefaultUncaughtExceptionHandler
             }
             previous?.uncaughtException(thread, throwable)

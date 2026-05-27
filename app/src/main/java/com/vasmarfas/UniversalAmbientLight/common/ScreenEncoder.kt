@@ -26,7 +26,7 @@ class ScreenEncoder(
     screenWidth: Int,
     screenHeight: Int,
     density: Int,
-    private val mOptions: AppOptions
+    private val mOptions: AppOptions,
 ) : ScreenEncoderBase(listener, projection, screenWidth, screenHeight, density, mOptions) {
 
     // Capture components
@@ -34,6 +34,7 @@ class ScreenEncoder(
     private var mImageReader: ImageReader? = null
     private var mCaptureThread: HandlerThread? = null
     private var mCaptureHandler: Handler? = null
+
     @Volatile
     private var mRunning: Boolean = false
     private var mCaptureWidth: Int = 0
@@ -45,7 +46,7 @@ class ScreenEncoder(
     private var mBorderX: Int = 0
     private var mBorderY: Int = 0
     private var mFrameCount: Int = 0
-    
+
     // Performance profiling
     private var mProfileFrames: Int = 0
     private var mTotalLoopTime: Long = 0
@@ -63,13 +64,13 @@ class ScreenEncoder(
             val start = System.nanoTime()
             captureFrame()
             val end = System.nanoTime()
-            
+
             // Profiling loop time
             val elapsedNs = end - start
             val elapsedMs = elapsedNs / 1_000_000L
             mTotalLoopTime += elapsedNs
             mProfileFrames++
-            
+
             val now = System.currentTimeMillis()
             if (now - mLastLogTime >= 2000) { // Log every 2 seconds
                 if (mProfileFrames > 0) {
@@ -79,11 +80,15 @@ class ScreenEncoder(
                     val avgCapture = (mTotalCaptureTime / mProfileFrames) / 1_000_000f
                     val avgProcess = (mTotalProcessTime / mProfileFrames) / 1_000_000f
                     val avgSend = (mTotalSendTime / mProfileFrames) / 1_000_000f
-                    
-                    Log.i(TAG, String.format("PERF: FPS=%.1f | Loop=%.1fms (Cap=%.1f, Proc=%.1f, Send=%.1f)", 
-                        fps, avgLoop, avgCapture, avgProcess, avgSend))
+
+                    Log.i(
+                        TAG, String.format(
+                            "PERF: FPS=%.1f | Loop=%.1fms (Cap=%.1f, Proc=%.1f, Send=%.1f)",
+                            fps, avgLoop, avgCapture, avgProcess, avgSend
+                        )
+                    )
                 }
-                
+
                 mLastLogTime = now
                 mProfileFrames = 0
                 mTotalLoopTime = 0
@@ -126,7 +131,10 @@ class ScreenEncoder(
     init {
         initCaptureDimensions()
 
-        if (DEBUG) Log.d(TAG, "Capture: " + mCaptureWidth + "x" + mCaptureHeight + " @ " + mFrameRate + "fps")
+        if (DEBUG) Log.d(
+            TAG,
+            "Capture: " + mCaptureWidth + "x" + mCaptureHeight + " @ " + mFrameRate + "fps"
+        )
 
         try {
             init()
@@ -246,7 +254,7 @@ class ScreenEncoder(
             val startCap = System.nanoTime()
             img = mImageReader!!.acquireLatestImage()
             mTotalCaptureTime += (System.nanoTime() - startCap)
-            
+
             if (img != null) {
                 processImage(img)
             }
@@ -274,13 +282,13 @@ class ScreenEncoder(
         } else {
             sendPixelData(buffer, width, height, rowStride, pixelStride)
         }
-        
+
         mTotalProcessTime += (System.nanoTime() - startProc)
     }
 
     private fun sendPixelData(
         buffer: ByteBuffer, width: Int, height: Int,
-        rowStride: Int, pixelStride: Int
+        rowStride: Int, pixelStride: Int,
     ) {
         val bx = mBorderX
         val by = mBorderY
@@ -289,13 +297,17 @@ class ScreenEncoder(
 
         if (effWidth <= 0 || effHeight <= 0) return
 
-        val rgb = extractRgb(buffer, width, height, rowStride, pixelStride, bx, by, effWidth, effHeight)
-        
+        val rgb =
+            extractRgb(buffer, width, height, rowStride, pixelStride, bx, by, effWidth, effHeight)
+
         // Применяем обработку цветов
         ColorProcessor.processRgbData(rgb, mOptions)
 
         if (DEBUG && System.currentTimeMillis() % 5000 < 100) {
-            Log.d(TAG, "sendPixelData: effWidth=$effWidth, effHeight=$effHeight, rgb.size=${rgb.size}, expected=${effWidth * effHeight * 3}")
+            Log.d(
+                TAG,
+                "sendPixelData: effWidth=$effWidth, effHeight=$effHeight, rgb.size=${rgb.size}, expected=${effWidth * effHeight * 3}"
+            )
         }
 
         val cropped = mBorderCropper.applyForEncoder(rgb, effWidth, effHeight, mOptions)
@@ -307,7 +319,7 @@ class ScreenEncoder(
     private fun extractRgb(
         buffer: ByteBuffer, width: Int, height: Int,
         rowStride: Int, pixelStride: Int,
-        bx: Int, by: Int, effWidth: Int, effHeight: Int
+        bx: Int, by: Int, effWidth: Int, effHeight: Int,
     ): ByteArray {
         val rgbSize = effWidth * effHeight * BYTES_PER_PIXEL_RGB
 
@@ -375,7 +387,7 @@ class ScreenEncoder(
 
     private fun sendAverageColor(
         buffer: ByteBuffer, width: Int, height: Int,
-        rowStride: Int, pixelStride: Int
+        rowStride: Int, pixelStride: Int,
     ) {
         val bx = mBorderX
         val by = mBorderY
@@ -410,7 +422,7 @@ class ScreenEncoder(
             val avgR = (r / count).toInt()
             val avgG = (g / count).toInt()
             val avgB = (b / count).toInt()
-            
+
             // Применяем обработку цветов
             val (rOut, gOut, bOut) = ColorProcessor.processColor(
                 avgR, avgG, avgB,
@@ -422,11 +434,11 @@ class ScreenEncoder(
                 mOptions.brightnessR, mOptions.brightnessG, mOptions.brightnessB,
                 mOptions.gammaR, mOptions.gammaG, mOptions.gammaB
             )
-            
+
             mAvgColorResult[0] = rOut.toByte()
             mAvgColorResult[1] = gOut.toByte()
             mAvgColorResult[2] = bOut.toByte()
-            
+
             val startSend = System.nanoTime()
             mListener.sendFrame(mAvgColorResult, 1, 1)
             mTotalSendTime += (System.nanoTime() - startSend)
