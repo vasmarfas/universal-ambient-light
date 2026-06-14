@@ -42,6 +42,7 @@ class HyperionThread(
     private val mWledColorOrder: String = wledColorOrder ?: "rgb"
     private val mReconnectEnabled = AtomicBoolean(reconnect)
     private val mConnected = AtomicBoolean(false)
+    private val mStandbyPaused = AtomicBoolean(false)
     private val mClient = AtomicReference<HyperionClient?>()
     private val mExecutor = Executors.newSingleThreadExecutor()
 
@@ -64,6 +65,7 @@ class HyperionThread(
 
     private val mListener = object : HyperionThreadListener {
         override fun sendFrame(data: ByteArray, width: Int, height: Int) {
+            if (mStandbyPaused.get()) return
             val client = mClient.get()
             if (client == null || !client.isConnected()) return
             if (mExecutor.isShutdown) return
@@ -81,6 +83,7 @@ class HyperionThread(
         }
 
         private fun sendPendingFrame() {
+            if (mStandbyPaused.get()) return
             val frame = mPendingFrame
             val client = mClient.get()
 
@@ -170,6 +173,31 @@ class HyperionThread(
         }
     }
 
+    /**
+     * Полностью останавливает отправку данных на время сна ТВ (экран выключен).
+     * Соединение с устройством сохраняется, чтобы возобновление было мгновенным.
+     */
+    fun pauseSending() {
+        mStandbyPaused.set(true)
+        when (val client = mClient.get()) {
+            is WLEDClient -> client.pauseSending()
+            is AdalightClient -> client.pauseSending()
+            else -> {}
+        }
+    }
+
+    /**
+     * Возобновляет отправку данных после включения экрана.
+     */
+    fun resumeSending() {
+        mStandbyPaused.set(false)
+        when (val client = mClient.get()) {
+            is WLEDClient -> client.resumeSending()
+            is AdalightClient -> client.resumeSending()
+            else -> {}
+        }
+    }
+
     override fun run() {
         startKeepAlive()
         connect()
@@ -177,6 +205,7 @@ class HyperionThread(
 
     private fun startKeepAlive() {
         mKeepAliveExecutor.scheduleWithFixedDelay({
+            if (mStandbyPaused.get()) return@scheduleWithFixedDelay
             val client = mClient.get() ?: return@scheduleWithFixedDelay
             if (!client.isConnected()) return@scheduleWithFixedDelay
             // WLED and Adalight have their own keepalive logic.
@@ -253,7 +282,8 @@ class HyperionThread(
     private fun handleError(e: IOException) {
         mCallback.onConnectionError(e.hashCode(), e.message)
 
-        if (mReconnectEnabled.get() && mConnected.get()) {
+        // Не пересоздавать клиент во сне: для Adalight новое открытие порта сбрасывает Arduino.
+        if (mReconnectEnabled.get() && mConnected.get() && !mStandbyPaused.get()) {
             sleepSafe(mReconnectDelayMs)
             try {
                 val newClient = createClient()

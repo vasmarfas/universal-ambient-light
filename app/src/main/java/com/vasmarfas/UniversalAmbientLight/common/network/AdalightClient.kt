@@ -40,6 +40,9 @@ class AdalightClient(
     @Volatile
     private var mConnected = false
 
+    @Volatile
+    private var mPaused = false
+
     private val mSmoothing: ColorSmoothing
     private var mLedDataBuffer: Array<ColorRgb>? = null
 
@@ -156,6 +159,15 @@ class AdalightClient(
         return mConnected && mPort != null
     }
 
+    fun pauseSending() {
+        mPaused = true
+        mSmoothing.stop()
+    }
+
+    fun resumeSending() {
+        mPaused = false
+    }
+
     @Throws(IOException::class)
     override fun disconnect() {
         mSmoothing.stop()
@@ -229,7 +241,7 @@ class AdalightClient(
 
     // Callback from ColorSmoothing
     private fun sendLedData(leds: Array<ColorRgb>) {
-        if (!isConnected()) return
+        if (!isConnected() || mPaused) return
 
         val port = mPort
         if (port == null) {

@@ -121,6 +121,8 @@
   <string name="pref_summary_reconnect">Автоматическое переподключение при потере связи</string>
   <string name="pref_title_reconnect_delay">Задержка переподключения</string>
   <string name="pref_summary_reconnect_delay">Секунды ожидания перед попыткой переподключения</string>
+  <string name="pref_title_standby_keepalive">Работа в режиме сна</string>
+  <string name="pref_summary_standby_keepalive">Продолжать слать данные на ленту при выключенном экране ТВ. Если выключено — приложение гасит ленту и ничего не отправляет в режиме сна, возобновляя работу при включении экрана</string>
   <!-- Capture source -->
   <string name="pref_title_capture_source">Источник захвата</string>
   <string name="pref_summary_capture_source">Захват экрана или внешняя камера</string>

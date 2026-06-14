@@ -794,6 +794,19 @@ fun SettingsScreen(
                         AnalyticsHelper.logSettingChanged(context, "boot_start", enabled.toString())
                     }
                 )
+                CheckBoxPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_standby_keepalive,
+                    title = stringResource(R.string.pref_title_standby_keepalive),
+                    summary = stringResource(R.string.pref_summary_standby_keepalive),
+                    onValueChange = { enabled ->
+                        AnalyticsHelper.logSettingChanged(
+                            context,
+                            "standby_keepalive",
+                            enabled.toString()
+                        )
+                    }
+                )
                 ListPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_language,

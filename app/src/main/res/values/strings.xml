@@ -121,6 +121,8 @@
   <string name="pref_summary_reconnect">Automatic reconnect to hyperion on lost connection</string>
   <string name="pref_title_reconnect_delay">Reconnect Delay</string>
   <string name="pref_summary_reconnect_delay">The number of seconds to wait before trying to reconnect</string>
+  <string name="pref_title_standby_keepalive">Keep running in standby</string>
+  <string name="pref_summary_standby_keepalive">Keep sending data to the LEDs while the TV screen is off. When disabled, the app turns the LEDs off and stays silent in standby, resuming when the screen turns back on</string>
   <!-- Capture source -->
   <string name="pref_title_capture_source">Capture Source</string>
   <string name="pref_summary_capture_source">Screen capture or external camera</string>

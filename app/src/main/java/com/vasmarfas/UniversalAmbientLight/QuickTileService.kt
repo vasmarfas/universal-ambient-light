@@ -91,7 +91,8 @@ class QuickTileService : TileService() {
                     if (!setupStarted) {
                         val i = Intent(this, BootActivity::class.java)
                         i.addFlags(
-                            Intent.FLAG_ACTIVITY_NO_ANIMATION
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                                    or Intent.FLAG_ACTIVITY_NO_ANIMATION
                                     or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
                                     or Intent.FLAG_ACTIVITY_NO_HISTORY
                         )

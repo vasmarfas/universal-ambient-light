@@ -21,8 +21,11 @@ class AmbilightApplication : Application() {
         installFrameworkBugFilter()
         seedXmlDefaults()
         migratePreferences()
-        // Инициализируем user properties при запуске приложения
-        AnalyticsHelper.initializeUserProperties(this)
+        // Off the main thread: reads SharedPreferences (first-access disk I/O) and
+        // touches Firebase — doing it inline in onCreate adds to cold-start ANRs.
+        Thread { AnalyticsHelper.initializeUserProperties(this) }
+            .apply { name = "analytics-init"; isDaemon = true }
+            .start()
     }
 
     /**
@@ -67,25 +70,32 @@ class AmbilightApplication : Application() {
     }
 
     /**
-     * Swallows the Android-framework NPE emitted from MediaCodec's internal
-     * DisplayListener on display removal (NVIDIA SHIELD HDMI unplug, etc.).
-     * Listener outlives release() on affected firmware; no app frames in stack.
+     * Swallows a handful of platform/OEM bugs that surface as uncaught exceptions
+     * on threads we don't control. Each predicate is tightly scoped so genuine app
+     * crashes still propagate to the previous handler (Crashlytics).
      */
     private fun installFrameworkBugFilter() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            if (isMediaCodecDisplayListenerNpe(throwable)) {
-                Log.w(
-                    "AmbilightApplication",
-                    "Swallowed MediaCodec.onDisplayChanged NPE on ${thread.name}",
-                    throwable
-                )
+            val reason = when {
+                isMediaCodecDisplayListenerNpe(throwable) -> "MediaCodec.onDisplayChanged NPE"
+                isReportSizeConfigurationsBug(throwable) -> "ActivityThread.reportSizeConfigurations race"
+                isForegroundServiceTimeout(throwable) -> "ForegroundServiceDidNotStartInTime (OEM blocked FGS)"
+                else -> null
+            }
+            if (reason != null) {
+                Log.w("AmbilightApplication", "Swallowed framework bug ($reason) on ${thread.name}", throwable)
                 return@setDefaultUncaughtExceptionHandler
             }
             previous?.uncaughtException(thread, throwable)
         }
     }
 
+    /**
+     * Android-framework NPE emitted from MediaCodec's internal DisplayListener on
+     * display removal (NVIDIA SHIELD HDMI unplug, etc.). Listener outlives release()
+     * on affected firmware; no app frames in stack.
+     */
     private fun isMediaCodecDisplayListenerNpe(t: Throwable): Boolean {
         if (t !is NullPointerException) return false
         val frames = t.stackTrace
@@ -93,6 +103,33 @@ class AmbilightApplication : Application() {
         val top = frames[0]
         if (!top.className.startsWith("android.media.MediaCodec") || top.methodName != "onDisplayChanged") return false
         return frames.any { it.className.startsWith("android.hardware.display.DisplayManagerGlobal") }
+    }
+
+    /**
+     * AOSP race where the system reports an Activity's size configurations after its
+     * ActivityRecord is already gone, surfaced as
+     * `IllegalArgumentException: reportSizeConfigurations: ActivityRecord not found`.
+     * Triggered by short-lived trampoline activities (BootActivity); originates
+     * entirely in system_server, no app frame to blame.
+     */
+    private fun isReportSizeConfigurationsBug(t: Throwable): Boolean {
+        if (t !is IllegalArgumentException) return false
+        if (t.message?.contains("reportSizeConfigurations") == true) return true
+        return t.stackTrace.any {
+            it.className == "android.app.ActivityThread" && it.methodName == "reportSizeConfigurations"
+        }
+    }
+
+    /**
+     * `ForegroundServiceDidNotStartInTimeException` for our own capture service. On
+     * some OEM firmware (e.g. TCL) startForeground() is blocked, so the service
+     * intentionally keeps running without a foreground notification and the platform
+     * later force-throws this exception. Scoped to our package so a genuine
+     * "forgot to call startForeground" bug elsewhere still surfaces.
+     */
+    private fun isForegroundServiceTimeout(t: Throwable): Boolean {
+        if (!t.javaClass.name.contains("ForegroundServiceDidNotStartInTimeException")) return false
+        return t.message?.contains(packageName) == true
     }
 
     private fun migratePreferences() {

@@ -54,6 +54,9 @@ class WLEDClient(
 
     @Volatile
     private var mLastLeds: Array<ColorRgb>? = null
+
+    @Volatile
+    private var mPaused = false
     private val mLastReconnectAttemptMs = AtomicLong(0L)
     private val mBlockedUntilMs = AtomicLong(0L)
     private val mLastErrorLogMs = AtomicLong(0L)
@@ -92,10 +95,23 @@ class WLEDClient(
 
     private fun startKeepAlive() {
         mKeepAliveExecutor.scheduleWithFixedDelay({
-            if (!mConnected || mLastLeds == null) return@scheduleWithFixedDelay
+            if (mPaused || !mConnected || mLastLeds == null) return@scheduleWithFixedDelay
             // Resend last frame to keep alive
             sendLedData(mLastLeds!!)
         }, 1000, 1000, TimeUnit.MILLISECONDS)
+    }
+
+    /**
+     * Останавливает любую исходящую отправку на время сна ТВ (экран выключен).
+     * Сокет остаётся открытым, чтобы возобновление было мгновенным.
+     */
+    fun pauseSending() {
+        mPaused = true
+        mSmoothing.stop()
+    }
+
+    fun resumeSending() {
+        mPaused = false
     }
 
     @Throws(IOException::class)
@@ -253,7 +269,7 @@ class WLEDClient(
     }
 
     private fun sendLedData(leds: Array<ColorRgb>) {
-        if (!isConnected()) return
+        if (!isConnected() || mPaused) return
         // Volatile reference — keepalive sees either the previous or the new array.
         mLastLeds = leds
 
