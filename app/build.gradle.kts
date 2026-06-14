@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.firebase.perf)
 }
 
-val defaultVersionName = "1.3.2"
+val defaultVersionName = "1.3.3"
 
 val appVersionName: String = System.getenv("APP_VERSION_NAME") ?: defaultVersionName
 
