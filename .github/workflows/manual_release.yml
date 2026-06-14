@@ -16,19 +16,19 @@ on:
         description: 'App versionName (например 0.1.0 или 0.1.0-beta.1)'
         required: true
       release_notes_github:
-        description: 'Release notes for the GitHub Release (optional; empty = no body, as before)'
+        description: 'GitHub Release notes. Fields are single-line — type \n for a line break (Markdown headings/lists need them). Optional; empty = no body.'
         required: false
         default: ''
       release_notes_googleplay_en:
-        description: 'Google Play What''s new — English (en-US). Max 500 chars. Optional.'
+        description: 'Google Play What''s new — English (en-US). Max 500 chars. Type \n for a line break. Optional.'
         required: false
         default: ''
       release_notes_googleplay_ru:
-        description: 'Google Play What''s new — Russian (ru-RU). Max 500 chars. Optional.'
+        description: 'Google Play What''s new — Russian (ru-RU). Max 500 chars. Type \n for a line break. Optional.'
         required: false
         default: ''
       release_notes_rustore:
-        description: 'What''s new for RuStore (optional; empty = no notes, as before)'
+        description: 'What''s new for RuStore. Type \n for a line break. Optional; empty = no notes.'
         required: false
         default: ''
       github_publish:
@@ -122,15 +122,24 @@ jobs:
       run: |
         echo "tag_name=v${{ github.event.inputs.version_name }}" >> $GITHUB_OUTPUT
 
+    - name: Prepare GitHub release notes
+      env:
+        GH_NOTES: ${{ inputs.release_notes_github }}
+      run: |
+        # workflow_dispatch inputs are single-line, so let "\n" stand for a line break.
+        # printf '%b' expands the escapes into real newlines so Markdown (headings, lists,
+        # blank lines) renders. %b leaves %, backticks and UTF-8 untouched.
+        printf '%b' "$GH_NOTES" > release_body.md
+
     - name: Upload APK to GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.tag.outputs.tag_name }}
         name: Release ${{ github.event.inputs.version_name }}
-        body: ${{ inputs.release_notes_github }}
+        body_path: release_body.md
         files: |
           dist/apk/release/app-release.apk
-          dist/bundle/release/app-release.aab
+#          dist/bundle/release/app-release.aab
         draft: ${{ ! inputs.github_publish }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -156,13 +165,14 @@ jobs:
       run: |
         wrote=0
         mkdir -p distribution/whatsnew
+        # Single-line dispatch inputs: expand "\n" into real line breaks (Play renders them).
         if [ -n "$GP_NOTES_EN" ]; then
-          printf '%s' "$GP_NOTES_EN" > distribution/whatsnew/whatsnew-en-US
+          printf '%b' "$GP_NOTES_EN" > distribution/whatsnew/whatsnew-en-US
           echo "Wrote whatsnew-en-US"
           wrote=1
         fi
         if [ -n "$GP_NOTES_RU" ]; then
-          printf '%s' "$GP_NOTES_RU" > distribution/whatsnew/whatsnew-ru-RU
+          printf '%b' "$GP_NOTES_RU" > distribution/whatsnew/whatsnew-ru-RU
           echo "Wrote whatsnew-ru-RU"
           wrote=1
         fi
@@ -263,9 +273,11 @@ jobs:
           # Build the body with jq so the (optional, possibly multi-line) notes are safely escaped.
           # whatsNew is added only when provided — otherwise the body is identical to before.
           # publishType: INSTANTLY = auto-publish after moderation, MANUAL = publish by hand.
+          # Single-line dispatch input: expand "\n" into real line breaks before jq encodes it.
+          WHATS_NEW=$(printf '%b' "$RUSTORE_NOTES")
           BODY=$(jq -n \
             --arg publishType "$RUSTORE_PUBLISH_TYPE" \
-            --arg whatsNew "$RUSTORE_NOTES" \
+            --arg whatsNew "$WHATS_NEW" \
             '{minAndroidVersion: 8, publishType: $publishType}
              + (if $whatsNew == "" then {} else {whatsNew: $whatsNew} end)')
           echo "RuStore draft request body: $BODY"
@@ -361,6 +373,31 @@ jobs:
             fi
           else
             echo "RuStore APK uploaded successfully"
+          fi
+
+      - name: Set RuStore publication settings
+        env:
+          RUSTORE_JWE: ${{ env.RUSTORE_JWE }}
+          PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
+          RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
+          RUSTORE_PUBLISH_TYPE: ${{ inputs.rustore_auto_publish && 'INSTANTLY' || 'MANUAL' }}
+        run: |
+          # Enforce publishType on the (possibly reused) draft. publishType is only
+          # applied at draft creation — when an existing draft is reused ("You already
+          # have draft version with ID = ..."), this run's value was never set, so an
+          # intended INSTANTLY release kept the draft's old MANUAL type and got stuck
+          # waiting for a manual "Publish" in the console. This call makes it deterministic.
+          # Must run after the APK upload and before commit (send to moderation).
+          BODY=$(jq -n --arg publishType "$RUSTORE_PUBLISH_TYPE" '{publishType: $publishType}')
+          RESPONSE=$(curl -s -X POST "https://public-api.rustore.ru/public/v1/application/${PACKAGE_NAME}/version/${RUSTORE_VERSION_ID}/publish-settings" \
+            -H "Content-Type: application/json" \
+            -H "Public-Token: ${RUSTORE_JWE}" \
+            -d "$BODY")
+          echo "RuStore publish-settings response: $RESPONSE"
+          CODE=$(echo "$RESPONSE" | jq -r '.code // empty')
+          if [ "$CODE" != "OK" ]; then
+            echo "RuStore publish-settings failed, code=$CODE"
+            exit 1
           fi
 
       - name: Commit RuStore version (send to moderation)
