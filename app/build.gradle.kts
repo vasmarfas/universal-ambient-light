@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.firebase.perf)
 }
 
-val defaultVersionName = "1.3.3"
+val defaultVersionName = "1.3.4"
 
 val appVersionName: String = System.getenv("APP_VERSION_NAME") ?: defaultVersionName
 
@@ -59,6 +59,22 @@ android {
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
             }
+        }
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        // GitHub / RuStore: full feature set, including the AccessibilityService capture
+        // fallback and accessibility-assisted ADB auto-pairing.
+        create("full") {
+            dimension = "distribution"
+            buildConfigField("boolean", "HAS_ACCESSIBILITY", "true")
+        }
+        // Google Play: no AccessibilityService (the API is disallowed here without an
+        // eligible accessibility-tool use case). Screen capture stays on MediaProjection.
+        create("playstore") {
+            dimension = "distribution"
+            buildConfigField("boolean", "HAS_ACCESSIBILITY", "false")
         }
     }
 

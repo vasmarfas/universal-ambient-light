@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      AccessibilityService capture fallback. Present only in the "full" flavor
+      (GitHub / RuStore). The Google Play flavor ships without it, so the
+      BIND_ACCESSIBILITY_SERVICE service is never declared in that build.
+    -->
+    <application>
+        <service
+            android:name=".common.AccessibilityCaptureService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+    </application>
+
+</manifest>

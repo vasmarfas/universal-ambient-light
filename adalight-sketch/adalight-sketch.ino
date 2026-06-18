@@ -13,10 +13,21 @@
  */
 
 #include <FastLED.h>
+#if defined(ESP32) || defined(ESP_PLATFORM)
+#include "esp_system.h"
+#endif
 
 // ========== CONFIGURATION ==========
 
-#define DATA_PIN 9
+// LED data pin — platform default chosen to be valid out of the box on each board.
+// Change it to match your wiring.
+#if defined(ESP32) || defined(ESP_PLATFORM)
+#define DATA_PIN 2 // ESP32: GPIO 6-11 are reserved for flash; 2/4/5/16/17… are free
+#elif defined(ESP8266)
+#define DATA_PIN 2 // ESP8266: GPIO2 (labelled D4 on many boards)
+#else
+#define DATA_PIN 9 // AVR (Uno/Nano) and others
+#endif
 #define NUM_LEDS 66
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
@@ -25,6 +36,13 @@
 
 // Optional watchdog for broken streams (ms). Set 0 to disable.
 #define PACKET_TIMEOUT_MS 500
+
+// Startup LED test (R->G->B->W). 1 = on, 0 = off.
+// When on, it plays only on a real power-on. On boards whose bootloader preserves the
+// reset flags it is skipped on external/DTR resets — i.e. when the USB host (the app /
+// TV) re-opens the serial port or the TV cycles USB power in standby — so the strip no
+// longer flashes all colors every time. Set to 0 to disable the test entirely.
+#define STARTUP_TEST 0
 
 // 0 = auto (recommended), 1 = force ADA, 2 = force LBAPA, 3 = force AWA (only works if sender uses AWA header)
 #define FORCE_PROTOCOL 0
@@ -224,6 +242,22 @@ static Protocol decideAdaVsLbapa(uint16_t countVal)
 
 void setup()
 {
+#if STARTUP_TEST
+  // Decide whether this boot is a fresh power-on, so the test plays only then — not on
+  // external/DTR resets (USB host re-opening the port, TV cycling USB power). Reset-cause
+  // detection is MCU-specific; unknown platforms keep the original "always show" behaviour.
+  bool powerOnReset = true;
+#if defined(__AVR__)
+  // PORF = power-on. Read MCUSR before anything clears it, then clear it for the next boot.
+  const uint8_t resetFlags = MCUSR;
+  MCUSR = 0;
+  powerOnReset = (resetFlags & _BV(PORF)) != 0 || resetFlags == 0;
+#elif defined(ESP32) || defined(ESP_PLATFORM)
+  const esp_reset_reason_t rr = esp_reset_reason();
+  powerOnReset = (rr == ESP_RST_POWERON || rr == ESP_RST_UNKNOWN);
+#endif
+#endif
+
   Serial.begin(SERIAL_BAUD);
 
   FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
@@ -231,16 +265,21 @@ void setup()
   FastLED.clear();
   FastLED.show();
 
-  // Startup LED test: R -> G -> B -> W (300ms each)
-  const CRGB startupColors[] = {CRGB::Red, CRGB::Green, CRGB::Blue, CRGB::White};
-  for (uint8_t ci = 0; ci < (sizeof(startupColors) / sizeof(startupColors[0])); ci++)
+#if STARTUP_TEST
+  if (powerOnReset)
   {
-    fill_solid(leds, NUM_LEDS, startupColors[ci]);
+    // Startup LED test: R -> G -> B -> W (300ms each)
+    const CRGB startupColors[] = {CRGB::Red, CRGB::Green, CRGB::Blue, CRGB::White};
+    for (uint8_t ci = 0; ci < (sizeof(startupColors) / sizeof(startupColors[0])); ci++)
+    {
+      fill_solid(leds, NUM_LEDS, startupColors[ci]);
+      FastLED.show();
+      delay(300);
+    }
+    FastLED.clear();
     FastLED.show();
-    delay(300);
   }
-  FastLED.clear();
-  FastLED.show();
+#endif
 }
 
 void loop()

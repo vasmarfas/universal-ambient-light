@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Play Store flavor: список методов захвата без пункта «Accessibility» — в этой сборке
+  AccessibilityService отсутствует. Переопределяет массивы из src/main.
+-->
+<resources>
+  <string-array name="pref_list_capture_method">
+    <item>MediaProjection (Стандартный)</item>
+    <item>Scrcpy (ADB, ~30мс) ★★★★★</item>
+    <item>ADB Stream (H.264, ~50мс)</item>
+    <item>Screencap (Shell / ADB)</item>
+    <item>Screencap (Root)</item>
+    <item>ADB (Скриншот, ~200мс)</item>
+    <item>MTK аппаратный захват (Root)</item>
+  </string-array>
+  <string-array name="pref_list_capture_method_values">
+    <item>media_projection</item>
+    <item>scrcpy</item>
+    <item>adb_stream</item>
+    <item>screencap_shell</item>
+    <item>screencap_root</item>
+    <item>adb_local</item>
+    <item>mtk_thal_capture</item>
+  </string-array>
+</resources>

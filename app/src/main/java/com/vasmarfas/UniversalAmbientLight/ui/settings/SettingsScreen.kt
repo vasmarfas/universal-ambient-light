@@ -76,6 +76,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.vasmarfas.UniversalAmbientLight.BuildConfig
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
@@ -1338,11 +1339,14 @@ fun AdbPairingDialog(
 
                         // One-tap path: shows a consent dialog first, then the app reads the code via
                         // Accessibility, finds the port via mDNS and pairs without leaving the screen.
-                        OutlinedButton(
-                            enabled = !testing,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { showAutoPairConsent = true }
-                        ) { Text(stringResource(R.string.adb_autopair_btn)) }
+                        // Accessibility-dependent — hidden in the Play Store flavor (no such service).
+                        if (BuildConfig.HAS_ACCESSIBILITY) {
+                            OutlinedButton(
+                                enabled = !testing,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { showAutoPairConsent = true }
+                            ) { Text(stringResource(R.string.adb_autopair_btn)) }
+                        }
 
                         Spacer(modifier = Modifier.height(6.dp))
                         // Manual entry hidden behind a spoiler so it doesn't clutter D-pad navigation.

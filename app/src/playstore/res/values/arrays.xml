@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Play Store flavor: capture-method list without the "Accessibility" option, since this
+  build ships no AccessibilityService. Overrides the arrays from src/main.
+-->
+<resources>
+  <string-array name="pref_list_capture_method">
+    <item>MediaProjection (Standard)</item>
+    <item>Scrcpy (ADB, ~30ms) ★★★★★</item>
+    <item>ADB Stream (H.264, ~50ms)</item>
+    <item>Screencap (Shell / ADB)</item>
+    <item>Screencap (Root)</item>
+    <item>ADB (Screenshot, ~200ms)</item>
+    <item>MTK Hardware Capture (Root)</item>
+  </string-array>
+  <string-array name="pref_list_capture_method_values">
+    <item>media_projection</item>
+    <item>scrcpy</item>
+    <item>adb_stream</item>
+    <item>screencap_shell</item>
+    <item>screencap_root</item>
+    <item>adb_local</item>
+    <item>mtk_thal_capture</item>
+  </string-array>
+</resources>

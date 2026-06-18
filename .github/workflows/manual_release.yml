@@ -91,7 +91,9 @@ jobs:
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         BUILD_NUMBER: ${{ github.run_number }}
         APP_VERSION_NAME: ${{ inputs.version_name }}
-      run: ./gradlew assembleRelease bundleRelease
+      # full flavor → APK for GitHub & RuStore (keeps the AccessibilityService features);
+      # playstore flavor → AAB for Google Play (no AccessibilityService, per Play policy).
+      run: ./gradlew assembleFullRelease bundlePlaystoreRelease
 
     - name: Upload build artifacts (APK/AAB)
       uses: actions/upload-artifact@v4
@@ -99,8 +101,8 @@ jobs:
         name: android-release
         if-no-files-found: error
         path: |
-          app/build/outputs/apk/release/app-release.apk
-          app/build/outputs/bundle/release/app-release.aab
+          app/build/outputs/apk/full/release/app-full-release.apk
+          app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab
 
   github_release:
     runs-on: ubuntu-latest
@@ -138,8 +140,8 @@ jobs:
         name: Release ${{ github.event.inputs.version_name }}
         body_path: release_body.md
         files: |
-          dist/apk/release/app-release.apk
-#          dist/bundle/release/app-release.aab
+          dist/apk/full/release/app-full-release.apk
+#          dist/bundle/playstoreRelease/app-playstore-release.aab
         draft: ${{ ! inputs.github_publish }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -188,7 +190,7 @@ jobs:
       with:
         serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         packageName: com.vasmarfas.UniversalAmbientLight
-        releaseFiles: dist/bundle/release/app-release.aab
+        releaseFiles: dist/bundle/playstoreRelease/app-playstore-release.aab
         track: ${{ inputs.track }}
         # Checkbox on → completed + sent for review; off → use the Status field (draft by default).
         status: ${{ inputs.googleplay_send_to_review && 'completed' || inputs.status }}
@@ -318,9 +320,9 @@ jobs:
           PACKAGE_NAME: com.vasmarfas.UniversalAmbientLight
           RUSTORE_VERSION_ID: ${{ env.RUSTORE_VERSION_ID }}
         run: |
-          # Ищем APK файл в разных возможных местах
+          # Ищем APK файл в разных возможных местах (full flavor — с AccessibilityService)
           APK_PATH=""
-          for path in "dist/apk/release/app-release.apk" "dist/app/build/outputs/apk/release/app-release.apk" "dist/app-release.apk"; do
+          for path in "dist/apk/full/release/app-full-release.apk" "dist/app/build/outputs/apk/full/release/app-full-release.apk" "dist/app-full-release.apk"; do
             if [ -f "$path" ]; then
               APK_PATH="$path"
               break
