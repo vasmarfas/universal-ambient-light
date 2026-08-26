@@ -76,7 +76,10 @@ class ToggleActivity : AppCompatActivity() {
         val requestMediaProjection = {
             val captureMethod =
                 prefs.getString(R.string.pref_key_capture_method, "media_projection")
-            if (captureMethod != "media_projection") {
+            if (prefs.getString(R.string.pref_key_capture_source, "screen") == "effect") {
+                BootActivity.startEffects(this)
+                finish()
+            } else if (captureMethod != "media_projection") {
                 // Методы без MediaProjection поднимаем сразу, как в BootActivity: иначе
                 // включение с пульта или ярлыка каждый раз упиралось бы в диалог захвата.
                 startScreenRecorderDirect(this)

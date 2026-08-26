@@ -52,6 +52,8 @@ object RemoteSession {
         val projectMedia: Boolean,
         /** Окна поверх других приложений — без них Android 10+ не покажет окно из фона. */
         val overlay: Boolean,
+        /** Возможности новее первой версии протокола, см. RemoteProtocol.FEATURE_*. */
+        val features: Set<String> = emptySet(),
     )
 
     data class Snapshot(
@@ -232,6 +234,20 @@ object RemoteSession {
     fun call(op: String, args: JSONObject = JSONObject(), timeoutMs: Long = 15_000L): JSONObject {
         val client = mClient ?: throw IOException(string(R.string.remote_error_offline))
         return client.call(op, args, timeoutMs)
+    }
+
+    /**
+     * Отправляет несохранённые правки зеркала прямо сейчас и ждёт ответа. Нужно перед
+     * командой, которая зависит от только что изменённых настроек: иначе запуск подсветки
+     * обгонял бы отложенную пачку и ТВ стартовал бы со старым источником.
+     */
+    fun flushPending() {
+        val client = mClient ?: return
+        val entries = mainSync {
+            mMain.removeCallbacks(mFlush)
+            collectPending()
+        }
+        if (entries.length() > 0) client.call(RemoteProtocol.OP_SET_PREFS, JSONObject().put("set", entries))
     }
 
     fun adb(action: String, extra: JSONObject = JSONObject()): JSONObject =
@@ -454,6 +470,7 @@ object RemoteSession {
     private fun parseCaps(caps: JSONObject?): TvCaps? {
         caps ?: return null
         val methods = caps.optJSONArray("methods") ?: JSONArray()
+        val features = caps.optJSONArray("features") ?: JSONArray()
         return TvCaps(
             sdk = caps.optInt("sdk"),
             appVersion = caps.optString("app"),
@@ -462,7 +479,8 @@ object RemoteSession {
             accessibilityOn = caps.optBoolean("accessibilityOn"),
             methods = (0 until methods.length()).map { methods.optString(it) }.toSet(),
             projectMedia = caps.optBoolean("projectMedia"),
-            overlay = caps.optBoolean("overlay")
+            overlay = caps.optBoolean("overlay"),
+            features = (0 until features.length()).map { features.optString(it) }.toSet(),
         )
     }
 

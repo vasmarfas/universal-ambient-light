@@ -35,8 +35,9 @@ class BootActivity : AppCompatActivity() {
         val connectionType =
             prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
         val captureMethod = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+        val effect = prefs.getString(R.string.pref_key_capture_source, "screen") == "effect"
 
-        if (captureMethod == "accessibility") {
+        if (captureMethod == "accessibility" && !effect) {
             if (AccessibilityCaptureService.getInstance() == null) {
                 Toast.makeText(
                     this,
@@ -64,6 +65,11 @@ class BootActivity : AppCompatActivity() {
     }
 
     private fun startCaptureAfterPermission(captureMethod: String?) {
+        if (Preferences(this).getString(R.string.pref_key_capture_source, "screen") == "effect") {
+            startEffects(this)
+            finish()
+            return
+        }
         if (captureMethod != "media_projection") {
             startAlternativeRecorder(this)
             finish()
@@ -104,7 +110,10 @@ class BootActivity : AppCompatActivity() {
                 if (autoStart && wasActive) {
                     val captureMethod =
                         prefs.getString(R.string.pref_key_capture_method, "media_projection")
-                    if (captureMethod != "media_projection") {
+                    if (prefs.getString(R.string.pref_key_capture_source, "screen") == "effect") {
+                        startEffects(this)
+                        finish()
+                    } else if (captureMethod != "media_projection") {
                         startAlternativeRecorder(this)
                         finish()
                     } else {
@@ -188,6 +197,13 @@ class BootActivity : AppCompatActivity() {
             intent.action = ScreenGrabberService.ACTION_START
             intent.putExtra(ScreenGrabberService.EXTRA_RESULT_CODE, resultCode)
             intent.putExtra(ScreenGrabberService.EXTRA_RESULT_DATA, data)
+            startForegroundServiceCompat(context, intent)
+        }
+
+        @JvmStatic
+        fun startEffects(context: Context) {
+            val intent = Intent(context, ScreenGrabberService::class.java)
+            intent.action = ScreenGrabberService.ACTION_START_EFFECT
             startForegroundServiceCompat(context, intent)
         }
 

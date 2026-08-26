@@ -2,7 +2,9 @@ package com.vasmarfas.UniversalAmbientLight.ui.home
 
 import android.content.Context
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.ui.effects.titleRes
 
 /** Куда уходит свет: «WLED · 192.168.1.50:19446». */
 internal fun describeTarget(context: Context, prefs: Preferences): String {
@@ -22,9 +24,13 @@ internal fun describeTarget(context: Context, prefs: Preferences): String {
     }
 }
 
-/** Откуда берётся картинка: камера или способ захвата экрана без технических хвостов. */
+/** Откуда берётся картинка: камера, эффект или способ захвата экрана без технических хвостов. */
 internal fun describeSource(context: Context, prefs: Preferences): String {
     val source = prefs.getString(R.string.pref_key_capture_source) ?: "screen"
+    if (source == "effect") {
+        val effect = Effect.byId(prefs.getString(R.string.pref_key_effect))
+        return context.getString(R.string.home_source_effect, context.getString(effect.titleRes()))
+    }
     if (source == "camera") {
         return entryFor(
             context,

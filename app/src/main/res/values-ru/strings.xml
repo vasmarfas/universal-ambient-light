@@ -102,10 +102,12 @@
   <string-array name="pref_list_capture_source">
     <item>Экран</item>
     <item>Камера</item>
+    <item>Эффект (без захвата)</item>
   </string-array>
   <string-array name="pref_list_capture_source_values">
     <item>screen</item>
     <item>camera</item>
+    <item>effect</item>
   </string-array>
   <string name="pref_title_camera_setup">Настройка углов камеры</string>
   <string name="pref_summary_camera_setup">Настройте 4 угла для совмещения с экраном ТВ в кадре камеры</string>
@@ -566,4 +568,44 @@
   <string name="remote_notification_title">Управление с телефона включено</string>
   <string name="remote_notification_waiting">Ждём подключения телефона</string>
   <string name="remote_notification_connected">Подключены: %1$s</string>
+
+  <!-- Effects without screen capture -->
+  <string name="effects_title">Эффекты</string>
+  <string name="effects_intro">Эффекты зажигают ленту сами, без захвата экрана: разрешение на запись не нужно, и неважно, что сейчас на ТВ.</string>
+  <string name="effects_group_static">Статичные</string>
+  <string name="effects_group_dynamic">Динамичные</string>
+  <string name="effects_group_setup">Для настройки</string>
+  <string name="effects_parameters">Настройки: %1$s</string>
+  <string name="effects_now_off">Подсветка выключена. Выберите эффект, и он сразу включится.</string>
+  <string name="effects_now_effect">Сейчас горит: %1$s</string>
+  <string name="effects_now_screen">Сейчас подсветка повторяет картинку. Выбор эффекта переключит её.</string>
+  <string name="effects_turn_off">Выключить</string>
+  <string name="effects_back_to_screen">Вернуть захват экрана</string>
+  <string name="effects_color">Цвет</string>
+  <string name="effects_color2">Второй цвет</string>
+  <string name="effects_hue">Оттенок</string>
+  <string name="effects_saturation">Насыщенность</string>
+  <string name="effects_speed">Скорость</string>
+  <string name="effects_brightness">Яркость</string>
+  <string name="effects_temperature">Цветовая температура</string>
+  <string name="effects_standby">Не гасить при выключенном экране</string>
+  <string name="effects_standby_summary">Лента светит ночником, пока приставка не уснула. Часть телевизоров в режиме ожидания отключает сеть, тогда лента всё равно погаснет.</string>
+  <string name="unit_kelvin">%1$d К</string>
+  <string name="effect_solid">Один цвет</string>
+  <string name="effect_gradient">Градиент</string>
+  <string name="effect_white">Белый для кино</string>
+  <string name="effect_white_hint">Эталонный белый для просмотра кино 6500 К, чем меньше, тем теплее.</string>
+  <string name="effect_rainbow">Радуга</string>
+  <string name="effect_color_cycle">Смена цвета</string>
+  <string name="effect_breathing">Дыхание</string>
+  <string name="effect_candle">Свеча</string>
+  <string name="effect_fire">Огонь</string>
+  <string name="effect_aurora">Северное сияние</string>
+  <string name="effect_ocean">Океан</string>
+  <string name="effect_plasma">Плазма</string>
+  <string name="effect_comet">Комета</string>
+  <string name="effect_layout_test">Проверка раскладки</string>
+  <string name="effect_layout_test_hint">Верх красный, правая сторона зелёная, низ синий, левая жёлтая. Белая точка бежит от первого светодиода в сторону нумерации. Если цвета или путь точки не совпадают с лентой, поправьте раскладку.</string>
+  <string name="home_source_effect">Эффект: %1$s</string>
+  <string name="remote_error_update_tv">На ТВ стоит старая версия приложения, в ней этого ещё нет. Обновите приложение на ТВ.</string>
 </resources>

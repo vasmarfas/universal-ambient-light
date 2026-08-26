@@ -31,9 +31,9 @@ import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
+import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeSource
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeTarget
-import com.vasmarfas.UniversalAmbientLight.ui.home.EffectMode
 import com.vasmarfas.UniversalAmbientLight.ui.home.HelpDialog
 import com.vasmarfas.UniversalAmbientLight.ui.home.HomeStatus
 import com.vasmarfas.UniversalAmbientLight.ui.home.LowRatingDialog
@@ -57,8 +57,6 @@ fun AppNavHost(
     startDestination: String = Screen.Home.route,
     isRunning: Boolean,
     onToggleClick: () -> Unit,
-    onEffectsClick: () -> Unit,
-    effectMode: EffectMode,
     lastError: String? = null,
     remotePending: Boolean = false,
     pendingPayload: PairingPayload? = null,
@@ -141,8 +139,9 @@ fun AppNavHost(
                 onSettingsClick = {
                     navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                 },
-                onEffectsClick = onEffectsClick,
-                effectMode = effectMode,
+                onEffectsClick = {
+                    navController.navigate(Screen.Effects.route) { launchSingleTop = true }
+                },
                 captureSource = captureSource,
                 status = status,
                 localPreview = remote == null,
@@ -326,6 +325,20 @@ fun AppNavHost(
                 AnalyticsHelper.logScreenView(context, "remote_host", "RemoteHostScreen")
             }
             RemoteHostScreen(onBackClick = { navController.popBackStack() })
+        }
+        composable(Screen.Effects.route) {
+            val context = LocalContext.current
+            val remote = LocalRemote.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "effects", "EffectsScreen")
+            }
+            val running = remote?.running ?: isRunning
+            EffectsScreen(
+                running = running,
+                onBackClick = { navController.popBackStack() },
+                onStart = { if (!running) onToggleClick() },
+                onStop = { if (running) onToggleClick() }
+            )
         }
         composable(Screen.RemoteTvs.route) {
             val context = LocalContext.current

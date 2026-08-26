@@ -56,8 +56,6 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
-import com.vasmarfas.UniversalAmbientLight.ui.home.EffectMode
-import com.vasmarfas.UniversalAmbientLight.ui.home.next
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.Screen
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
@@ -94,7 +92,6 @@ class MainActivity : ComponentActivity() {
     private var mOverlayRequested = false
     private var mTclWarningShown = false
     private lateinit var appUpdateManager: AppUpdateManager
-    private var currentEffect by mutableStateOf(EffectMode.RAINBOW)
     private var mSessionStartTime: Long? = null
     private var mSessionEverConnected: Boolean = false
     private var mSessionMethod: String? = null
@@ -242,14 +239,6 @@ class MainActivity : ComponentActivity() {
                             onToggleClick = {
                                 if (remoteActive) toggleRemoteCapture() else toggleScreenCapture()
                             },
-                            onEffectsClick = {
-                                currentEffect = currentEffect.next()
-                                AnalyticsHelper.logEffectChanged(
-                                    this@MainActivity,
-                                    currentEffect.name.lowercase()
-                                )
-                            },
-                            effectMode = currentEffect,
                             lastError = if (remoteActive) mRemoteError else mLastError,
                             remotePending = mRemotePending,
                             pendingPayload = mPendingPayload,
@@ -480,6 +469,8 @@ class MainActivity : ComponentActivity() {
         val action = if (start) RemoteProtocol.CAPTURE_START else RemoteProtocol.CAPTURE_STOP
         Thread({
             val result = runCatching {
+                // Источник могли переключить только что: правка обязана дойти до ТВ раньше запуска
+                if (start) RemoteSession.flushPending()
                 RemoteSession.call(
                     RemoteProtocol.OP_CAPTURE,
                     JSONObject().put("action", action),
@@ -533,6 +524,8 @@ class MainActivity : ComponentActivity() {
 
             if (captureSource == "camera") {
                 requestCameraCapture()
+            } else if (captureSource == "effect") {
+                ensureUsbPermissionForAdalight { startEffects() }
             } else {
                 ensureUsbPermissionForAdalight {
                     requestScreenCapture()
@@ -638,6 +631,18 @@ class MainActivity : ComponentActivity() {
         } else {
             startCameraGrabber()
         }
+    }
+
+    private fun startEffects() {
+        val prefs = Preferences(this)
+        val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        BootActivity.startEffects(this)
+        mRecorderRunning = true
+        beginCaptureSession(
+            source = "effect",
+            method = prefs.getString(R.string.pref_key_effect, "rainbow") ?: "rainbow",
+            protocol = protocol
+        )
     }
 
     private fun startCameraGrabber() {

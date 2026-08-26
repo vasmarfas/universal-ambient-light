@@ -99,6 +99,7 @@ internal class RemoteHostHandler(
             .put("projectMedia", PermissionHelper.hasProjectMediaPermission(mContext))
             .put("overlay", PermissionHelper.canDrawOverlays(mContext))
             .put("methods", JSONArray(methods))
+            .put("features", JSONArray(FEATURES))
     }
 
     private fun setPrefs(client: RemoteServer.Client, request: JSONObject): JSONObject {
@@ -255,5 +256,9 @@ internal class RemoteHostHandler(
 
         /** Отметка удалённого ключа в [RemoteServer.Client.sentValues]: null туда не положить. */
         val REMOVED = Any()
+
+        private val FEATURES = listOf(
+            RemoteProtocol.FEATURE_EFFECTS,
+        )
     }
 }

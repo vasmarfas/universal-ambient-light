@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -256,6 +257,81 @@ fun NumberStepper(
             range = range,
             onConfirm = {
                 change(it)
+                showDialog = false
+            },
+            onDismiss = { showDialog = false }
+        )
+    }
+}
+
+/**
+ * Ползунок без привязки к настройке, с тем же поведением, что у SliderPreference: стрелки
+ * пульта двигают значение, OK открывает точный ввод, сам ползунок фокус не берёт.
+ * [onValueChange] приходит на каждом шаге, [onValueChangeFinished] - когда отпустили.
+ */
+@Composable
+fun ValueSlider(
+    title: String,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    range: IntRange,
+    modifier: Modifier = Modifier,
+    step: Int = 1,
+    valueText: (Int) -> String = { it.toString() },
+    onValueChangeFinished: () -> Unit = {},
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+
+    fun change(newValue: Int) {
+        val clamped = newValue.coerceIn(range)
+        if (clamped != value) onValueChange(clamped)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .focusHighlight(interactionSource)
+            .dpadAdjust(
+                onStep = { direction, multiplier -> change(value + direction * step * multiplier) },
+                onRelease = onValueChangeFinished
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = { showDialog = true }
+            )
+            .padding(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = valueText(value),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Slider(
+            value = value.coerceIn(range).toFloat(),
+            onValueChange = { change(snapToStep(it, range, step)) },
+            onValueChangeFinished = onValueChangeFinished,
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            modifier = Modifier.focusProperties { canFocus = false }
+        )
+    }
+
+    if (showDialog) {
+        NumberInputDialog(
+            title = title,
+            initial = value,
+            range = range,
+            onConfirm = {
+                change(it)
+                onValueChangeFinished()
                 showDialog = false
             },
             onDismiss = { showDialog = false }
