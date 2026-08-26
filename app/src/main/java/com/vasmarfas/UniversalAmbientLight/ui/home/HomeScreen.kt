@@ -67,36 +67,6 @@ import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground
 import kotlin.math.sqrt
 
 /**
- * Главный экран: кнопка включения, режимы фоновой анимации и кнопки в углах.
- */
-enum class EffectMode {
-    RAINBOW,
-    SIDE_COLORS,
-    MOVING_BAR,
-    SOLID_WHITE,
-    SOLID_RED,
-    SOLID_GREEN,
-    SOLID_BLUE,
-    BREATHING,
-    VERTICAL_BARS,
-    HORIZONTAL_BARS;
-}
-
-internal fun EffectMode.next(): EffectMode =
-    when (this) {
-        EffectMode.RAINBOW -> EffectMode.SIDE_COLORS
-        EffectMode.SIDE_COLORS -> EffectMode.MOVING_BAR
-        EffectMode.MOVING_BAR -> EffectMode.SOLID_WHITE
-        EffectMode.SOLID_WHITE -> EffectMode.SOLID_RED
-        EffectMode.SOLID_RED -> EffectMode.SOLID_GREEN
-        EffectMode.SOLID_GREEN -> EffectMode.SOLID_BLUE
-        EffectMode.SOLID_BLUE -> EffectMode.BREATHING
-        EffectMode.BREATHING -> EffectMode.VERTICAL_BARS
-        EffectMode.VERTICAL_BARS -> EffectMode.HORIZONTAL_BARS
-        EffectMode.HORIZONTAL_BARS -> EffectMode.RAINBOW
-    }
-
-/**
  * Рамка фокуса для d-pad на ТВ. Отдельно от border с условной шириной: 0.dp — это
  * Dp.Hairline, и тонкое кольцо primary рисовалось даже без фокуса.
  */
@@ -141,11 +111,10 @@ fun MainScreen(
     onToggleClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onEffectsClick: () -> Unit,
-    effectMode: EffectMode,
     captureSource: String = "screen",
     status: HomeStatus = HomeStatus(running = isRunning),
-    // Эффекты рисуются на экране этого устройства — при управлении телевизором с телефона
-    // они ничего не дают, как и превью камеры телефона
+    // Превью камеры и радуга захвата рисуются на экране этого устройства, при управлении
+    // телевизором с телефона они ничего не показывают
     localPreview: Boolean = true,
     remoteEntry: RemoteEntry? = null,
     topContent: @Composable () -> Unit = {},
@@ -160,225 +129,45 @@ fun MainScreen(
             CameraPreviewBackground(isCapturing = isRunning)
         }
 
-        // В режиме экрана — анимированный фон, но только когда захват запущен
-        if (isRunning && captureSource != "camera" && localPreview) {
+        // Пока идёт захват экрана, фон переливается радугой: она попадает на ленту и сразу
+        // показывает, что картинка доходит до контроллера
+        if (isRunning && captureSource == "screen" && localPreview) {
             val infiniteTransition = rememberInfiniteTransition(label = "effects")
+            val angle by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(4000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "rotation"
+            )
 
-            when (effectMode) {
-                EffectMode.RAINBOW -> {
-                    val angle by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(4000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "rotation"
-                    )
+            Spacer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        val diagonal =
+                            sqrt(size.width * size.width + size.height * size.height)
 
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val diagonal =
-                                    sqrt(size.width * size.width + size.height * size.height)
-
-                                rotate(angle) {
-                                    drawCircle(
-                                        brush = Brush.sweepGradient(
-                                            colors = listOf(
-                                                Color.Red,
-                                                Color.Magenta,
-                                                Color.Blue,
-                                                Color.Cyan,
-                                                Color.Green,
-                                                Color.Yellow,
-                                                Color.Red
-                                            )
-                                        ),
-                                        radius = diagonal / 2
+                        rotate(angle) {
+                            drawCircle(
+                                brush = Brush.sweepGradient(
+                                    colors = listOf(
+                                        Color.Red,
+                                        Color.Magenta,
+                                        Color.Blue,
+                                        Color.Cyan,
+                                        Color.Green,
+                                        Color.Yellow,
+                                        Color.Red
                                     )
-                                }
-                            }
-                    )
-                }
-
-                EffectMode.SIDE_COLORS -> {
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val thickness = h * 0.12f
-
-                                // Верх — красный
-                                drawRect(
-                                    color = Color.Red,
-                                    size = androidx.compose.ui.geometry.Size(w, thickness)
-                                )
-                                // Низ — синий
-                                drawRect(
-                                    color = Color.Blue,
-                                    topLeft = androidx.compose.ui.geometry.Offset(
-                                        0f,
-                                        h - thickness
-                                    ),
-                                    size = androidx.compose.ui.geometry.Size(w, thickness)
-                                )
-                                // Слева — жёлтый
-                                drawRect(
-                                    color = Color.Yellow,
-                                    topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
-                                    size = androidx.compose.ui.geometry.Size(thickness, h)
-                                )
-                                // Справа — зелёный
-                                drawRect(
-                                    color = Color.Green,
-                                    topLeft = androidx.compose.ui.geometry.Offset(
-                                        w - thickness,
-                                        0f
-                                    ),
-                                    size = androidx.compose.ui.geometry.Size(thickness, h)
-                                )
-                            }
-                    )
-                }
-
-                EffectMode.MOVING_BAR -> {
-                    val offset by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(3000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "movingBar"
-                    )
-
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val barWidth = w * 0.12f
-                                val x = (w + barWidth) * offset - barWidth
-
-                                drawRect(
-                                    brush = Brush.verticalGradient(
-                                        listOf(
-                                            Color.Red,
-                                            Color.Yellow,
-                                            Color.Green,
-                                            Color.Cyan,
-                                            Color.Blue,
-                                            Color.Magenta
-                                        )
-                                    ),
-                                    topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
-                                    size = androidx.compose.ui.geometry.Size(barWidth, h)
-                                )
-                            }
-                    )
-                }
-
-                EffectMode.SOLID_WHITE,
-                EffectMode.SOLID_RED,
-                EffectMode.SOLID_GREEN,
-                EffectMode.SOLID_BLUE,
-                    -> {
-                    val color = when (effectMode) {
-                        EffectMode.SOLID_WHITE -> Color.White
-                        EffectMode.SOLID_RED -> Color.Red
-                        EffectMode.SOLID_GREEN -> Color.Green
-                        EffectMode.SOLID_BLUE -> Color.Blue
-                        else -> Color.White
+                                ),
+                                radius = diagonal / 2
+                            )
+                        }
                     }
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(color)
-                    )
-                }
-
-                EffectMode.BREATHING -> {
-                    val alpha by infiniteTransition.animateFloat(
-                        initialValue = 0.2f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(2000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "breathing"
-                    )
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Cyan.copy(alpha = alpha))
-                    )
-                }
-
-                EffectMode.VERTICAL_BARS -> {
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val colors = listOf(
-                                    Color.Red,
-                                    Color.Yellow,
-                                    Color.Green,
-                                    Color.Cyan,
-                                    Color.Blue,
-                                    Color.Magenta
-                                )
-                                val barWidth = w / colors.size
-                                colors.forEachIndexed { index, c ->
-                                    drawRect(
-                                        color = c,
-                                        topLeft = androidx.compose.ui.geometry.Offset(
-                                            index * barWidth,
-                                            0f
-                                        ),
-                                        size = androidx.compose.ui.geometry.Size(barWidth, h)
-                                    )
-                                }
-                            }
-                    )
-                }
-
-                EffectMode.HORIZONTAL_BARS -> {
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val colors = listOf(
-                                    Color.Red,
-                                    Color.Yellow,
-                                    Color.Green,
-                                    Color.Cyan,
-                                    Color.Blue,
-                                    Color.Magenta
-                                )
-                                val barHeight = h / colors.size
-                                colors.forEachIndexed { index, c ->
-                                    drawRect(
-                                        color = c,
-                                        topLeft = androidx.compose.ui.geometry.Offset(
-                                            0f,
-                                            index * barHeight
-                                        ),
-                                        size = androidx.compose.ui.geometry.Size(w, barHeight)
-                                    )
-                                }
-                            }
-                    )
-                }
-            }
+            )
         }
 
         // Центральный блок с рядом кнопок управления. Прокрутка — на телефоне в ландшафте
@@ -407,16 +196,12 @@ fun MainScreen(
 
             topContent()
 
-            // Эффекты рисуются на экране устройства и попадают на ленту через захват
-            // экрана — в режиме камеры кнопка ничего не меняет
-            val effectsEnabled = captureSource != "camera"
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 // Кнопка эффектов (слева)
-                if (localPreview) Box(
+                Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(80.dp)
@@ -430,7 +215,6 @@ fun MainScreen(
                 ) {
                     IconButton(
                         onClick = onEffectsClick,
-                        enabled = effectsEnabled,
                         modifier = Modifier
                             .size(72.dp)
                             .onFocusChanged { effectsFocused = it.isFocused }
@@ -439,12 +223,10 @@ fun MainScreen(
                             imageVector = Icons.Default.Palette,
                             contentDescription = stringResource(R.string.home_effects),
                             modifier = Modifier.size(40.dp),
-                            tint = when {
-                                !effectsEnabled ->
-                                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-
-                                isRunning -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onBackground
+                            tint = if (isRunning && captureSource == "effect") {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onBackground
                             }
                         )
                     }

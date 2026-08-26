@@ -22,6 +22,7 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.core.app.ServiceCompat
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.ConnectionConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
@@ -85,7 +86,7 @@ class ScreenGrabberService : Service() {
     // Одновременно работает ровно один способ захвата: его выбирают startScreenRecord,
     // startAlternativeRecord и startCameraCapture по настройкам и доступности на прошивке.
     private var mActiveBackend: CaptureBackend? = null
-    private var mCaptureSource: String = "screen" // "screen" or "camera"
+    private var mCaptureSource: String = "screen" // "screen", "camera" или "effect"
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
     private var mConnectionType = "hyperion"
@@ -153,7 +154,7 @@ class ScreenGrabberService : Service() {
 
         /** Гасим вывод, только если экран действительно погашен и keepalive выключен. */
         private fun maybeStandbyPauseOnConnect() {
-            if (mCaptureSource == "camera") return
+            if (mCaptureSource == "camera" || effectStaysOn()) return
             if (Preferences(this@ScreenGrabberService).getBoolean(R.string.pref_key_standby_keepalive)) return
             val standby = mStandby ?: return
             if (!standby.isScreenOff()) return
@@ -256,7 +257,8 @@ class ScreenGrabberService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SCREEN_OFF intent received")
                     // Камера снимает внешний телевизор, сон экрана устройства ей безразличен — работаем как работали.
-                    val isCamera = mCaptureSource == "camera"
+                    // Так же живёт эффект, который попросили не гасить: ТВ выключен, лента светит ночником
+                    val isCamera = mCaptureSource == "camera" || effectStaysOn()
                     val standbyKeepalive =
                         Preferences(context).getBoolean(R.string.pref_key_standby_keepalive)
                     if (standbyKeepalive || isCamera) {
@@ -267,7 +269,12 @@ class ScreenGrabberService : Service() {
                     }
                     // Камера снимает внешний телевизор, её кадры не зависят от экрана
                     // устройства — гасим ленту только для экранных способов захвата.
-                    if (mActiveBackend !is CameraEncoder) mActiveBackend?.clearLights()
+                    // Эффект рисует кадры сам и зажёг бы ленту снова - его останавливаем
+                    when (val backend = mActiveBackend) {
+                        is CameraEncoder -> {}
+                        is EffectEncoder -> if (!isCamera) backend.pause()
+                        else -> backend?.clearLights()
+                    }
                     if (!standbyKeepalive && !isCamera) {
                         // Keepalive в простое выключен: даём чёрным кадрам уйти и молчим до SCREEN_ON
                         mStandby?.schedulePause()
@@ -503,6 +510,10 @@ class ScreenGrabberService : Service() {
                     Log.i(TAG, "Restarted by the system after the process died, resuming capture")
                     return onStartCommand(Intent(this, javaClass).setAction(ACTION_START), flags, startId)
                 }
+                if (source == "effect" && !adalight) {
+                    Log.i(TAG, "Restarted by the system after the process died, resuming the effect")
+                    return onStartCommand(Intent(this, javaClass).setAction(ACTION_START_EFFECT), flags, startId)
+                }
                 // Остальным путям нужен диалог (согласие на запись экрана, разрешения на USB и
                 // камеру) — их поднимает CaptureLauncher, когда этот экземпляр уже остановлен
                 val app = applicationContext
@@ -571,6 +582,22 @@ class ScreenGrabberService : Service() {
                         }
 
                         startCameraCapture()
+                        registerEventReceiver()
+                    } else {
+                        haltStartup()
+                    }
+                }
+
+                ACTION_START_EFFECT -> if (mHyperionThread == null) {
+                    mCaptureSource = "effect"
+                    val foregroundStarted =
+                        tryStartForegroundCompat(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+
+                    if (prepared()) {
+                        if (!foregroundStarted && mTclBlocked) {
+                            mStandby?.acquireWakeLock()
+                        }
+                        startEffect()
                         registerEventReceiver()
                     } else {
                         haltStartup()
@@ -848,6 +875,18 @@ class ScreenGrabberService : Service() {
         encoder.sendStatus()
     }
 
+
+    private fun startEffect() {
+        val prefs = Preferences(this)
+        val encoder = EffectEncoder(newGate(), buildAppOptions(prefs), EffectConfig.from(prefs))
+        mActiveBackend = encoder
+        encoder.sendStatus()
+    }
+
+    /** Эффект просили не гасить вместе с экраном ТВ. */
+    private fun effectStaysOn(): Boolean =
+        mCaptureSource == "effect" &&
+                Preferences(this).getBoolean(R.string.pref_key_effect_standby)
 
     private fun notifyTclBlocked() {
         val intent = Intent(BROADCAST_FILTER)
@@ -1371,6 +1410,7 @@ class ScreenGrabberService : Service() {
             getString(R.string.pref_key_capture_source),
             getString(R.string.pref_key_capture_method)
         )
+        val effectKeys = EFFECT_KEYS.map { getString(it) }.toSet()
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == null) return@OnSharedPreferenceChangeListener
@@ -1378,6 +1418,9 @@ class ScreenGrabberService : Service() {
                 if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
                 if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
                 if (key in cameraIdleKeys) mActiveOptions?.refreshCameraIdleSettings(prefs)
+                if (key in effectKeys) {
+                    (mActiveBackend as? EffectEncoder)?.setConfig(EffectConfig.from(prefs))
+                }
                 // Остальное вступало в силу только после ручного перезапуска подсветки; с
                 // телефона правят посреди фильма, и ждать перезапуска там некому
                 val output = key in outputKeys
@@ -1474,6 +1517,10 @@ class ScreenGrabberService : Service() {
         Log.i(TAG, "Capture settings changed, recreating ${backend.javaClass.simpleName}")
 
         when (backend) {
+            // Эффект не зависит ни от частоты, ни от качества захвата, а раскладку ленты
+            // разбор кадра перечитывает сам
+            is EffectEncoder -> return
+
             is ScreenEncoder -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     // Android 14+ не отдаёт вторую проекцию по тому же согласию — новые
@@ -1535,6 +1582,7 @@ class ScreenGrabberService : Service() {
         private const val BASE = "com.vasmarfas.UniversalAmbientLight.service."
         const val ACTION_START = BASE + "ACTION_START"
         const val ACTION_START_CAMERA = BASE + "ACTION_START_CAMERA"
+        const val ACTION_START_EFFECT = BASE + "ACTION_START_EFFECT"
         const val ACTION_STOP = BASE + "ACTION_STOP"
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_DETECT_FRAME = BASE + "ACTION_DETECT_FRAME"
@@ -1589,6 +1637,18 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_ha2_dark_off,
             R.string.pref_key_ha2_dark_threshold,
             R.string.pref_key_ha2_turn_off_lights,
+        )
+
+        /** Параметры эффекта: применяются на ходу, без перезапуска. */
+        private val EFFECT_KEYS = intArrayOf(
+            R.string.pref_key_effect,
+            R.string.pref_key_effect_color,
+            R.string.pref_key_effect_color2,
+            R.string.pref_key_effect_speed,
+            R.string.pref_key_effect_brightness,
+            R.string.pref_key_effect_temperature,
+            R.string.pref_key_led_start_corner,
+            R.string.pref_key_led_direction,
         )
 
         /** Настройки, которые энкодер берёт при создании. */

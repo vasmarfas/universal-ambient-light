@@ -102,10 +102,12 @@
   <string-array name="pref_list_capture_source">
     <item>Screen</item>
     <item>Camera</item>
+    <item>Effect (no capture)</item>
   </string-array>
   <string-array name="pref_list_capture_source_values">
     <item>screen</item>
     <item>camera</item>
+    <item>effect</item>
   </string-array>
   <string name="pref_title_camera_setup">Camera Corner Setup</string>
   <string name="pref_summary_camera_setup">Adjust the 4 corners to match your TV screen in the camera view</string>
@@ -586,4 +588,44 @@
   <string name="remote_notification_title">Control from a phone is on</string>
   <string name="remote_notification_waiting">Waiting for a phone</string>
   <string name="remote_notification_connected">Connected: %1$s</string>
+
+  <!-- Effects without screen capture -->
+  <string name="effects_title">Effects</string>
+  <string name="effects_intro">Effects light the strip on their own, without screen capture. No screen recording permission is needed, and it does not matter what is on the TV.</string>
+  <string name="effects_group_static">Static</string>
+  <string name="effects_group_dynamic">Animated</string>
+  <string name="effects_group_setup">For setup</string>
+  <string name="effects_parameters">Settings: %1$s</string>
+  <string name="effects_now_off">The lighting is off. Pick an effect and it turns on.</string>
+  <string name="effects_now_effect">Now on: %1$s</string>
+  <string name="effects_now_screen">The lighting follows the screen now. Picking an effect switches it over.</string>
+  <string name="effects_turn_off">Turn off</string>
+  <string name="effects_back_to_screen">Back to the screen</string>
+  <string name="effects_color">Color</string>
+  <string name="effects_color2">Second color</string>
+  <string name="effects_hue">Hue</string>
+  <string name="effects_saturation">Saturation</string>
+  <string name="effects_speed">Speed</string>
+  <string name="effects_brightness">Brightness</string>
+  <string name="effects_temperature">Color temperature</string>
+  <string name="effects_standby">Keep on when the TV screen is off</string>
+  <string name="effects_standby_summary">The strip keeps glowing like a night light while the TV box stays awake. Some TVs cut the network in standby, then it goes dark anyway.</string>
+  <string name="unit_kelvin">%1$d K</string>
+  <string name="effect_solid">Solid color</string>
+  <string name="effect_gradient">Gradient</string>
+  <string name="effect_white">Movie white</string>
+  <string name="effect_white_hint">The reference white for watching movies is 6500 K, lower values are warmer.</string>
+  <string name="effect_rainbow">Rainbow</string>
+  <string name="effect_color_cycle">Color cycle</string>
+  <string name="effect_breathing">Breathing</string>
+  <string name="effect_candle">Candle</string>
+  <string name="effect_fire">Fire</string>
+  <string name="effect_aurora">Aurora</string>
+  <string name="effect_ocean">Ocean</string>
+  <string name="effect_plasma">Plasma</string>
+  <string name="effect_comet">Comet</string>
+  <string name="effect_layout_test">Layout test</string>
+  <string name="effect_layout_test_hint">Top is red, right is green, bottom is blue, left is yellow. The white dot runs from the first LED in the numbering direction. If the colors or the path of the dot do not match the strip, fix the LED layout.</string>
+  <string name="home_source_effect">Effect: %1$s</string>
+  <string name="remote_error_update_tv">The app on the TV is older than this feature. Update it on the TV.</string>
 </resources>

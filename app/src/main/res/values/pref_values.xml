@@ -229,6 +229,22 @@
     <string name="pref_key_capture_source" translatable="false">pref_key_capture_source</string>
     <string name="pref_default_capture_source" translatable="false">screen</string>
 
+    <!-- Эффекты без захвата экрана. Цвета - строкой #RRGGBB -->
+    <string name="pref_key_effect" translatable="false">pref_key_effect</string>
+    <string name="pref_default_effect" translatable="false">rainbow</string>
+    <string name="pref_key_effect_color" translatable="false">pref_key_effect_color</string>
+    <string name="pref_default_effect_color" translatable="false">#FF8C3C</string>
+    <string name="pref_key_effect_color2" translatable="false">pref_key_effect_color2</string>
+    <string name="pref_default_effect_color2" translatable="false">#3C64FF</string>
+    <string name="pref_key_effect_speed" translatable="false">pref_key_effect_speed</string>
+    <integer name="pref_default_effect_speed" translatable="false">50</integer>
+    <string name="pref_key_effect_brightness" translatable="false">pref_key_effect_brightness</string>
+    <integer name="pref_default_effect_brightness" translatable="false">100</integer>
+    <string name="pref_key_effect_temperature" translatable="false">pref_key_effect_temperature</string>
+    <integer name="pref_default_effect_temperature" translatable="false">6500</integer>
+    <string name="pref_key_effect_standby" translatable="false">pref_key_effect_standby</string>
+    <bool name="pref_default_effect_standby" translatable="false">false</bool>
+
     <string name="pref_key_camera_corners" translatable="false">pref_key_camera_corners</string>
     <!-- Код неудачной автоподстройки от сервиса к экрану: у сервиса нет другого способа
          рассказать интерфейсу, почему экран не нашёлся. Значение с меткой времени, чтобы

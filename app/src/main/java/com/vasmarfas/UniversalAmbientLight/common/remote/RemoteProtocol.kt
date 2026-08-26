@@ -48,6 +48,12 @@ object RemoteProtocol {
     const val ERR_BAD_REQUEST = "bad_request"
     const val ERR_FAILED = "failed"
 
+    /**
+     * Что умеет приложение на ТВ сверх первой версии протокола. Новые команды добавляются
+     * без смены [VERSION]: старый ТВ просто не объявит их, и телефон попросит его обновить.
+     */
+    const val FEATURE_EFFECTS = "effects"
+
     /** Сколько телефонов держит ТВ одновременно; больше — признак ошибки, а не сценарий. */
     const val MAX_CLIENTS = 4
 
