@@ -20,7 +20,7 @@ class AdalightClient(
     settlingTime: Int = 200,
     outputDelayMs: Long = 80L,
     updateFrequency: Int = 25,
-) : HyperionClient {
+) : HyperionClient, StreamingClient {
 
     enum class ProtocolType {
         ADA,    // Standard Adalight
@@ -212,13 +212,23 @@ class AdalightClient(
         return mConnected && mPort != null
     }
 
-    fun pauseSending() {
+    override fun pauseSending() {
         mPaused = true
         mSmoothing.stop()
     }
 
-    fun resumeSending() {
+    override fun resumeSending() {
         mPaused = false
+    }
+
+    override val delaysOutput = true
+
+    override fun setOutputDelay(ms: Long) {
+        mSmoothing.setOutputDelay(ms)
+    }
+
+    override fun setSmoothingEnabled(enabled: Boolean) {
+        mSmoothing.setEnabled(enabled)
     }
 
     @Throws(IOException::class)

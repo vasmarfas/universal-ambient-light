@@ -54,6 +54,8 @@ object RemoteSession {
         val overlay: Boolean,
         /** Возможности новее первой версии протокола, см. RemoteProtocol.FEATURE_*. */
         val features: Set<String> = emptySet(),
+        /** ТВ видит, какое приложение на экране, - работает задержка по приложениям. */
+        val usageAccess: Boolean = false,
     )
 
     data class Snapshot(
@@ -481,6 +483,7 @@ object RemoteSession {
             projectMedia = caps.optBoolean("projectMedia"),
             overlay = caps.optBoolean("overlay"),
             features = (0 until features.length()).map { features.optString(it) }.toSet(),
+            usageAccess = caps.optBoolean("usageAccess")
         )
     }
 

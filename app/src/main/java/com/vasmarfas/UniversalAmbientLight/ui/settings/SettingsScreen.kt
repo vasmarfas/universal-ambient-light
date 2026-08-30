@@ -61,6 +61,7 @@ fun SettingsScreen(
     onCameraSetupClick: () -> Unit = {},
     onRemoteHostClick: () -> Unit = {},
     onRemoteTvsClick: () -> Unit = {},
+    onDelayClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val remote = LocalRemote.current
@@ -121,7 +122,7 @@ fun SettingsScreen(
                 CaptureSection(prefs, state, onLedLayoutClick, onCameraSetupClick)
                 CameraIdleSection(prefs, state)
                 BorderDetectionSection(prefs, state)
-                SmoothingSection(prefs, state)
+                SmoothingSection(prefs, state, onDelayClick)
                 if (remote == null) RemoteSection(onRemoteHostClick, onRemoteTvsClick)
                 GeneralSection(prefs, state)
             }

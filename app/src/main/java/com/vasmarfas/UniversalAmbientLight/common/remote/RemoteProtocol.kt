@@ -29,6 +29,8 @@ object RemoteProtocol {
     const val OP_DEBUG_INFO = "debug_info"
     const val OP_PING = "ping"
 
+    const val OP_APPS = "apps"
+
     const val EVENT_STATUS = "status"
     const val EVENT_PREFS = "prefs"
 

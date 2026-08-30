@@ -13,11 +13,13 @@ import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.CaptureLauncher
 import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
+import com.vasmarfas.UniversalAmbientLight.common.input.TvApps
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbAutoPair
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbSetup
 import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DevOptionsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
+import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import org.json.JSONArray
@@ -68,6 +70,8 @@ internal class RemoteHostHandler(
                 JSONObject()
             }
 
+            RemoteProtocol.OP_APPS -> JSONObject().put("apps", TvApps.list(mContext))
+
             RemoteProtocol.OP_ADB -> adb(request)
             RemoteProtocol.OP_DEBUG_INFO -> JSONObject().put("text", DebugInfoHelper.getDebugInfo(mContext))
             else -> throw RemoteCommandException(RemoteProtocol.ERR_BAD_REQUEST, "Unknown op: $op")
@@ -100,6 +104,7 @@ internal class RemoteHostHandler(
             .put("overlay", PermissionHelper.canDrawOverlays(mContext))
             .put("methods", JSONArray(methods))
             .put("features", JSONArray(FEATURES))
+            .put("usageAccess", ForegroundApp.hasAccess(mContext))
     }
 
     private fun setPrefs(client: RemoteServer.Client, request: JSONObject): JSONObject {

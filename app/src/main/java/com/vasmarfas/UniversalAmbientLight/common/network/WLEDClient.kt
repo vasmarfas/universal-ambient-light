@@ -26,7 +26,7 @@ class WLEDClient(
     updateFrequency: Int = 25,
     rgbw: Boolean = false,
     brightness: Int = 255,
-) : HyperionClient {
+) : HyperionClient, StreamingClient {
 
     enum class Protocol {
         DDP,
@@ -121,13 +121,23 @@ class WLEDClient(
      * Останавливает любую исходящую отправку на время сна ТВ (экран выключен).
      * Сокет остаётся открытым, чтобы возобновление было мгновенным.
      */
-    fun pauseSending() {
+    override fun pauseSending() {
         mPaused = true
         mSmoothing.stop()
     }
 
-    fun resumeSending() {
+    override fun resumeSending() {
         mPaused = false
+    }
+
+    override val delaysOutput = true
+
+    override fun setOutputDelay(ms: Long) {
+        mSmoothing.setOutputDelay(ms)
+    }
+
+    override fun setSmoothingEnabled(enabled: Boolean) {
+        mSmoothing.setEnabled(enabled)
     }
 
     @Throws(IOException::class)
