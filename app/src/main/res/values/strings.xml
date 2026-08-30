@@ -521,7 +521,7 @@
   <string name="autostart_permissions_ok">Granted: the lighting comes back by itself, without dialogs</string>
   <string name="autostart_permissions_missing">Not granted: after sleep the TV may ask to confirm screen capture. Open to grant them via ADB</string>
   <string name="adb_grant_title">Autostart permissions</string>
-  <string name="adb_grant_description">Uses ADB once to allow screen capture without a confirmation dialog, windows over other apps and unrestricted background work. Without them Android 10+ cannot bring the lighting back by itself after the TV wakes up or reboots.</string>
+  <string name="adb_grant_description">Uses ADB once to allow screen capture without a confirmation dialog, windows over other apps and unrestricted background work. Without them Android 10+ cannot bring the lighting back by itself after the TV wakes up or reboots. Usage access comes along: with it the lighting knows which app is on screen and uses the per-app delay.</string>
   <string name="adb_grant_btn">Grant via ADB</string>
   <string name="adb_grant_success">Done: screen capture without confirmation, windows over other apps and background work are allowed.</string>
   <string name="adb_grant_partial">Not applied: %1$s. This firmware may not support it.</string>
@@ -628,4 +628,15 @@
   <string name="effect_layout_test_hint">Top is red, right is green, bottom is blue, left is yellow. The white dot runs from the first LED in the numbering direction. If the colors or the path of the dot do not match the strip, fix the LED layout.</string>
   <string name="home_source_effect">Effect: %1$s</string>
   <string name="remote_error_update_tv">The app on the TV is older than this feature. Update it on the TV.</string>
+
+  <!-- Lighting delay -->
+  <string name="delay_title">Lighting delay</string>
+  <string name="delay_summary">Per-app delay and auto-tuning with the phone camera</string>
+  <string name="delay_intro">If the strip runs ahead of the picture, a delay holds it back. Players and sources process video differently, so an app can have its own delay: the TV switches to it while that app is on screen.</string>
+  <string name="delay_global">Delay for all apps</string>
+  <string name="delay_apps_title">Per-app delay</string>
+  <string name="delay_no_usage_access">The TV does not report which app is on screen. Grant usage access via ADB, otherwise the delay for all apps is used everywhere.</string>
+  <string name="delay_apps_empty">No apps with their own delay yet.</string>
+  <string name="delay_apps_remove">Remove</string>
+  <string name="delay_apps_add">Add an app</string>
 </resources>

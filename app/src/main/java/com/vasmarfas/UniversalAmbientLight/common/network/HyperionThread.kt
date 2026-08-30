@@ -32,8 +32,12 @@ class HyperionThread(
     private val mSmoothingEnabled: Boolean = config.smoothingEnabled
     private val mSmoothingPreset: String = config.smoothingPreset
     private val mSettlingTime: Int = config.settlingTime
-    private val mOutputDelayMs: Long = config.outputDelayMs
     private val mUpdateFrequency: Int = config.updateFrequency
+
+    // Задержку двигают на ходу, глядя на ленту: пересоздание клиента на каждый шаг ползунка
+    // гасило бы её и переподключало
+    @Volatile
+    private var mOutputDelayMs: Long = config.outputDelayMs
 
     private val mReconnectDelayMs: Long = (config.reconnectDelaySeconds * 1000).toLong()
     private val mConnectionType: String = config.connectionType
@@ -55,6 +59,9 @@ class HyperionThread(
     private val mSendLock = Any()
     private val mKeepAliveExecutor: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor()
+    private val mDelayExecutor: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "$TAG-delay") }
+    private val mDelayLine = FrameDelayLine()
 
     private val mRecovering = AtomicBoolean(false)
 
@@ -93,6 +100,11 @@ class HyperionThread(
                 return
             }
             if (mExecutor.isShutdown) return
+
+            if (mOutputDelayMs > 0 && (client as? StreamingClient)?.delaysOutput != true) {
+                delayFrame(data, width, height)
+                return
+            }
 
             // sendFrame зовёт единственный поток захвата активного энкодера, поэтому
             // кольцо не нуждается в блокировке
@@ -133,37 +145,15 @@ class HyperionThread(
             System.arraycopy(frame.data, 0, buffer, 0, frame.data.size)
 
             try {
-                synchronized(mSendLock) {
-                    client.setImage(
-                        buffer,
-                        frame.width,
-                        frame.height,
-                        mPriority,
-                        FRAME_DURATION
-                    )
-
-                    if (client is HyperionFlatBuffers) {
-                        // Стабильная копия для повторов keepalive. Нужна только Hyperion:
-                        // у WLED, Adalight и Home Assistant свой keepalive, кадр им не нужен
-                        var keepAlive = mKeepAliveBuffer
-                        if (keepAlive == null || keepAlive.size != buffer.size) {
-                            keepAlive = ByteArray(buffer.size)
-                            mKeepAliveBuffer = keepAlive
-                        }
-                        System.arraycopy(buffer, 0, keepAlive, 0, buffer.size)
-                        mLastSentFrame = FrameData(keepAlive, frame.width, frame.height)
-
-                        // Под тем же замком, что и keepalive: два читателя одного сокета
-                        // поделили бы заголовок ответа и рассинхронизировали поток
-                        client.cleanReplies()
-                    }
-                }
+                deliver(client, buffer, frame.width, frame.height)
             } catch (e: IOException) {
                 handleError(e)
             }
         }
 
         override fun clear() {
+            // Отложенные кадры иначе дошли бы после чёрного и зажгли ленту снова
+            mDelayLine.clear()
             val client = mClient.get()
             if (client != null && client.isConnected()) {
                 try {
@@ -194,6 +184,8 @@ class HyperionThread(
             if (!mKeepAliveExecutor.isShutdown) {
                 mKeepAliveExecutor.shutdownNow()
             }
+            mDelayExecutor.shutdownNow()
+            mDelayLine.clear()
 
             if (!mExecutor.isShutdown) {
                 mExecutor.shutdownNow()
@@ -223,6 +215,69 @@ class HyperionThread(
     val receiver: HyperionThreadListener
         get() = mListener
 
+    /** Кадр уходит клиенту; вызывается с потока отправки или с потока задержки. */
+    @Throws(IOException::class)
+    private fun deliver(client: HyperionClient, buffer: ByteArray, width: Int, height: Int) {
+        synchronized(mSendLock) {
+            client.setImage(buffer, width, height, mPriority, FRAME_DURATION)
+
+            if (client is HyperionFlatBuffers) {
+                // Стабильная копия для повторов keepalive. Нужна только Hyperion:
+                // у WLED, Adalight и Home Assistant свой keepalive, кадр им не нужен
+                var keepAlive = mKeepAliveBuffer
+                if (keepAlive == null || keepAlive.size != buffer.size) {
+                    keepAlive = ByteArray(buffer.size)
+                    mKeepAliveBuffer = keepAlive
+                }
+                System.arraycopy(buffer, 0, keepAlive, 0, buffer.size)
+                mLastSentFrame = FrameData(keepAlive, width, height)
+
+                // Под тем же замком, что и keepalive: два читателя одного сокета
+                // поделили бы заголовок ответа и рассинхронизировали поток
+                client.cleanReplies()
+            }
+        }
+    }
+
+    /**
+     * Каждый кадр ставит себе будильник на своё время: так очередь разбирается ровно в срок
+     * и без отдельного таймера, а кадры, опоздавшие из-за занятого сокета, пропускаются.
+     */
+    private fun delayFrame(data: ByteArray, width: Int, height: Int) {
+        val delay = mOutputDelayMs
+        mDelayLine.push(data, width, height, System.currentTimeMillis() + delay)
+        try {
+            mDelayExecutor.schedule({ sendDueFrame() }, delay, TimeUnit.MILLISECONDS)
+        } catch (_: RejectedExecutionException) {
+            // Вывод уже остановлен - кадр никому не нужен.
+        }
+    }
+
+    private fun sendDueFrame() {
+        val frame = mDelayLine.takeDue(System.currentTimeMillis()) ?: return
+        try {
+            val client = mClient.get()
+            if (!mStandbyPaused.get() && client != null && client.isConnected()) {
+                deliver(client, frame.data, frame.width, frame.height)
+            }
+        } catch (e: IOException) {
+            handleError(e)
+        } finally {
+            mDelayLine.recycle(frame)
+        }
+    }
+
+    fun setOutputDelay(ms: Long) {
+        mOutputDelayMs = ms.coerceIn(0L, 1000L)
+        applyTiming()
+    }
+
+    private fun applyTiming() {
+        val client = mClient.get() as? StreamingClient ?: return
+        client.setSmoothingEnabled(mSmoothingEnabled)
+        client.setOutputDelay(mOutputDelayMs)
+    }
+
     /**
      * Сбрасывает блокировку отправки данных для WLED клиента.
      * Вызывается при включении экрана, чтобы возобновить отправку после ошибки EPERM.
@@ -240,12 +295,7 @@ class HyperionThread(
      */
     fun pauseSending() {
         mStandbyPaused.set(true)
-        when (val client = mClient.get()) {
-            is WLEDClient -> client.pauseSending()
-            is AdalightClient -> client.pauseSending()
-            is HomeAssistantClient -> client.pauseSending()
-            else -> {}
-        }
+        (mClient.get() as? StreamingClient)?.pauseSending()
     }
 
     /**
@@ -253,12 +303,7 @@ class HyperionThread(
      */
     fun resumeSending() {
         mStandbyPaused.set(false)
-        when (val client = mClient.get()) {
-            is WLEDClient -> client.resumeSending()
-            is AdalightClient -> client.resumeSending()
-            is HomeAssistantClient -> client.resumeSending()
-            else -> {}
-        }
+        (mClient.get() as? StreamingClient)?.resumeSending()
     }
 
     override fun run() {

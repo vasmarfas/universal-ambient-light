@@ -31,6 +31,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
+import com.vasmarfas.UniversalAmbientLight.ui.delay.DelayScreen
 import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeSource
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeTarget
@@ -297,6 +298,9 @@ fun AppNavHost(
                 },
                 onRemoteTvsClick = {
                     navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
+                },
+                onDelayClick = {
+                    navController.navigate(Screen.Delay.route) { launchSingleTop = true }
                 }
             )
         }
@@ -338,6 +342,15 @@ fun AppNavHost(
                 onBackClick = { navController.popBackStack() },
                 onStart = { if (!running) onToggleClick() },
                 onStop = { if (running) onToggleClick() }
+            )
+        }
+        composable(Screen.Delay.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "delay", "DelayScreen")
+            }
+            DelayScreen(
+                onBackClick = { navController.popBackStack() },
             )
         }
         composable(Screen.RemoteTvs.route) {

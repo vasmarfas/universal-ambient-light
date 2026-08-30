@@ -229,6 +229,9 @@
     <string name="pref_key_capture_source" translatable="false">pref_key_capture_source</string>
     <string name="pref_default_capture_source" translatable="false">screen</string>
 
+    <!-- Задержка вывода по приложениям: пакет=мс;пакет=мс -->
+    <string name="pref_key_delay_profiles" translatable="false">pref_key_delay_profiles</string>
+
     <!-- Эффекты без захвата экрана. Цвета - строкой #RRGGBB -->
     <string name="pref_key_effect" translatable="false">pref_key_effect</string>
     <string name="pref_default_effect" translatable="false">rainbow</string>

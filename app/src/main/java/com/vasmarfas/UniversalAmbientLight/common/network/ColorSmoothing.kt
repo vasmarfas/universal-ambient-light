@@ -30,6 +30,9 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     // Конфигурация
     private var mUpdateFrequencyHz = DEFAULT_UPDATE_FREQUENCY_HZ
     private var mSettlingTimeMs = DEFAULT_SETTLING_TIME_MS
+
+    // Меняется на ходу из потока настроек, читается циклом отправки
+    @Volatile
     private var mOutputDelayMs: Long = DEFAULT_OUTPUT_DELAY_MS
     private var mEnabled = true
 
@@ -76,7 +79,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     private val mUpdateRunnable = object : Runnable {
         override fun run() {
             val generation = mGeneration
-            if (!mRunning || !mEnabled) return
+            if (!mRunning || !needsTimer()) return
 
             updateLeds()
 
@@ -100,7 +103,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
         mLastUpdateTime = now
 
         synchronized(this) {
-            mTargetTime = now + mSettlingTimeMs
+            mTargetTime = now + if (mEnabled) mSettlingTimeMs else 0
             mIdleFrameSent = false
 
             // Инициализация при первом вызове или изменении размера
@@ -117,8 +120,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
                     previous[i].set(targetColors[i])
                 }
 
-                // Запускаем таймер только если сглаживание включено
-                if (mEnabled) {
+                if (needsTimer()) {
                     start()
                 }
             } else {
@@ -129,8 +131,8 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
             }
         }
 
-        // Если сглаживание выключено, отправляем данные напрямую (клонируем для безопасности)
-        if (!mEnabled) {
+        // Ни сглаживания, ни задержки - отправляем данные напрямую (клонируем для безопасности)
+        if (!needsTimer()) {
             val colorsCopy = Array(targetColors.size) { i -> targetColors[i].clone() }
             sendToDevice(colorsCopy)
         }
@@ -275,7 +277,12 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     }
 
     fun setOutputDelay(ms: Long) {
-        mOutputDelayMs = max(0L, min(1000L, ms)) // Задержка в миллисекундах (0-1000 мс)
+        val neededBefore = needsTimer()
+        mOutputDelayMs = max(0L, min(1000L, ms))
+        // Без задержки очередь больше не разбирается, и застрявшие в ней кадры вспыхнули бы
+        // разом при следующем включении задержки
+        if (mOutputDelayMs == 0L) synchronized(mOutputQueue) { mOutputQueue.clear() }
+        onTimerNeedChanged(neededBefore)
     }
 
     fun setUpdateFrequency(hz: Int) {
@@ -287,15 +294,23 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
     }
 
     fun setEnabled(enabled: Boolean) {
-        val wasEnabled = mEnabled
+        val neededBefore = needsTimer()
         mEnabled = enabled
+        onTimerNeedChanged(neededBefore)
+    }
 
-        // Если сглаживание выключено, останавливаем таймер
-        if (!enabled && wasEnabled && mRunning) {
+    /**
+     * Цикл с таймером нужен не только сглаживанию: задержка вывода держит кадры в очереди,
+     * и без цикла выключенное сглаживание отправляло бы их сразу, молча игнорируя задержку.
+     * Без интерполяции цикл просто отдаёт цель на первом же тике.
+     */
+    private fun needsTimer(): Boolean = mEnabled || mOutputDelayMs > 0
+
+    private fun onTimerNeedChanged(neededBefore: Boolean) {
+        val needed = needsTimer()
+        if (neededBefore && !needed && mRunning) {
             stop()
-        }
-        // Если сглаживание включено и таймер не запущен, запускаем его
-        else if (enabled && !wasEnabled && mTargetValues != null && !mRunning) {
+        } else if (needed && !neededBefore && mTargetValues != null && !mRunning) {
             start()
         }
     }
@@ -348,7 +363,7 @@ class ColorSmoothing(private val mDataSender: LedDataSender?) {
         }
         // Выключенный пресет должен погасить и цикл: иначе mRunning остаётся true, и
         // последующий setEnabled(true) не смог бы его перезапустить.
-        if (!mEnabled && mRunning) stop()
+        if (!needsTimer() && mRunning) stop()
         // Новый интервал цикл подхватит сам на следующем тике (см. setUpdateFrequency).
     }
 }

@@ -110,6 +110,9 @@ object AdbSetup {
             add("appops set $pkg PROJECT_MEDIA allow")
             add("appops set $pkg SYSTEM_ALERT_WINDOW allow")
             add("appops set $pkg RUN_ANY_IN_BACKGROUND allow")
+            // Статистика использования нужна только задержке по приложениям - в проверку
+            // успеха ниже не входит
+            add("appops set $pkg GET_USAGE_STATS allow")
             add("cmd deviceidle whitelist +$pkg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add("pm grant $pkg android.permission.POST_NOTIFICATIONS")

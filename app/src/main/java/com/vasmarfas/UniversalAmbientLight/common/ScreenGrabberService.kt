@@ -29,10 +29,15 @@ import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
+import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
+import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import java.util.Objects
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 /**
  * Отдаёт кадры сразу двум приёмникам — основному подключению и дополнительному выводу на
@@ -113,6 +118,11 @@ class ScreenGrabberService : Service() {
     private var mPendingCaptureRestart = false
     private var mPendingSessionRestart = false
     private val mApplySettings = Runnable { applyPendingSettings() }
+
+    // Задержка по приложениям: раз в несколько секунд смотрим, что на экране. Статистика
+    // использования - вызов в системный сервис, с главного потока его уводим
+    private var mAppWatch: ScheduledExecutorService? = null
+    private var mForegroundPackage: String? = null
 
     /**
      * Выход одного энкодера. После отцепления (перезапуск захвата с новыми настройками)
@@ -359,7 +369,7 @@ class ScreenGrabberService : Service() {
         val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
         val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
         val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 50)
-        val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 0).toLong()
+        val outputDelayMs = effectiveOutputDelay(prefs)
         val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 60)
 
         val haToken = prefs.getString(R.string.pref_key_ha_token, "") ?: ""
@@ -479,9 +489,45 @@ class ScreenGrabberService : Service() {
             Log.w(TAG, "Additional Home Assistant output enabled but not fully configured, skipping")
         }
         mOutput = DualHyperionThreadListener(thread.receiver, mSecondaryHyperionThread?.receiver)
+        if (mCaptureSource == "screen") startAppWatch()
 
         mStartError = null
         return true
+    }
+
+    private fun effectiveOutputDelay(prefs: Preferences): Long =
+        DelayProfiles.effectiveDelay(prefs, mForegroundPackage).toLong()
+
+    private fun applyOutputDelay() {
+        val delay = effectiveOutputDelay(Preferences(this))
+        mHyperionThread?.setOutputDelay(delay)
+        mSecondaryHyperionThread?.setOutputDelay(delay)
+    }
+
+    /** Следить за приложением на экране есть смысл, только когда заданы задержки по приложениям. */
+    private fun startAppWatch() {
+        if (mAppWatch != null) return
+        val profiles = Preferences(this).getString(R.string.pref_key_delay_profiles, "")
+        if (DelayProfiles.parse(profiles).isEmpty()) return
+        val foreground = ForegroundApp(this)
+        mAppWatch = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "app-watch") }.also {
+            it.scheduleWithFixedDelay({
+                val pkg = foreground.current()
+                mHandler?.post { onForegroundApp(pkg) }
+            }, 0, APP_WATCH_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    private fun stopAppWatch() {
+        mAppWatch?.shutdownNow()
+        mAppWatch = null
+        mForegroundPackage = null
+    }
+
+    private fun onForegroundApp(pkg: String?) {
+        if (mAppWatch == null || pkg == mForegroundPackage) return
+        mForegroundPackage = pkg
+        applyOutputDelay()
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
@@ -668,6 +714,7 @@ class ScreenGrabberService : Service() {
 
         unregisterColorPrefsListener()
         mHandler?.removeCallbacks(mApplySettings)
+        stopAppWatch()
         mActiveOptions = null
 
         mStandby?.releaseAll()
@@ -1282,6 +1329,7 @@ class ScreenGrabberService : Service() {
     private fun stopAllCapture() {
         if (DEBUG) Log.v(TAG, "Stopping all capture")
         mReconnectEnabled = false
+        stopAppWatch()
         mNotificationManager?.cancel(NOTIFICATION_ID)
 
         val backend = mActiveBackend
@@ -1411,6 +1459,8 @@ class ScreenGrabberService : Service() {
             getString(R.string.pref_key_capture_method)
         )
         val effectKeys = EFFECT_KEYS.map { getString(it) }.toSet()
+        val keyOutputDelay = getString(R.string.pref_key_output_delay)
+        val keyDelayProfiles = getString(R.string.pref_key_delay_profiles)
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == null) return@OnSharedPreferenceChangeListener
@@ -1418,6 +1468,13 @@ class ScreenGrabberService : Service() {
                 if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
                 if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
                 if (key in cameraIdleKeys) mActiveOptions?.refreshCameraIdleSettings(prefs)
+                if (key == keyDelayProfiles && mCaptureSource == "screen" && mHyperionThread != null) {
+                    // Первая задержка по приложению включает слежение за экраном, удаление
+                    // последней - выключает
+                    val profiles = prefs.getString(R.string.pref_key_delay_profiles, "")
+                    if (DelayProfiles.parse(profiles).isEmpty()) stopAppWatch() else startAppWatch()
+                }
+                if (key == keyOutputDelay || key == keyDelayProfiles) applyOutputDelay()
                 if (key in effectKeys) {
                     (mActiveBackend as? EffectEncoder)?.setConfig(EffectConfig.from(prefs))
                 }
@@ -1594,6 +1651,7 @@ class ScreenGrabberService : Service() {
         private const val NOTIFICATION_EXIT_INTENT_ID = 2
         private const val APPLY_SETTINGS_DELAY_MS = 1200L
         private const val SESSION_RESTART_DELAY_MS = 700L
+        private const val APP_WATCH_INTERVAL_MS = 3000L
 
         /** Настройки вывода: меняются пересозданием HyperionThread под тем же энкодером. */
         private val OUTPUT_KEYS = intArrayOf(
@@ -1612,7 +1670,6 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_smoothing_enabled,
             R.string.pref_key_smoothing_preset,
             R.string.pref_key_settling_time,
-            R.string.pref_key_output_delay,
             R.string.pref_key_update_frequency,
             R.string.pref_key_ha_token,
             R.string.pref_key_ha_lamps,

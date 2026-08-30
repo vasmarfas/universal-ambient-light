@@ -31,7 +31,7 @@ class HomeAssistantClient(
     darkOffEnabled: Boolean,
     darkThreshold: Int,
     private val mTurnOffLights: Boolean,
-) : HyperionClient {
+) : HyperionClient, StreamingClient {
 
     private val mBaseUrl = baseUrl(host, port)
     private val mToken = token.trim()
@@ -90,11 +90,11 @@ class HomeAssistantClient(
 
     override fun isConnected(): Boolean = mConnected
 
-    fun pauseSending() {
+    override fun pauseSending() {
         mPaused = true
     }
 
-    fun resumeSending() {
+    override fun resumeSending() {
         mPaused = false
         // После паузы лампы могли гаситься и переключаться руками — первый кадр уходит заново
         mPolicy.reset()
