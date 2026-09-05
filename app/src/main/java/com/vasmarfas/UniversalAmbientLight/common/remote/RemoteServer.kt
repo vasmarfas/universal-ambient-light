@@ -37,6 +37,8 @@ class RemoteServer(
         fun handle(client: Client, op: String, request: JSONObject): JSONObject
 
         fun onClientsChanged(clients: List<Client>)
+
+        fun onClientGone(client: Client)
     }
 
     class Client internal constructor(val id: Int, val name: String, val channel: RemoteChannel) {
@@ -180,6 +182,7 @@ class RemoteServer(
         } finally {
             channel.close()
             mClients.remove(client)
+            handler.onClientGone(client)
             notifyClientsChanged()
         }
     }

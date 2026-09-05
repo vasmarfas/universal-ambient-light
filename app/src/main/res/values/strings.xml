@@ -629,11 +629,43 @@
   <string name="home_source_effect">Effect: %1$s</string>
   <string name="remote_error_update_tv">The app on the TV is older than this feature. Update it on the TV.</string>
 
-  <!-- Lighting delay -->
+  <!-- Lighting delay and auto-tuning with the phone camera -->
+  <string name="calibration_title">Delay auto-tuning</string>
+  <string name="calibration_needs_remote">Auto-tuning films the TV with the phone camera, so it runs from a phone paired with the TV.</string>
+  <string name="calibration_needs_screen">Turn on the lighting in screen capture mode on the TV and play a movie: the delay is measured on it.</string>
+  <string name="calibration_turn_on">Turn on the lighting</string>
+  <string name="calibration_intro">The phone films the TV and the glow on the wall and compares when the picture and the strip change. The delay is measured on what is playing right now, so every app and source gets its own value.</string>
+  <string name="calibration_steps">1. Play a movie or a video with frequent scene changes.\n2. Turn off the lights in the room.\n3. Stand so that the whole TV screen and the wall around it are in the frame, and hold the phone still for about a minute.</string>
+  <string name="calibration_start">Start</string>
+  <string name="calibration_searching">The strip goes dark for a few seconds while the phone looks for the TV screen. Hold the phone still.</string>
+  <string name="calibration_measuring">Measuring. Scene changes: %1$d, seconds: %2$d. Hold the phone still.</string>
+  <string name="calibration_glow_invisible">The camera barely sees the glow of the strip. Turn off the lights and make sure the wall around the TV is in the frame.</string>
+  <string name="calibration_result_ahead">The strip is %1$d ms ahead of the picture</string>
+  <string name="calibration_result_behind">The strip is %1$d ms behind the picture</string>
+  <string name="calibration_result_in_sync">The strip and the picture are in sync</string>
+  <string name="calibration_result_details">Scene changes: %1$d. Accuracy about ±%2$d ms, match %3$d%%.</string>
+  <string name="calibration_unreliable">The result is not reliable: too few scene changes or the phone moved. Better repeat on a more dynamic scene.</string>
+  <string name="calibration_behind_hint">A delay cannot fix a late strip. Lower the smoothing or pick a faster capture method.</string>
+  <string name="calibration_current">Set now: %1$d ms. Suggested: %2$d ms.</string>
+  <string name="calibration_save_app">Save for %1$s</string>
+  <string name="calibration_save_all">Save for all apps</string>
+  <string name="calibration_no_usage_access">The TV does not report which app is on screen, so the delay is saved for all apps. Per-app delay needs usage access, it is granted together with the autostart permissions via ADB.</string>
+  <string name="calibration_saved">Saved: %1$d ms. The TV applies it right away.</string>
+  <string name="calibration_repeat">Measure again</string>
+  <string name="calibration_error_no_screen">The TV screen was not found in the frame. Point the camera so that the whole screen is visible, and try again.</string>
+  <string name="calibration_error_too_dark">The frame is too dark. The TV should be on and playing something bright enough.</string>
+  <string name="calibration_error_too_close">The TV fills almost the whole frame and leaves no room for the wall. Step back a little.</string>
+  <string name="calibration_error_static">Too few scene changes for a measurement. Play something more dynamic and try again.</string>
+  <string name="calibration_error_not_running">Turn on the lighting on the TV first.</string>
+  <string name="calibration_error_not_screen">Auto-tuning works with screen capture, and the TV is showing an effect or using the camera now.</string>
   <string name="delay_title">Lighting delay</string>
   <string name="delay_summary">Per-app delay and auto-tuning with the phone camera</string>
   <string name="delay_intro">If the strip runs ahead of the picture, a delay holds it back. Players and sources process video differently, so an app can have its own delay: the TV switches to it while that app is on screen.</string>
   <string name="delay_global">Delay for all apps</string>
+  <string name="delay_calibration_title">Auto-tuning</string>
+  <string name="delay_calibration_summary">The phone camera films the TV and the glow and finds the delay on the movie that is playing.</string>
+  <string name="delay_calibration_open">Tune with the camera</string>
+  <string name="delay_calibration_on_phone">Auto-tuning runs from a phone: open TV remote on it, connect to this TV and go to Settings, Lighting delay.</string>
   <string name="delay_apps_title">Per-app delay</string>
   <string name="delay_no_usage_access">The TV does not report which app is on screen. Grant usage access via ADB, otherwise the delay for all apps is used everywhere.</string>
   <string name="delay_apps_empty">No apps with their own delay yet.</string>
