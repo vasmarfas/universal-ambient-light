@@ -31,6 +31,9 @@ object RemoteProtocol {
 
     const val OP_APPS = "apps"
 
+    /** Автоподбор задержки: действие "a" - begin, dark (с "ms") или end. */
+    const val OP_CALIBRATION = "calibration"
+
     const val EVENT_STATUS = "status"
     const val EVENT_PREFS = "prefs"
 
@@ -55,6 +58,7 @@ object RemoteProtocol {
      * без смены [VERSION]: старый ТВ просто не объявит их, и телефон попросит его обновить.
      */
     const val FEATURE_EFFECTS = "effects"
+    const val FEATURE_CALIBRATION = "calibration"
 
     /** Сколько телефонов держит ТВ одновременно; больше — признак ошибки, а не сценарий. */
     const val MAX_CLIENTS = 4

@@ -17,6 +17,7 @@ import com.vasmarfas.UniversalAmbientLight.common.input.TvApps
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbAutoPair
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbSetup
 import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
 import com.vasmarfas.UniversalAmbientLight.common.util.DevOptionsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
@@ -41,7 +42,21 @@ internal class RemoteHostHandler(
     private val mContext = context.applicationContext
     private val mMainHandler = Handler(Looper.getMainLooper())
 
+    // Кто начал замер задержки: если этот телефон пропадёт, замер надо снять, а не ждать
+    // таймаута сервиса с лентой без сглаживания
+    @Volatile
+    private var mCalibrationClient: RemoteServer.Client? = null
+
     override fun onClientsChanged(clients: List<RemoteServer.Client>) = clientsListener(clients)
+
+    override fun onClientGone(client: RemoteServer.Client) {
+        if (mCalibrationClient === client) {
+            mCalibrationClient = null
+            sendToService(ScreenGrabberService.ACTION_CALIBRATION) {
+                putExtra(ScreenGrabberService.EXTRA_CALIBRATION, ScreenGrabberService.CALIBRATION_END)
+            }
+        }
+    }
 
     override fun handle(client: RemoteServer.Client, op: String, request: JSONObject): JSONObject =
         when (op) {
@@ -71,6 +86,7 @@ internal class RemoteHostHandler(
             }
 
             RemoteProtocol.OP_APPS -> JSONObject().put("apps", TvApps.list(mContext))
+            RemoteProtocol.OP_CALIBRATION -> calibration(client, request)
 
             RemoteProtocol.OP_ADB -> adb(request)
             RemoteProtocol.OP_DEBUG_INFO -> JSONObject().put("text", DebugInfoHelper.getDebugInfo(mContext))
@@ -105,6 +121,44 @@ internal class RemoteHostHandler(
             .put("methods", JSONArray(methods))
             .put("features", JSONArray(FEATURES))
             .put("usageAccess", ForegroundApp.hasAccess(mContext))
+    }
+
+    private fun calibration(client: RemoteServer.Client, request: JSONObject): JSONObject {
+        val action = request.optString("a")
+        val prefs = Preferences(mContext)
+        val reply = JSONObject()
+        when (action) {
+            ScreenGrabberService.CALIBRATION_BEGIN -> {
+                if (!ScreenGrabberService.sInstanceRunning) {
+                    throw RemoteCommandException(
+                        RemoteProtocol.ERR_FAILED,
+                        mContext.getString(R.string.calibration_error_not_running)
+                    )
+                }
+                if (prefs.getString(R.string.pref_key_capture_source, "screen") != "screen") {
+                    throw RemoteCommandException(
+                        RemoteProtocol.ERR_FAILED,
+                        mContext.getString(R.string.calibration_error_not_screen)
+                    )
+                }
+                mCalibrationClient = client
+                // Своё приложение на экране ТВ - не то, для чего подбирают задержку
+                val app = ForegroundApp(mContext).current()?.takeIf { it != mContext.packageName }
+                reply.put("app", app)
+                    .put("label", app?.let { TvApps.label(mContext, it) })
+                    .put("delay", DelayProfiles.effectiveDelay(prefs, app))
+                    .put("usageAccess", ForegroundApp.hasAccess(mContext))
+            }
+
+            ScreenGrabberService.CALIBRATION_END -> mCalibrationClient = null
+            ScreenGrabberService.CALIBRATION_DARK -> {}
+            else -> throw RemoteCommandException(RemoteProtocol.ERR_BAD_REQUEST, "Unknown action")
+        }
+        sendToService(ScreenGrabberService.ACTION_CALIBRATION) {
+            putExtra(ScreenGrabberService.EXTRA_CALIBRATION, action)
+            putExtra(ScreenGrabberService.EXTRA_DARK_MS, request.optLong("ms"))
+        }
+        return reply
     }
 
     private fun setPrefs(client: RemoteServer.Client, request: JSONObject): JSONObject {
@@ -225,12 +279,13 @@ internal class RemoteHostHandler(
         return AdbSetup.Outcome(success, mContext.getString(message))
     }
 
-    private fun sendToService(action: String) {
+    private fun sendToService(action: String, extras: Intent.() -> Unit = {}) {
         // Без работающего сервиса команду некому выполнить, а startService поднял бы пустой
         // foreground-сервис с уведомлением
         if (!ScreenGrabberService.sInstanceRunning) return
         val intent = Intent(mContext, ScreenGrabberService::class.java)
         intent.action = action
+        intent.extras()
         mMainHandler.post {
             try {
                 mContext.startService(intent)
@@ -264,6 +319,7 @@ internal class RemoteHostHandler(
 
         private val FEATURES = listOf(
             RemoteProtocol.FEATURE_EFFECTS,
+            RemoteProtocol.FEATURE_CALIBRATION,
         )
     }
 }

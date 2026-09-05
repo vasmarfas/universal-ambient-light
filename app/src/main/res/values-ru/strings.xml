@@ -609,11 +609,43 @@
   <string name="home_source_effect">Эффект: %1$s</string>
   <string name="remote_error_update_tv">На ТВ стоит старая версия приложения, в ней этого ещё нет. Обновите приложение на ТВ.</string>
 
-  <!-- Lighting delay -->
+  <!-- Lighting delay and auto-tuning with the phone camera -->
+  <string name="calibration_title">Автоподбор задержки</string>
+  <string name="calibration_needs_remote">Автоподбор снимает ТВ камерой телефона, поэтому запускается с телефона, сопряжённого с ТВ.</string>
+  <string name="calibration_needs_screen">Включите на ТВ подсветку по экрану и запустите фильм: задержка меряется на нём.</string>
+  <string name="calibration_turn_on">Включить подсветку</string>
+  <string name="calibration_intro">Телефон снимает ТВ и свечение на стене и сравнивает, когда меняются картинка и лента. Задержка меряется на том, что идёт сейчас, поэтому для каждого приложения и источника она получается своя.</string>
+  <string name="calibration_steps">1. Включите фильм или ролик, где часто меняются сцены.\n2. Выключите свет в комнате.\n3. Встаньте так, чтобы в кадр попал весь экран ТВ и стена вокруг, и держите телефон неподвижно около минуты.</string>
+  <string name="calibration_start">Начать</string>
+  <string name="calibration_searching">Лента на несколько секунд гаснет, пока телефон ищет экран ТВ. Держите телефон неподвижно.</string>
+  <string name="calibration_measuring">Идёт замер. Смен сцен: %1$d, секунд: %2$d. Держите телефон неподвижно.</string>
+  <string name="calibration_glow_invisible">Камера почти не видит свечения ленты. Выключите свет и проверьте, что стена вокруг ТВ попадает в кадр.</string>
+  <string name="calibration_result_ahead">Лента опережает картинку на %1$d мс</string>
+  <string name="calibration_result_behind">Лента отстаёт от картинки на %1$d мс</string>
+  <string name="calibration_result_in_sync">Лента и картинка идут вровень</string>
+  <string name="calibration_result_details">Смен сцен: %1$d, точность около ±%2$d мс, совпадение %3$d%%.</string>
+  <string name="calibration_unreliable">Результат ненадёжный: мало смен сцен или телефон сдвинулся. Лучше повторить на более динамичной сцене.</string>
+  <string name="calibration_behind_hint">Отстающую ленту задержкой не исправить. Уменьшите сглаживание или выберите более быстрый способ захвата.</string>
+  <string name="calibration_current">Сейчас стоит %1$d мс, предлагается %2$d мс.</string>
+  <string name="calibration_save_app">Сохранить для «%1$s»</string>
+  <string name="calibration_save_all">Сохранить для всех приложений</string>
+  <string name="calibration_no_usage_access">ТВ не сообщает, какое приложение на экране, поэтому задержка сохраняется для всех. Для задержки по приложениям нужен доступ к статистике использования, он выдаётся вместе с разрешениями для автозапуска через ADB.</string>
+  <string name="calibration_saved">Сохранено: %1$d мс. ТВ применяет её сразу.</string>
+  <string name="calibration_repeat">Измерить ещё раз</string>
+  <string name="calibration_error_no_screen">Экран ТВ в кадре не нашёлся. Наведите камеру так, чтобы экран был виден целиком, и попробуйте ещё раз.</string>
+  <string name="calibration_error_too_dark">В кадре слишком темно. На ТВ должно идти что-то достаточно яркое.</string>
+  <string name="calibration_error_too_close">ТВ занимает почти весь кадр, для стены не осталось места. Отойдите чуть дальше.</string>
+  <string name="calibration_error_static">Слишком мало смен сцен для замера. Включите что-то динамичнее и попробуйте снова.</string>
+  <string name="calibration_error_not_running">Сначала включите подсветку на ТВ.</string>
+  <string name="calibration_error_not_screen">Автоподбор работает с захватом экрана, а сейчас на ТВ эффект или камера.</string>
   <string name="delay_title">Задержка подсветки</string>
   <string name="delay_summary">Задержка по приложениям и автоподбор камерой телефона</string>
   <string name="delay_intro">Если лента опережает картинку, её придерживают задержкой. Плееры и источники обрабатывают видео по-разному, поэтому у приложения может быть своя задержка: ТВ переключается на неё, пока это приложение на экране.</string>
   <string name="delay_global">Задержка для всех приложений</string>
+  <string name="delay_calibration_title">Автоподбор</string>
+  <string name="delay_calibration_summary">Камера телефона снимает ТВ и свечение и находит задержку на идущем фильме.</string>
+  <string name="delay_calibration_open">Подобрать камерой</string>
+  <string name="delay_calibration_on_phone">Автоподбор запускается с телефона: откройте на нём «Пульт для ТВ», подключитесь к этому ТВ и зайдите в «Настройки», «Задержка подсветки».</string>
   <string name="delay_apps_title">Задержка по приложениям</string>
   <string name="delay_no_usage_access">ТВ не сообщает, какое приложение на экране. Выдайте доступ к статистике использования через ADB, иначе везде действует общая задержка.</string>
   <string name="delay_apps_empty">Пока ни у одного приложения нет своей задержки.</string>

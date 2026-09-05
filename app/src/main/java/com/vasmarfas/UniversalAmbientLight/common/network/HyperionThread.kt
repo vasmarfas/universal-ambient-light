@@ -39,6 +39,16 @@ class HyperionThread(
     @Volatile
     private var mOutputDelayMs: Long = config.outputDelayMs
 
+    // Автоподбор задержки меряет сам конвейер: на время замера ни сглаживания, ни задержки
+    @Volatile
+    private var mCalibrating = false
+
+    private val effectiveDelayMs: Long
+        get() = if (mCalibrating) 0L else mOutputDelayMs
+
+    private val effectiveSmoothing: Boolean
+        get() = mSmoothingEnabled && !mCalibrating
+
     private val mReconnectDelayMs: Long = (config.reconnectDelaySeconds * 1000).toLong()
     private val mConnectionType: String = config.connectionType
     private val mWledColorOrder: String = config.wledColorOrder
@@ -101,7 +111,7 @@ class HyperionThread(
             }
             if (mExecutor.isShutdown) return
 
-            if (mOutputDelayMs > 0 && (client as? StreamingClient)?.delaysOutput != true) {
+            if (effectiveDelayMs > 0 && (client as? StreamingClient)?.delaysOutput != true) {
                 delayFrame(data, width, height)
                 return
             }
@@ -244,7 +254,7 @@ class HyperionThread(
      * и без отдельного таймера, а кадры, опоздавшие из-за занятого сокета, пропускаются.
      */
     private fun delayFrame(data: ByteArray, width: Int, height: Int) {
-        val delay = mOutputDelayMs
+        val delay = effectiveDelayMs
         mDelayLine.push(data, width, height, System.currentTimeMillis() + delay)
         try {
             mDelayExecutor.schedule({ sendDueFrame() }, delay, TimeUnit.MILLISECONDS)
@@ -272,10 +282,15 @@ class HyperionThread(
         applyTiming()
     }
 
+    fun setCalibrating(calibrating: Boolean) {
+        mCalibrating = calibrating
+        applyTiming()
+    }
+
     private fun applyTiming() {
         val client = mClient.get() as? StreamingClient ?: return
-        client.setSmoothingEnabled(mSmoothingEnabled)
-        client.setOutputDelay(mOutputDelayMs)
+        client.setSmoothingEnabled(effectiveSmoothing)
+        client.setOutputDelay(effectiveDelayMs)
     }
 
     /**
@@ -368,10 +383,10 @@ class HyperionThread(
                 mPriority,
                 mWledColorOrder,
                 mWledProtocol,
-                mSmoothingEnabled,
+                effectiveSmoothing,
                 mSmoothingPreset,
                 mSettlingTime,
-                mOutputDelayMs,
+                effectiveDelayMs,
                 mUpdateFrequency,
                 mWledRgbw,
                 mWledBrightness
@@ -379,7 +394,7 @@ class HyperionThread(
         } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
             AdalightClient(
                 mContext, mPriority, mBaudRate, mAdalightProtocol,
-                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency
+                effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
             )
         } else if ("homeassistant".equals(mConnectionType, ignoreCase = true)) {
             HomeAssistantClient(

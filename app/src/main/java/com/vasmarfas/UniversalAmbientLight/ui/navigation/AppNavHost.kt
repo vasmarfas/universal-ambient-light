@@ -30,6 +30,7 @@ import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.calibration.CalibrationScreen
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
 import com.vasmarfas.UniversalAmbientLight.ui.delay.DelayScreen
 import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
@@ -351,6 +352,22 @@ fun AppNavHost(
             }
             DelayScreen(
                 onBackClick = { navController.popBackStack() },
+                onCalibrateClick = {
+                    navController.navigate(Screen.Calibration.route) { launchSingleTop = true }
+                }
+            )
+        }
+        composable(Screen.Calibration.route) {
+            val context = LocalContext.current
+            val remote = LocalRemote.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "calibration", "CalibrationScreen")
+            }
+            val running = remote?.running ?: isRunning
+            CalibrationScreen(
+                running = running,
+                onBackClick = { navController.popBackStack() },
+                onStartLighting = { if (!running) onToggleClick() }
             )
         }
         composable(Screen.RemoteTvs.route) {

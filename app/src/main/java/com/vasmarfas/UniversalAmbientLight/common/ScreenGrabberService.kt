@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
@@ -124,6 +125,15 @@ class ScreenGrabberService : Service() {
     private var mAppWatch: ScheduledExecutorService? = null
     private var mForegroundPackage: String? = null
 
+    // Автоподбор задержки с телефона: вывод без сглаживания и задержки, а на короткое время
+    // лента гаснет, чтобы камера телефона увидела, сколько света даёт сам экран
+    private var mCalibrating = false
+
+    @Volatile
+    private var mDarkUntil = 0L
+    private var mDarkFrame: ByteArray? = null
+    private val mEndCalibration = Runnable { setCalibrating(false) }
+
     /**
      * Выход одного энкодера. После отцепления (перезапуск захвата с новыми настройками)
      * старый энкодер больше ничего не шлёт: его прощальные чёрные кадры и disconnect
@@ -134,7 +144,17 @@ class ScreenGrabberService : Service() {
         var attached = true
 
         override fun sendFrame(data: ByteArray, width: Int, height: Int) {
-            if (attached) mOutput?.sendFrame(data, width, height)
+            if (!attached) return
+            if (SystemClock.uptimeMillis() < mDarkUntil) {
+                var dark = mDarkFrame
+                if (dark == null || dark.size != data.size) {
+                    dark = ByteArray(data.size)
+                    mDarkFrame = dark
+                }
+                mOutput?.sendFrame(dark, width, height)
+                return
+            }
+            mOutput?.sendFrame(data, width, height)
         }
 
         override fun clear() {
@@ -459,6 +479,7 @@ class ScreenGrabberService : Service() {
             haTurnOffLights = haTurnOffLights
         )
         val thread = HyperionThread(mReceiver, baseContext, config)
+        if (mCalibrating) thread.setCalibrating(true)
         mHyperionThread = thread
         thread.start()
 
@@ -497,6 +518,20 @@ class ScreenGrabberService : Service() {
 
     private fun effectiveOutputDelay(prefs: Preferences): Long =
         DelayProfiles.effectiveDelay(prefs, mForegroundPackage).toLong()
+
+    /**
+     * Замер задержки: сглаживание и задержка вывода снимаются на ходу, без переподключения.
+     * Если телефон пропал посреди замера, режим снимется сам через [MAX_CALIBRATION_MS].
+     */
+    private fun setCalibrating(calibrating: Boolean) {
+        mHandler?.removeCallbacks(mEndCalibration)
+        mCalibrating = calibrating
+        if (!calibrating) mDarkUntil = 0L
+        mHyperionThread?.setCalibrating(calibrating)
+        mSecondaryHyperionThread?.setCalibrating(calibrating)
+        if (calibrating) mHandler?.postDelayed(mEndCalibration, MAX_CALIBRATION_MS)
+        Log.i(TAG, if (calibrating) "Delay calibration started" else "Delay calibration finished")
+    }
 
     private fun applyOutputDelay() {
         val delay = effectiveOutputDelay(Preferences(this))
@@ -650,6 +685,16 @@ class ScreenGrabberService : Service() {
                     }
                 }
 
+                ACTION_CALIBRATION -> {
+                    when (intent.getStringExtra(EXTRA_CALIBRATION)) {
+                        CALIBRATION_BEGIN -> setCalibrating(true)
+                        CALIBRATION_END -> setCalibrating(false)
+                        CALIBRATION_DARK -> mDarkUntil =
+                            SystemClock.uptimeMillis() + intent.getLongExtra(EXTRA_DARK_MS, 0L).coerceIn(0L, MAX_DARK_MS)
+                    }
+                    if (mHyperionThread == null) stopSelf()
+                }
+
                 ACTION_DETECT_FRAME -> {
                     // Кнопка автоподстройки: перезапускаем поиск экрана прямо в идущей
                     // сессии камеры.
@@ -714,6 +759,7 @@ class ScreenGrabberService : Service() {
 
         unregisterColorPrefsListener()
         mHandler?.removeCallbacks(mApplySettings)
+        mHandler?.removeCallbacks(mEndCalibration)
         stopAppWatch()
         mActiveOptions = null
 
@@ -1643,6 +1689,12 @@ class ScreenGrabberService : Service() {
         const val ACTION_STOP = BASE + "ACTION_STOP"
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_DETECT_FRAME = BASE + "ACTION_DETECT_FRAME"
+        const val ACTION_CALIBRATION = BASE + "ACTION_CALIBRATION"
+        const val EXTRA_CALIBRATION = BASE + "EXTRA_CALIBRATION"
+        const val EXTRA_DARK_MS = BASE + "EXTRA_DARK_MS"
+        const val CALIBRATION_BEGIN = "begin"
+        const val CALIBRATION_END = "end"
+        const val CALIBRATION_DARK = "dark"
         const val ACTION_EXIT = BASE + "ACTION_EXIT"
         const val GET_STATUS = BASE + "ACTION_STATUS"
         const val EXTRA_RESULT_CODE = BASE + "EXTRA_RESULT_CODE"
@@ -1652,6 +1704,8 @@ class ScreenGrabberService : Service() {
         private const val APPLY_SETTINGS_DELAY_MS = 1200L
         private const val SESSION_RESTART_DELAY_MS = 700L
         private const val APP_WATCH_INTERVAL_MS = 3000L
+        private const val MAX_CALIBRATION_MS = 3 * 60 * 1000L
+        private const val MAX_DARK_MS = 6000L
 
         /** Настройки вывода: меняются пересозданием HyperionThread под тем же энкодером. */
         private val OUTPUT_KEYS = intArrayOf(

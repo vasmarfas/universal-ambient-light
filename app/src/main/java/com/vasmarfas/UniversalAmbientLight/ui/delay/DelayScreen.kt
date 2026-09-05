@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,6 +19,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -51,12 +54,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Задержка подсветки: общая и своя для отдельных приложений.
+ * Задержка подсветки: общая, своя для отдельных приложений и автоподбор камерой телефона.
  * На телефоне-пульте правит настройки телевизора, как и остальные экраны настроек.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DelayScreen(onBackClick: () -> Unit) {
+fun DelayScreen(onBackClick: () -> Unit, onCalibrateClick: () -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val remote = LocalRemote.current
@@ -137,6 +140,18 @@ fun DelayScreen(onBackClick: () -> Unit) {
                 step = 5,
                 valueText = { resources.getString(R.string.unit_ms, it) }
             )
+
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.delay_calibration_title), style = MaterialTheme.typography.titleMedium)
+                    if (remote != null) {
+                        Text(stringResource(R.string.delay_calibration_summary), style = MaterialTheme.typography.bodyMedium)
+                        Button(onClick = onCalibrateClick) { Text(stringResource(R.string.delay_calibration_open)) }
+                    } else {
+                        Text(stringResource(R.string.delay_calibration_on_phone), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
 
             Text(
                 text = stringResource(R.string.delay_apps_title),
