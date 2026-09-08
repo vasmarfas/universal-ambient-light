@@ -31,6 +31,9 @@ object RemoteProtocol {
 
     const val OP_APPS = "apps"
 
+    /** Таймер сна: "minutes", 0 - отменить. */
+    const val OP_SLEEP = "sleep"
+
     /** Автоподбор задержки: действие "a" - begin, dark (с "ms") или end. */
     const val OP_CALIBRATION = "calibration"
 
@@ -59,6 +62,7 @@ object RemoteProtocol {
      */
     const val FEATURE_EFFECTS = "effects"
     const val FEATURE_CALIBRATION = "calibration"
+    const val FEATURE_SLEEP = "sleep"
 
     /** Сколько телефонов держит ТВ одновременно; больше — признак ошибки, а не сценарий. */
     const val MAX_CLIENTS = 4

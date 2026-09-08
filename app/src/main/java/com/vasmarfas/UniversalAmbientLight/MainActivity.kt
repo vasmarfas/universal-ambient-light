@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
 
     // Последняя ошибка сервиса — на карточке состояния главного экрана до следующего запуска
     private var mLastError by mutableStateOf<String?>(null)
+    private var mSleepAt by mutableStateOf(0L)
     // Отказ телевизора выполнить команду пульта; своя ошибка у ТВ приходит его статусом
     private var mRemoteError by mutableStateOf<String?>(null)
     private var mRemotePending by mutableStateOf(false)
@@ -139,6 +140,7 @@ class MainActivity : ComponentActivity() {
 
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
             mLastError = if (checked) null else error
+            mSleepAt = intent.getLongExtra(ScreenGrabberService.BROADCAST_SLEEP_AT, 0L)
             val tclBlocked =
                 intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
 
@@ -240,6 +242,10 @@ class MainActivity : ComponentActivity() {
                                 if (remoteActive) toggleRemoteCapture() else toggleScreenCapture()
                             },
                             lastError = if (remoteActive) mRemoteError else mLastError,
+                            sleepAt = mSleepAt,
+                            onSleepTimer = { minutes ->
+                                if (remoteActive) setRemoteSleepTimer(minutes) else setSleepTimer(minutes)
+                            },
                             remotePending = mRemotePending,
                             pendingPayload = mPendingPayload,
                             onPayloadConsumed = { mPendingPayload = null }
@@ -503,6 +509,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }, "remote-capture").start()
+    }
+
+    private fun setSleepTimer(minutes: Int) {
+        if (!ScreenGrabberService.sInstanceRunning) return
+        val intent = Intent(this, ScreenGrabberService::class.java)
+            .setAction(ScreenGrabberService.ACTION_SLEEP_TIMER)
+            .putExtra(ScreenGrabberService.EXTRA_SLEEP_MINUTES, minutes)
+        startService(intent)
+    }
+
+    private fun setRemoteSleepTimer(minutes: Int) {
+        Thread({
+            val result = runCatching {
+                RemoteSession.call(RemoteProtocol.OP_SLEEP, JSONObject().put("minutes", minutes))
+            }
+            result.exceptionOrNull()?.let { error ->
+                runOnUiThread { mRemoteError = error.message }
+            }
+        }, "remote-sleep").start()
     }
 
     private fun toggleScreenCapture() {

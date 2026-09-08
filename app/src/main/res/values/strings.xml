@@ -671,4 +671,10 @@
   <string name="delay_apps_empty">No apps with their own delay yet.</string>
   <string name="delay_apps_remove">Remove</string>
   <string name="delay_apps_add">Add an app</string>
+
+  <!-- Sleep timer -->
+  <string name="sleep_timer">Sleep timer</string>
+  <string name="sleep_timer_minutes">In %1$d min</string>
+  <string name="sleep_timer_cancel">Turn the timer off</string>
+  <string name="sleep_timer_until">Turns off at %1$s</string>
 </resources>

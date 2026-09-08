@@ -87,6 +87,18 @@ internal class RemoteHostHandler(
 
             RemoteProtocol.OP_APPS -> JSONObject().put("apps", TvApps.list(mContext))
             RemoteProtocol.OP_CALIBRATION -> calibration(client, request)
+            RemoteProtocol.OP_SLEEP -> {
+                if (!ScreenGrabberService.sInstanceRunning) {
+                    throw RemoteCommandException(
+                        RemoteProtocol.ERR_FAILED,
+                        mContext.getString(R.string.calibration_error_not_running)
+                    )
+                }
+                sendToService(ScreenGrabberService.ACTION_SLEEP_TIMER) {
+                    putExtra(ScreenGrabberService.EXTRA_SLEEP_MINUTES, request.optInt("minutes"))
+                }
+                JSONObject()
+            }
 
             RemoteProtocol.OP_ADB -> adb(request)
             RemoteProtocol.OP_DEBUG_INFO -> JSONObject().put("text", DebugInfoHelper.getDebugInfo(mContext))
@@ -320,6 +332,7 @@ internal class RemoteHostHandler(
         private val FEATURES = listOf(
             RemoteProtocol.FEATURE_EFFECTS,
             RemoteProtocol.FEATURE_CALIBRATION,
+            RemoteProtocol.FEATURE_SLEEP,
         )
     }
 }

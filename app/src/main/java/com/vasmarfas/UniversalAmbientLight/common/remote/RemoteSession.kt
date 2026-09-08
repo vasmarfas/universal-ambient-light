@@ -69,6 +69,8 @@ object RemoteSession {
         val problem: String? = null,
         /** Растёт с каждым полным снимком настроек — экранам пора перечитать зеркало. */
         val revision: Int = 0,
+        /** Когда ТВ выключит подсветку по таймеру сна, мс по часам ТВ; 0 - таймера нет. */
+        val sleepAt: Long = 0L,
     )
 
     fun interface Listener {
@@ -409,7 +411,8 @@ object RemoteSession {
         running = status.optBoolean("running"),
         alive = status.optBoolean("alive"),
         error = status.optString("error").takeIf { status.has("error") && !status.isNull("error") },
-        source = status.optString("source").ifEmpty { null }
+        source = status.optString("source").ifEmpty { null },
+        sleepAt = status.optLong("sleepAt")
     )
 
     private fun replaceMirror(entries: JSONArray) {

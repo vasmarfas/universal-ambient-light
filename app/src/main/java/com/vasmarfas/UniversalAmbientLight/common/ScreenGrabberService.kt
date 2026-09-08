@@ -134,6 +134,13 @@ class ScreenGrabberService : Service() {
     private var mDarkFrame: ByteArray? = null
     private val mEndCalibration = Runnable { setCalibrating(false) }
 
+    // Таймер сна: подсветка выключается сама, как будто её выключили кнопкой
+    private val mSleep = Runnable {
+        Log.i(TAG, "Sleep timer elapsed, turning the lighting off")
+        sSleepAt = 0L
+        CaptureLauncher.stop(this)
+    }
+
     /**
      * Выход одного энкодера. После отцепления (перезапуск захвата с новыми настройками)
      * старый энкодер больше ничего не шлёт: его прощальные чёрные кадры и disconnect
@@ -516,6 +523,19 @@ class ScreenGrabberService : Service() {
         return true
     }
 
+    private fun setSleepTimer(minutes: Int) {
+        val handler = mHandler ?: return
+        handler.removeCallbacks(mSleep)
+        if (minutes > 0 && mHyperionThread != null) {
+            val delayMs = minutes * 60_000L
+            sSleepAt = System.currentTimeMillis() + delayMs
+            handler.postDelayed(mSleep, delayMs)
+        } else {
+            sSleepAt = 0L
+        }
+        notifyActivity()
+    }
+
     private fun effectiveOutputDelay(prefs: Preferences): Long =
         DelayProfiles.effectiveDelay(prefs, mForegroundPackage).toLong()
 
@@ -685,6 +705,11 @@ class ScreenGrabberService : Service() {
                     }
                 }
 
+                ACTION_SLEEP_TIMER -> {
+                    setSleepTimer(intent.getIntExtra(EXTRA_SLEEP_MINUTES, 0))
+                    if (mHyperionThread == null) stopSelf()
+                }
+
                 ACTION_CALIBRATION -> {
                     when (intent.getStringExtra(EXTRA_CALIBRATION)) {
                         CALIBRATION_BEGIN -> setCalibrating(true)
@@ -760,6 +785,8 @@ class ScreenGrabberService : Service() {
         unregisterColorPrefsListener()
         mHandler?.removeCallbacks(mApplySettings)
         mHandler?.removeCallbacks(mEndCalibration)
+        mHandler?.removeCallbacks(mSleep)
+        sSleepAt = 0L
         stopAppWatch()
         mActiveOptions = null
 
@@ -1415,6 +1442,7 @@ class ScreenGrabberService : Service() {
         val intent = Intent(BROADCAST_FILTER)
         intent.putExtra(BROADCAST_TAG, isCommunicating)
         intent.putExtra(BROADCAST_ERROR, mStartError)
+        intent.putExtra(BROADCAST_SLEEP_AT, sSleepAt)
         if (DEBUG) {
             Log.v(
                 TAG, "Broadcasting status: communicating=" + isCommunicating +
@@ -1679,6 +1707,7 @@ class ScreenGrabberService : Service() {
         const val BROADCAST_TAG = "SERVICE_STATUS"
         const val BROADCAST_FILTER = "SERVICE_FILTER"
         const val BROADCAST_TCL_BLOCKED = "TCL_BLOCKED"
+        const val BROADCAST_SLEEP_AT = "SLEEP_AT"
         private const val DEBUG = false
         private const val TAG = "ScreenGrabberService"
 
@@ -1689,6 +1718,8 @@ class ScreenGrabberService : Service() {
         const val ACTION_STOP = BASE + "ACTION_STOP"
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_DETECT_FRAME = BASE + "ACTION_DETECT_FRAME"
+        const val ACTION_SLEEP_TIMER = BASE + "ACTION_SLEEP_TIMER"
+        const val EXTRA_SLEEP_MINUTES = BASE + "EXTRA_SLEEP_MINUTES"
         const val ACTION_CALIBRATION = BASE + "ACTION_CALIBRATION"
         const val EXTRA_CALIBRATION = BASE + "EXTRA_CALIBRATION"
         const val EXTRA_DARK_MS = BASE + "EXTRA_DARK_MS"
@@ -1865,6 +1896,12 @@ class ScreenGrabberService : Service() {
             intent.setPackage(context.packageName)
             context.sendBroadcast(intent)
         }
+
+        /** Когда сработает таймер сна, мс по часам устройства; 0 - таймера нет. */
+        @Volatile
+        @JvmStatic
+        var sSleepAt: Long = 0L
+            private set
 
         /** True, пока экземпляр сервиса жив (onCreate→onDestroy). */
         @Volatile

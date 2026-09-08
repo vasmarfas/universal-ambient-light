@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.NavHostController
 import com.vasmarfas.UniversalAmbientLight.common.remote.PairingPayload
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
@@ -60,6 +61,8 @@ fun AppNavHost(
     isRunning: Boolean,
     onToggleClick: () -> Unit,
     lastError: String? = null,
+    sleepAt: Long = 0L,
+    onSleepTimer: (Int) -> Unit = {},
     remotePending: Boolean = false,
     pendingPayload: PairingPayload? = null,
     onPayloadConsumed: () -> Unit = {},
@@ -118,10 +121,17 @@ fun AppNavHost(
                     // Пока ждём запуска, прошлая ошибка ТВ только сбивала бы с толку
                     error = if (remotePending) null else lastError ?: remote.error,
                     target = target,
-                    source = source
+                    source = source,
+                    sleepAt = remote.sleepAt
                 )
             } else {
-                HomeStatus(running = isRunning, error = lastError, target = target, source = source)
+                HomeStatus(
+                    running = isRunning,
+                    error = lastError,
+                    target = target,
+                    source = source,
+                    sleepAt = sleepAt
+                )
             }
             // На ТВ — пустить телефон, на телефоне — управлять телевизором
             val remoteEntry = if (isTv && remote == null) {
@@ -133,6 +143,8 @@ fun AppNavHost(
                     navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
                 }
             }
+            val sleepSupported = remote == null ||
+                    remote.caps?.features?.contains(RemoteProtocol.FEATURE_SLEEP) == true
 
             MainScreen(
                 isRunning = if (remote != null) remote.running else isRunning,
@@ -148,6 +160,7 @@ fun AppNavHost(
                 status = status,
                 localPreview = remote == null,
                 remoteEntry = remoteEntry,
+                onSleepTimer = if (sleepSupported) onSleepTimer else null,
                 topContent = {
                     if (remote != null) {
                         RemoteBanner(
