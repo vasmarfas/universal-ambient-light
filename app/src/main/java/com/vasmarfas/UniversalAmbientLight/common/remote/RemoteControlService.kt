@@ -147,6 +147,7 @@ class RemoteControlService : Service() {
         val prefs = Preferences(this)
         return JSONObject()
             .put("running", mRunning && ScreenGrabberService.sInstanceRunning)
+            .put("sleepAt", ScreenGrabberService.sSleepAt)
             .put("alive", ScreenGrabberService.sInstanceRunning)
             .put("error", mError)
             .put("source", prefs.getString(R.string.pref_key_capture_source, "screen"))

@@ -651,4 +651,10 @@
   <string name="delay_apps_empty">Пока ни у одного приложения нет своей задержки.</string>
   <string name="delay_apps_remove">Удалить</string>
   <string name="delay_apps_add">Добавить приложение</string>
+
+  <!-- Sleep timer -->
+  <string name="sleep_timer">Таймер сна</string>
+  <string name="sleep_timer_minutes">Через %1$d мин</string>
+  <string name="sleep_timer_cancel">Отключить таймер</string>
+  <string name="sleep_timer_until">Выключится в %1$s</string>
 </resources>

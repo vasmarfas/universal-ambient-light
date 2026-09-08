@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Help
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +67,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground
+import com.vasmarfas.UniversalAmbientLight.ui.settings.ClickablePreference
+import java.text.DateFormat
+import java.util.Date
 import kotlin.math.sqrt
 
 /**
@@ -100,6 +106,8 @@ data class HomeStatus(
     val error: String? = null,
     val target: String? = null,
     val source: String? = null,
+    /** Когда подсветка выключится по таймеру сна, мс по часам; 0 - таймера нет. */
+    val sleepAt: Long = 0L,
 )
 
 /** Вход в удалённое управление: на ТВ — показать QR, на телефоне — выбрать телевизор. */
@@ -122,6 +130,8 @@ fun MainScreen(
     onSupportClick: () -> Unit = {},
     onReportIssueClick: () -> Unit = {},
     onLeaveReviewClick: () -> Unit = {},
+    // null - таймер сна недоступен (старый ТВ); 0 минут отменяет таймер
+    onSleepTimer: ((minutes: Int) -> Unit)? = null,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // В режиме камеры фоном идёт превью камеры с углами
@@ -311,6 +321,35 @@ fun MainScreen(
                     .padding(horizontal = 16.dp)
             )
 
+            if (onSleepTimer != null && isRunning) {
+                var showSleepDialog by remember { mutableStateOf(false) }
+                var sleepFocused by remember { mutableStateOf(false) }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { showSleepDialog = true },
+                    border = focusableOutline(sleepFocused),
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .onFocusChanged { sleepFocused = it.isFocused }
+                ) {
+                    Icon(Icons.Default.Bedtime, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.sleep_timer))
+                }
+                if (showSleepDialog) {
+                    SleepTimerDialog(
+                        active = status.sleepAt > 0,
+                        onPick = { minutes ->
+                            showSleepDialog = false
+                            onSleepTimer(minutes)
+                        },
+                        onDismiss = { showSleepDialog = false }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Столбец кнопок помощи и поддержки. Ширина ограничена: на ТВ кнопки
@@ -463,6 +502,14 @@ private fun StatusCard(status: HomeStatus, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (status.running && status.sleepAt > 0) {
+                val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(status.sleepAt))
+                Text(
+                    text = stringResource(R.string.sleep_timer_until, time),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             if (error != null) {
                 Text(
                     text = error,
@@ -476,3 +523,33 @@ private fun StatusCard(status: HomeStatus, modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+private fun SleepTimerDialog(active: Boolean, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sleep_timer)) },
+        text = {
+            Column {
+                for (minutes in SLEEP_OPTIONS) {
+                    ClickablePreference(
+                        title = stringResource(R.string.sleep_timer_minutes, minutes),
+                        onClick = { onPick(minutes) }
+                    )
+                }
+                if (active) {
+                    ClickablePreference(
+                        title = stringResource(R.string.sleep_timer_cancel),
+                        onClick = { onPick(0) }
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
+}
+
+private val SLEEP_OPTIONS = listOf(15, 30, 45, 60, 90, 120)
