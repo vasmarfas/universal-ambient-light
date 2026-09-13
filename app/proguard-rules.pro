@@ -44,6 +44,12 @@
     public static void main(java.lang.String[]);
 }
 
+# Процесс ввода для телефона-пульта запускается через ADB тем же способом:
+# CLASSPATH=<apk> app_process ... InputInjectorCli (см. InputInjector.start).
+-keep class com.vasmarfas.UniversalAmbientLight.common.input.InputInjectorCli {
+    public static void main(java.lang.String[]);
+}
+
 # AmbilightApplication опознаёт баг прошивки по имени класса в стеке (ProfileVerifier
 # бросает NoSuchMethodError там, где framework.jar не соответствует версии Android).
 # Обфускация переименовывала класс, и обход переставал срабатывать именно в release.

@@ -502,7 +502,7 @@
   <string name="rating_dialog_report_issue">Report Issue</string>
   <string name="rating_dialog_cancel">Cancel</string>
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
-  <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
+  <string name="accessibility_service_description">Lets Universal Ambient Light capture the screen for the ambient lighting and press TV buttons on commands from a paired phone.</string>
   <string name="accessibility_enable_prompt">Please enable the Accessibility Service for Universal Ambient Light</string>
   <string name="accessibility_disclosure_title">Accessibility Permission Required</string>
   <string name="accessibility_disclosure_message">This app uses the AccessibilityService API to capture screen content. This is required to analyze colors on your screen and sync them with your background lights (Ambilight) in real-time.\n\nThe screen data is processed locally on your device, is never saved, and is never transmitted to any third-party servers.\n\nIf you do not agree, you cannot use this capture mode.</string>
@@ -628,6 +628,48 @@
   <string name="effect_layout_test_hint">Top is red, right is green, bottom is blue, left is yellow. The white dot runs from the first LED in the numbering direction. If the colors or the path of the dot do not match the strip, fix the LED layout.</string>
   <string name="home_source_effect">Effect: %1$s</string>
   <string name="remote_error_update_tv">The app on the TV is older than this feature. Update it on the TV.</string>
+
+  <!-- Remote: buttons, mouse, text and apps of the TV -->
+  <string name="tv_remote_title">Remote</string>
+  <string name="tv_remote_tab_keys">Buttons</string>
+  <string name="tv_remote_tab_mouse">Mouse</string>
+  <string name="tv_remote_tab_text">Text</string>
+  <string name="tv_remote_tab_apps">Apps</string>
+  <string name="tv_remote_adb_missing">Buttons, mouse and text work through ADB on the TV, and it is not available now: %1$s</string>
+  <string name="tv_remote_adb_missing_accessibility">Without ADB only system buttons, taps and text through the accessibility service work.</string>
+  <string name="tv_remote_adb_setup">Set up ADB</string>
+  <string name="tv_remote_no_cursor">The TV does not allow windows over other apps, so the cursor is not visible. Grant the autostart permissions via ADB.</string>
+  <string name="tv_remote_power">Power</string>
+  <string name="tv_remote_input">Input source</string>
+  <string name="tv_remote_settings">TV settings</string>
+  <string name="tv_remote_back">Back</string>
+  <string name="tv_remote_home">Home</string>
+  <string name="tv_remote_menu">Menu</string>
+  <string name="tv_remote_ok">OK</string>
+  <string name="tv_remote_up">Up</string>
+  <string name="tv_remote_down">Down</string>
+  <string name="tv_remote_left">Left</string>
+  <string name="tv_remote_right">Right</string>
+  <string name="tv_remote_volume_up">Volume up</string>
+  <string name="tv_remote_volume_down">Volume down</string>
+  <string name="tv_remote_mute">Mute</string>
+  <string name="tv_remote_play_pause">Play or pause</string>
+  <string name="tv_remote_rewind">Rewind</string>
+  <string name="tv_remote_forward">Fast forward</string>
+  <string name="tv_remote_previous">Previous</string>
+  <string name="tv_remote_next">Next</string>
+  <string name="tv_remote_touchpad_hint">Slide a finger to move the cursor. A tap clicks, holding makes a long press. Two fingers scroll, a two-finger tap works as Back.</string>
+  <string name="tv_remote_click">Click</string>
+  <string name="tv_remote_text_label">Text for the TV</string>
+  <string name="tv_remote_text_hint">Select a text field on the TV, a search box for example, and type here. The text appears on the TV right away.</string>
+  <string name="tv_remote_enter">Enter</string>
+  <string name="tv_remote_backspace">Delete</string>
+  <string name="tv_remote_clear">Clear</string>
+  <string name="tv_remote_apps_loading">Loading the TV apps…</string>
+  <string name="tv_remote_apps_empty">No apps found on the TV</string>
+  <string name="remote_tvs_switch">Other TVs</string>
+  <string name="remote_input_needs_adb">This needs ADB on the TV (%1$s). It is set up on the Remote screen.</string>
+  <string name="remote_app_not_found">The app is not installed on the TV</string>
 
   <!-- Lighting delay and auto-tuning with the phone camera -->
   <string name="calibration_title">Delay auto-tuning</string>

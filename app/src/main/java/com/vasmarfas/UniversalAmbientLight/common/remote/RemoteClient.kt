@@ -100,6 +100,12 @@ class RemoteClient(private val listener: Listener) {
         }
     }
 
+    /** Команда без ожидания ответа: ТВ на неё и не отвечает (см. RemoteProtocol.OP_INPUT). */
+    fun post(op: String, args: JSONObject) {
+        val channel = mChannel ?: throw IOException("Not connected")
+        channel.send(args.put("id", 0).put("op", op))
+    }
+
     fun close() {
         closeWith(null)
     }

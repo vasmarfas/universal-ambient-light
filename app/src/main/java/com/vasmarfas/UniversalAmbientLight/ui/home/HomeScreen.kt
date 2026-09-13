@@ -124,7 +124,7 @@ fun MainScreen(
     // Превью камеры и радуга захвата рисуются на экране этого устройства, при управлении
     // телевизором с телефона они ничего не показывают
     localPreview: Boolean = true,
-    remoteEntry: RemoteEntry? = null,
+    remoteEntries: List<RemoteEntry> = emptyList(),
     topContent: @Composable () -> Unit = {},
     onHelpClick: () -> Unit = {},
     onSupportClick: () -> Unit = {},
@@ -362,7 +362,7 @@ fun MainScreen(
                     .widthIn(max = 420.dp)
                     .padding(horizontal = 16.dp)
             ) {
-                if (remoteEntry != null) {
+                for (remoteEntry in remoteEntries) {
                     var remoteFocused by remember { mutableStateOf(false) }
                     FilledTonalButton(
                         onClick = remoteEntry.onClick,

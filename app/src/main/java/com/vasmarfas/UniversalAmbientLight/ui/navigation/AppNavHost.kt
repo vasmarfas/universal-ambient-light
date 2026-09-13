@@ -4,8 +4,10 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,6 +55,7 @@ import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteBanner
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteHostScreen
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteTvsScreen
+import com.vasmarfas.UniversalAmbientLight.ui.remote.TvRemoteScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 @Composable
 fun AppNavHost(
@@ -133,18 +136,32 @@ fun AppNavHost(
                     sleepAt = sleepAt
                 )
             }
-            // На ТВ — пустить телефон, на телефоне — управлять телевизором
-            val remoteEntry = if (isTv && remote == null) {
-                RemoteEntry(stringResource(R.string.remote_host_title), Icons.Default.PhoneAndroid) {
-                    navController.navigate(Screen.RemoteHost.route) { launchSingleTop = true }
-                }
-            } else {
-                RemoteEntry(stringResource(R.string.remote_tvs_title), Icons.Default.SettingsRemote) {
-                    navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
-                }
-            }
             val sleepSupported = remote == null ||
                     remote.caps?.features?.contains(RemoteProtocol.FEATURE_SLEEP) == true
+            // На ТВ - пустить телефон, на телефоне - управлять телевизором, а уже подключённому
+            // пульту - кнопки ТВ и выбор другого телевизора
+            val remoteEntries = when {
+                remote != null -> listOf(
+                    RemoteEntry(stringResource(R.string.tv_remote_title), Icons.Default.Gamepad) {
+                        navController.navigate(Screen.TvRemote.route) { launchSingleTop = true }
+                    },
+                    RemoteEntry(stringResource(R.string.remote_tvs_switch), Icons.Default.Tv) {
+                        navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
+                    }
+                )
+
+                isTv -> listOf(
+                    RemoteEntry(stringResource(R.string.remote_host_title), Icons.Default.PhoneAndroid) {
+                        navController.navigate(Screen.RemoteHost.route) { launchSingleTop = true }
+                    }
+                )
+
+                else -> listOf(
+                    RemoteEntry(stringResource(R.string.remote_tvs_title), Icons.Default.SettingsRemote) {
+                        navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
+                    }
+                )
+            }
 
             MainScreen(
                 isRunning = if (remote != null) remote.running else isRunning,
@@ -159,7 +176,7 @@ fun AppNavHost(
                 captureSource = captureSource,
                 status = status,
                 localPreview = remote == null,
-                remoteEntry = remoteEntry,
+                remoteEntries = remoteEntries,
                 onSleepTimer = if (sleepSupported) onSleepTimer else null,
                 topContent = {
                     if (remote != null) {
@@ -382,6 +399,13 @@ fun AppNavHost(
                 onBackClick = { navController.popBackStack() },
                 onStartLighting = { if (!running) onToggleClick() }
             )
+        }
+        composable(Screen.TvRemote.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "tv_remote", "TvRemoteScreen")
+            }
+            TvRemoteScreen(onBackClick = { navController.popBackStack() })
         }
         composable(Screen.RemoteTvs.route) {
             val context = LocalContext.current
