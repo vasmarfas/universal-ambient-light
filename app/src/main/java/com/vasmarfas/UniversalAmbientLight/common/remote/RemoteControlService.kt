@@ -39,6 +39,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class RemoteControlService : Service() {
 
     private var mServer: RemoteServer? = null
+    private var mHostHandler: RemoteHostHandler? = null
     private var mConfig: RemoteHostConfig? = null
     private var mNsdManager: NsdManager? = null
     private var mNsdListener: NsdManager.RegistrationListener? = null
@@ -79,6 +80,7 @@ class RemoteControlService : Service() {
         val handler = RemoteHostHandler(this, config, ::status) { clients ->
             mHandler.post { onClientsChanged(clients) }
         }
+        mHostHandler = handler
         val server = RemoteServer(config.tvId, { config.secret }, handler)
         val port = try {
             server.start(config.port)
@@ -140,6 +142,8 @@ class RemoteControlService : Service() {
         unregisterNsd()
         mServer?.stop()
         mServer = null
+        mHostHandler?.close()
+        mHostHandler = null
         super.onDestroy()
     }
 

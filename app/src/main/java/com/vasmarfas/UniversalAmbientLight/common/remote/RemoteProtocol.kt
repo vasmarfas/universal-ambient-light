@@ -29,13 +29,25 @@ object RemoteProtocol {
     const val OP_DEBUG_INFO = "debug_info"
     const val OP_PING = "ping"
 
+    /**
+     * Ввод на ТВ: кнопка, текст или мышь. Выполняется прямо в потоке чтения, без пула, -
+     * порядок нажатий важнее всего. Запрос с id 0 ответа не получает: движения мыши идут
+     * десятками в секунду, и ответы на них никому не нужны.
+     */
+    const val OP_INPUT = "input"
+    const val OP_INPUT_PREPARE = "input_prepare"
     const val OP_APPS = "apps"
+    const val OP_LAUNCH = "launch"
 
     /** Таймер сна: "minutes", 0 - отменить. */
     const val OP_SLEEP = "sleep"
 
     /** Автоподбор задержки: действие "a" - begin, dark (с "ms") или end. */
     const val OP_CALIBRATION = "calibration"
+
+    const val INPUT_KEY = "key"
+    const val INPUT_TEXT = "text"
+    const val INPUT_POINTER = "pointer"
 
     const val EVENT_STATUS = "status"
     const val EVENT_PREFS = "prefs"
@@ -61,6 +73,7 @@ object RemoteProtocol {
      * без смены [VERSION]: старый ТВ просто не объявит их, и телефон попросит его обновить.
      */
     const val FEATURE_EFFECTS = "effects"
+    const val FEATURE_INPUT = "input"
     const val FEATURE_CALIBRATION = "calibration"
     const val FEATURE_SLEEP = "sleep"
 

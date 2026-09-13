@@ -483,7 +483,7 @@
   <string name="rating_dialog_report_issue">Сообщить о проблеме</string>
   <string name="rating_dialog_cancel">Отмена</string>
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
-  <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
+  <string name="accessibility_service_description">Позволяет Universal Ambient Light снимать экран для подсветки и нажимать кнопки ТВ по командам сопряжённого телефона.</string>
   <string name="accessibility_disclosure_title">Требуется разрешение специальных возможностей</string>
   <string name="accessibility_disclosure_message">Это приложение использует API специальных возможностей (AccessibilityService API) для захвата содержимого экрана. Это необходимо для анализа цветов на экране и синхронизации фоновой подсветки (Ambilight) в реальном времени.\n\nДанные экрана обрабатываются локально на вашем устройстве, никуда не сохраняются и не передаются третьим лицам.\n\nЕсли вы не согласны, вы не сможете использовать этот режим захвата.</string>
   <string name="accessibility_disclosure_button_deny">Отказать</string>
@@ -608,6 +608,48 @@
   <string name="effect_layout_test_hint">Верх красный, правая сторона зелёная, низ синий, левая жёлтая. Белая точка бежит от первого светодиода в сторону нумерации. Если цвета или путь точки не совпадают с лентой, поправьте раскладку.</string>
   <string name="home_source_effect">Эффект: %1$s</string>
   <string name="remote_error_update_tv">На ТВ стоит старая версия приложения, в ней этого ещё нет. Обновите приложение на ТВ.</string>
+
+  <!-- Remote: buttons, mouse, text and apps of the TV -->
+  <string name="tv_remote_title">Пульт</string>
+  <string name="tv_remote_tab_keys">Кнопки</string>
+  <string name="tv_remote_tab_mouse">Мышь</string>
+  <string name="tv_remote_tab_text">Текст</string>
+  <string name="tv_remote_tab_apps">Приложения</string>
+  <string name="tv_remote_adb_missing">Кнопки, мышь и текст работают через ADB на ТВ, а он сейчас недоступен: %1$s</string>
+  <string name="tv_remote_adb_missing_accessibility">Без ADB работают только системные кнопки, касания и текст через службу доступности.</string>
+  <string name="tv_remote_adb_setup">Настроить ADB</string>
+  <string name="tv_remote_no_cursor">ТВ не разрешает окна поверх других приложений, поэтому курсора не видно. Выдайте разрешения для автозапуска через ADB.</string>
+  <string name="tv_remote_power">Питание</string>
+  <string name="tv_remote_input">Источник сигнала</string>
+  <string name="tv_remote_settings">Настройки ТВ</string>
+  <string name="tv_remote_back">Назад</string>
+  <string name="tv_remote_home">Домой</string>
+  <string name="tv_remote_menu">Меню</string>
+  <string name="tv_remote_ok">OK</string>
+  <string name="tv_remote_up">Вверх</string>
+  <string name="tv_remote_down">Вниз</string>
+  <string name="tv_remote_left">Влево</string>
+  <string name="tv_remote_right">Вправо</string>
+  <string name="tv_remote_volume_up">Громче</string>
+  <string name="tv_remote_volume_down">Тише</string>
+  <string name="tv_remote_mute">Без звука</string>
+  <string name="tv_remote_play_pause">Пуск или пауза</string>
+  <string name="tv_remote_rewind">Назад по видео</string>
+  <string name="tv_remote_forward">Вперёд по видео</string>
+  <string name="tv_remote_previous">Предыдущее</string>
+  <string name="tv_remote_next">Следующее</string>
+  <string name="tv_remote_touchpad_hint">Ведите пальцем, чтобы двигать курсор. Касание нажимает, удержание делает долгое нажатие. Двумя пальцами листайте, касание двумя пальцами работает как «Назад».</string>
+  <string name="tv_remote_click">Нажать</string>
+  <string name="tv_remote_text_label">Текст для ТВ</string>
+  <string name="tv_remote_text_hint">Выберите поле ввода на ТВ, например поиск, и печатайте здесь. Текст сразу появляется на экране.</string>
+  <string name="tv_remote_enter">Ввод</string>
+  <string name="tv_remote_backspace">Стереть</string>
+  <string name="tv_remote_clear">Очистить</string>
+  <string name="tv_remote_apps_loading">Загружаю приложения ТВ…</string>
+  <string name="tv_remote_apps_empty">На ТВ не нашлось приложений</string>
+  <string name="remote_tvs_switch">Другие телевизоры</string>
+  <string name="remote_input_needs_adb">Для этого нужен ADB на ТВ (%1$s). Он настраивается на экране «Пульт».</string>
+  <string name="remote_app_not_found">Приложение не установлено на ТВ</string>
 
   <!-- Lighting delay and auto-tuning with the phone camera -->
   <string name="calibration_title">Автоподбор задержки</string>

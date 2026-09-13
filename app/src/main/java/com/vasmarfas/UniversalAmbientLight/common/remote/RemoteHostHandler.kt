@@ -14,6 +14,7 @@ import com.vasmarfas.UniversalAmbientLight.common.CaptureLauncher
 import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.input.TvApps
+import com.vasmarfas.UniversalAmbientLight.common.input.TvInput
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbAutoPair
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbSetup
 import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
@@ -25,6 +26,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -41,6 +43,7 @@ internal class RemoteHostHandler(
 
     private val mContext = context.applicationContext
     private val mMainHandler = Handler(Looper.getMainLooper())
+    private val mInput = TvInput(mContext)
 
     // Кто начал замер задержки: если этот телефон пропадёт, замер надо снять, а не ждать
     // таймаута сервиса с лентой без сглаживания
@@ -49,13 +52,20 @@ internal class RemoteHostHandler(
 
     override fun onClientsChanged(clients: List<RemoteServer.Client>) = clientsListener(clients)
 
+    // Телефон пропал посреди нажатия или с открытым тачпадом - кнопка не должна залипнуть,
+    // а курсор висеть поверх фильма
     override fun onClientGone(client: RemoteServer.Client) {
+        mInput.release()
         if (mCalibrationClient === client) {
             mCalibrationClient = null
             sendToService(ScreenGrabberService.ACTION_CALIBRATION) {
                 putExtra(ScreenGrabberService.EXTRA_CALIBRATION, ScreenGrabberService.CALIBRATION_END)
             }
         }
+    }
+
+    fun close() {
+        mInput.shutdown()
     }
 
     override fun handle(client: RemoteServer.Client, op: String, request: JSONObject): JSONObject =
@@ -85,7 +95,10 @@ internal class RemoteHostHandler(
                 JSONObject()
             }
 
+            RemoteProtocol.OP_INPUT -> input(request)
+            RemoteProtocol.OP_INPUT_PREPARE -> mInput.prepare()
             RemoteProtocol.OP_APPS -> JSONObject().put("apps", TvApps.list(mContext))
+            RemoteProtocol.OP_LAUNCH -> failing { mInput.launch(request.optString("pkg")) }
             RemoteProtocol.OP_CALIBRATION -> calibration(client, request)
             RemoteProtocol.OP_SLEEP -> {
                 if (!ScreenGrabberService.sInstanceRunning) {
@@ -135,6 +148,25 @@ internal class RemoteHostHandler(
             .put("usageAccess", ForegroundApp.hasAccess(mContext))
     }
 
+    private fun input(request: JSONObject): JSONObject = failing {
+        when (request.optString("t")) {
+            RemoteProtocol.INPUT_KEY -> mInput.key(
+                request.optInt("code"),
+                request.optString("a", TvInput.KEY_PRESS),
+                request.optInt("n", 1)
+            )
+
+            RemoteProtocol.INPUT_TEXT -> mInput.text(request.optString("text"))
+            RemoteProtocol.INPUT_POINTER -> mInput.pointer(
+                request.optString("a"),
+                request.optDouble("dx", 0.0).toFloat(),
+                request.optDouble("dy", 0.0).toFloat()
+            )
+
+            else -> throw RemoteCommandException(RemoteProtocol.ERR_BAD_REQUEST, "Unknown input")
+        }
+    }
+
     private fun calibration(client: RemoteServer.Client, request: JSONObject): JSONObject {
         val action = request.optString("a")
         val prefs = Preferences(mContext)
@@ -171,6 +203,16 @@ internal class RemoteHostHandler(
             putExtra(ScreenGrabberService.EXTRA_DARK_MS, request.optLong("ms"))
         }
         return reply
+    }
+
+    /** Отказ ввода уже с текстом для человека - телефон показывает его как есть. */
+    private fun failing(block: () -> Unit): JSONObject {
+        try {
+            block()
+        } catch (e: IOException) {
+            throw RemoteCommandException(RemoteProtocol.ERR_FAILED, e.message.orEmpty())
+        }
+        return JSONObject()
     }
 
     private fun setPrefs(client: RemoteServer.Client, request: JSONObject): JSONObject {
@@ -331,6 +373,7 @@ internal class RemoteHostHandler(
 
         private val FEATURES = listOf(
             RemoteProtocol.FEATURE_EFFECTS,
+            RemoteProtocol.FEATURE_INPUT,
             RemoteProtocol.FEATURE_CALIBRATION,
             RemoteProtocol.FEATURE_SLEEP,
         )

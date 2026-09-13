@@ -90,6 +90,12 @@ object RemoteSession {
         Thread(r, "remote-send").apply { isDaemon = true }
     }
 
+    // Ввод идёт своей очередью: кнопки и движения мыши обязаны дойти до ТВ по порядку и не
+    // ждать за пачкой настроек
+    private val mInputSender: ExecutorService = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "remote-input").apply { isDaemon = true }
+    }
+
     // Контекст не храним: синглтон живёт дольше любой активити, а нужно ему немногое
     private var mMirror: SharedPreferences? = null
     private var mResources: Resources? = null
@@ -252,6 +258,23 @@ object RemoteSession {
             collectPending()
         }
         if (entries.length() > 0) client.call(RemoteProtocol.OP_SET_PREFS, JSONObject().put("set", entries))
+    }
+
+    /**
+     * Ввод на ТВ. [wait] - ждать ответа и сообщить об отказе в [onError] на главном потоке;
+     * без ожидания уходят движения мыши, их десятки в секунду.
+     */
+    fun input(args: JSONObject, wait: Boolean = true, onError: (String) -> Unit = {}) {
+        mInputSender.execute {
+            val client = mClient
+            try {
+                if (client == null) throw IOException(string(R.string.remote_error_offline))
+                if (wait) client.call(RemoteProtocol.OP_INPUT, args) else client.post(RemoteProtocol.OP_INPUT, args)
+            } catch (e: IOException) {
+                val message = e.message ?: string(R.string.remote_error_offline)
+                mMain.post { onError(message) }
+            }
+        }
     }
 
     fun adb(action: String, extra: JSONObject = JSONObject()): JSONObject =
