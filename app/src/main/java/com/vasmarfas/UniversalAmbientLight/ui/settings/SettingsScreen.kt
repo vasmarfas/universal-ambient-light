@@ -62,6 +62,7 @@ fun SettingsScreen(
     onRemoteHostClick: () -> Unit = {},
     onRemoteTvsClick: () -> Unit = {},
     onDelayClick: () -> Unit = {},
+    onControllerClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val remote = LocalRemote.current
@@ -117,7 +118,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
-                ConnectionSection(prefs, state)
+                ConnectionSection(prefs, state, onControllerClick)
                 HomeAssistantSecondarySection(prefs, state)
                 CaptureSection(prefs, state, onLedLayoutClick, onCameraSetupClick)
                 CameraIdleSection(prefs, state)
@@ -255,66 +256,6 @@ fun SettingsScreen(
         )
     }
 
-    if (state.showScanDialog) {
-        DeviceScanDialog(
-            onDismiss = { state.showScanDialog = false },
-            onDeviceSelected = { device ->
-                val oldConnectionType = state.connectionType
-
-                when (device.type) {
-                    com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.WLED -> {
-                        val newConnectionType = "wled"
-                        prefs.putString(R.string.pref_key_connection_type, newConnectionType)
-                        state.connectionType = newConnectionType
-
-                        val protocol = when (device.protocol) {
-                            "ddp" -> "ddp"
-                            "udp_raw" -> "udp_raw"
-                            else -> "ddp"
-                        }
-                        state.wledProtocol = protocol
-                        prefs.putString(R.string.pref_key_wled_protocol, protocol)
-
-                        AnalyticsHelper.logProtocolChanged(
-                            context,
-                            oldConnectionType,
-                            newConnectionType
-                        )
-                        AnalyticsHelper.updateProtocolProperty(context, newConnectionType)
-                    }
-
-                    com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.HYPERION -> {
-                        val newConnectionType = "hyperion"
-                        prefs.putString(R.string.pref_key_connection_type, newConnectionType)
-                        state.connectionType = newConnectionType
-
-                        AnalyticsHelper.logProtocolChanged(
-                            context,
-                            oldConnectionType,
-                            newConnectionType
-                        )
-                        AnalyticsHelper.updateProtocolProperty(context, newConnectionType)
-                    }
-
-                    else -> {}
-                }
-
-                prefs.putString(R.string.pref_key_host, device.host)
-                prefs.putString(R.string.pref_key_port, device.port.toString())
-
-                state.currentHost = device.host
-                state.currentPort = device.port.toString()
-
-                AnalyticsHelper.logHostChanged(context, device.host)
-                AnalyticsHelper.logPortChanged(context, device.port)
-                AnalyticsHelper.logSettingChanged(
-                    context,
-                    "device_scanned",
-                    "${device.type}:${device.host}:${device.port}"
-                )
-            }
-        )
-    }
     if (state.showAdbPairingDialog) {
         val actions = remember(remote != null) {
             if (remote != null) RemoteAdbActions() else LocalAdbActions(context, prefs)

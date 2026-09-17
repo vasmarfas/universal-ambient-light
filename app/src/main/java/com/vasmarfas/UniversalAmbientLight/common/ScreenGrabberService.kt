@@ -28,6 +28,7 @@ import com.vasmarfas.UniversalAmbientLight.common.network.ConnectionConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
@@ -1822,9 +1823,10 @@ class ScreenGrabberService : Service() {
             val prefs = Preferences(context)
             val connectionType =
                 prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+            val type = OutputType.of(connectionType)
 
-            // Для Adalight адрес и порт не нужны
-            if (!"adalight".equals(connectionType, ignoreCase = true)) {
+            // Адрес не нужен только USB-ленте
+            if (type.needsHost) {
                 val host = prefs.getString(R.string.pref_key_host, null)?.trim()
                 if (host.isNullOrEmpty() || host == "0.0.0.0") {
                     return SettingsError(

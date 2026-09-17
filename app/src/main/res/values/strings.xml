@@ -12,16 +12,7 @@
   <!-- notification button -->
   <string name="notification_exit_button">Exit</string>
   <!-- Network scanner -->
-  <string name="scanner_description">Find WLED and Hyperion devices automatically</string>
   <string name="scanner_retry_button">retry</string>
-  <string name="scanner_scan_devices">Scan network</string>
-  <string name="scanner_scanning">Scanning network…</string>
-  <string name="scanner_found_devices">Found devices:</string>
-  <string name="scanner_no_devices_found">No devices found</string>
-  <string name="scanner_device_wled">WLED</string>
-  <string name="scanner_device_hyperion">Hyperion</string>
-  <string name="scanner_device_unknown">Unknown</string>
-  <string name="scanner_device_info">%1$s at %2$s:%3$d</string>
   <string name="scanner_cancel">Cancel</string>
   <!-- Network Scanner result -->
   <!-- Connection settings -->
@@ -84,9 +75,6 @@
   <string name="pref_category_debug">Debug</string>
   <string name="pref_title_device_info">Device Info</string>
   <string name="pref_summary_device_info">Show device information for debugging</string>
-  <string name="scan_scanning">Scanning: %1$s</string>
-  <string name="scan_hostname">Hostname: %1$s</string>
-  <string name="scan_protocol">Protocol: %1$s</string>
   <string name="rating_stars_desc">%1$d stars</string>
   <string name="usb_service_unavailable">USB service is not available on this device</string>
   <string name="usb_no_serial_devices">No USB serial devices found. Connect your device via USB OTG</string>
@@ -278,19 +266,6 @@
   <string name="notification_channel_label">Universal Ambient Light Notifications</string>
   <string name="notification_description">Currently grabbing screen content</string>
   <string name="pref_title_use_avg_color">Send Average Screen Color</string>
-  <string name="pref_title_connection_type">Connection Type</string>
-  <string-array name="pref_list_connection_type">
-    <item>Hyperion</item>
-    <item>WLED</item>
-    <item>Adalight</item>
-    <item>Home Assistant</item>
-  </string-array>
-  <string-array name="pref_list_connection_type_values">
-    <item>hyperion</item>
-    <item>wled</item>
-    <item>adalight</item>
-    <item>homeassistant</item>
-  </string-array>
   <string name="pref_title_adalight_baudrate">Adalight Baud Rate</string>
   <string-array name="pref_list_adalight_baudrate">
     <item>9600</item>
@@ -719,4 +694,35 @@
   <string name="sleep_timer_minutes">In %1$d min</string>
   <string name="sleep_timer_cancel">Turn the timer off</string>
   <string name="sleep_timer_until">Turns off at %1$s</string>
+
+  <!-- Controller picker -->
+  <string name="devices_title">Controller</string>
+  <string name="devices_found">Found on the network</string>
+  <string name="devices_searching">Looking for devices on the network…</string>
+  <string name="devices_nothing_found">Nothing answered. Check that the controller is on the same network, or pick its type below and enter the address by hand.</string>
+  <string name="devices_search_again">Search again</string>
+  <string name="devices_sweep">Check every address</string>
+  <string name="devices_sweep_summary">For WLED and Hyperion without mDNS. Takes a minute or two.</string>
+  <string name="devices_sweep_progress">Checking addresses: %1$d%%</string>
+  <string name="devices_manual">Choose by type</string>
+  <string name="devices_current">Current</string>
+  <string name="devices_remote_note">The search runs from this phone, so the TV has to be on the same network.</string>
+  <string name="devices_group_strip">Addressable strip over the network</string>
+  <string name="devices_group_usb">Strip over USB</string>
+  <string name="devices_group_lamps">Smart lights and panels</string>
+  <string name="devices_group_server">Ambilight server</string>
+
+  <!-- Output types -->
+  <string name="output_wled">WLED</string>
+  <string name="output_wled_summary">ESP8266 or ESP32 with WLED firmware</string>
+  <string name="output_adalight">Adalight and USB kits</string>
+  <string name="output_adalight_summary">Arduino, ESP, Skydimo and other boards on a USB cable</string>
+  <string name="output_homeassistant">Home Assistant</string>
+  <string name="output_homeassistant_summary">Any lights connected to Home Assistant</string>
+  <string name="output_hyperion">Hyperion / HyperHDR</string>
+  <string name="output_hyperion_summary">The picture goes to a Hyperion or HyperHDR server that drives the LEDs</string>
+
+  <!-- Controller settings -->
+  <string name="controller_change">Change</string>
+  <string name="controller_no_address">address not set</string>
 </resources>

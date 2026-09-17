@@ -65,7 +65,6 @@ class SettingsScreenState(prefs: Preferences) {
     var ha2Enabled by mutableStateOf(prefs.getBoolean(R.string.pref_key_ha2_enabled, false))
     var ha2LampsSpec by mutableStateOf(prefs.getString(R.string.pref_key_ha2_lamps) ?: "")
 
-    var showScanDialog by mutableStateOf(false)
     var showDebugDialog by mutableStateOf(false)
     var showAdbPairingDialog by mutableStateOf(false)
     var showAccessibilityDisclosure by mutableStateOf(false)

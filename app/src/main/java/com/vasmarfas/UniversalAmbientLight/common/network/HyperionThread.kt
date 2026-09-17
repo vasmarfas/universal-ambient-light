@@ -375,8 +375,8 @@ class HyperionThread(
         }
 
         val host = mHost
-        return if ("wled".equals(mConnectionType, ignoreCase = true)) {
-            WLEDClient(
+        return when (OutputType.of(mConnectionType)) {
+            OutputType.WLED -> WLEDClient(
                 mContext,
                 host,
                 mPort,
@@ -391,13 +391,13 @@ class HyperionThread(
                 mWledRgbw,
                 mWledBrightness
             )
-        } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
-            AdalightClient(
+
+            OutputType.ADALIGHT -> AdalightClient(
                 mContext, mPriority, mBaudRate, mAdalightProtocol,
                 effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
             )
-        } else if ("homeassistant".equals(mConnectionType, ignoreCase = true)) {
-            HomeAssistantClient(
+
+            OutputType.HOME_ASSISTANT -> HomeAssistantClient(
                 host,
                 mPort,
                 mConfig.haToken,
@@ -411,9 +411,8 @@ class HyperionThread(
                 mConfig.haDarkThreshold,
                 mConfig.haTurnOffLights
             )
-        } else {
-            // По умолчанию — Hyperion
-            HyperionFlatBuffers(host, mPort, mPriority)
+
+            OutputType.HYPERION -> HyperionFlatBuffers(host, mPort, mPriority)
         }
     }
 

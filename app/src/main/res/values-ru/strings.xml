@@ -12,16 +12,7 @@
   <!-- notification button -->
   <string name="notification_exit_button">Выход</string>
   <!-- Network scanner -->
-  <string name="scanner_description">Автоматически найти WLED и Hyperion устройства в сети</string>
   <string name="scanner_retry_button">Повторить</string>
-  <string name="scanner_scan_devices">Сканировать устройства</string>
-  <string name="scanner_scanning">Сканирование сети…</string>
-  <string name="scanner_found_devices">Найденные устройства:</string>
-  <string name="scanner_no_devices_found">Устройства не найдены</string>
-  <string name="scanner_device_wled">WLED</string>
-  <string name="scanner_device_hyperion">Hyperion</string>
-  <string name="scanner_device_unknown">Неизвестно</string>
-  <string name="scanner_device_info">%1$s на %2$s:%3$d</string>
   <string name="scanner_cancel">Отмена</string>
   <!-- Network Scanner result -->
   <!-- Connection settings -->
@@ -84,9 +75,6 @@
   <string name="pref_category_debug">Отладка</string>
   <string name="pref_title_device_info">Информация об устройстве</string>
   <string name="pref_summary_device_info">Показать данные устройства для отладки</string>
-  <string name="scan_scanning">Сканирование: %1$s</string>
-  <string name="scan_hostname">Имя хоста: %1$s</string>
-  <string name="scan_protocol">Протокол: %1$s</string>
   <string name="rating_stars_desc">Звёзд: %1$d</string>
   <string name="usb_service_unavailable">USB-сервис недоступен на этом устройстве</string>
   <string name="usb_no_serial_devices">USB-устройства не найдены. Подключите устройство через USB OTG</string>
@@ -280,19 +268,6 @@
   <string name="notification_channel_label">Уведомления Universal Ambient Light</string>
   <string name="notification_description">Идет захват содержимого экрана</string>
   <string name="pref_title_use_avg_color">Средний цвет экрана</string>
-  <string name="pref_title_connection_type">Тип подключения</string>
-  <string-array name="pref_list_connection_type">
-    <item>Hyperion</item>
-    <item>WLED</item>
-    <item>Adalight</item>
-    <item>Home Assistant</item>
-  </string-array>
-  <string-array name="pref_list_connection_type_values">
-    <item>hyperion</item>
-    <item>wled</item>
-    <item>adalight</item>
-    <item>homeassistant</item>
-  </string-array>
   <string name="pref_title_adalight_baudrate">Скорость Adalight</string>
   <string-array name="pref_list_adalight_baudrate">
     <item>9600</item>
@@ -699,4 +674,35 @@
   <string name="sleep_timer_minutes">Через %1$d мин</string>
   <string name="sleep_timer_cancel">Отключить таймер</string>
   <string name="sleep_timer_until">Выключится в %1$s</string>
+
+  <!-- Controller picker -->
+  <string name="devices_title">Контроллер</string>
+  <string name="devices_found">Найдено в сети</string>
+  <string name="devices_searching">Ищем устройства в сети…</string>
+  <string name="devices_nothing_found">Никто не ответил. Проверьте, что контроллер в той же сети, или выберите тип ниже и введите адрес вручную.</string>
+  <string name="devices_search_again">Искать снова</string>
+  <string name="devices_sweep">Проверить все адреса</string>
+  <string name="devices_sweep_summary">Для WLED и Hyperion без mDNS. Займёт минуту-две.</string>
+  <string name="devices_sweep_progress">Проверяем адреса: %1$d%%</string>
+  <string name="devices_manual">Выбрать по типу</string>
+  <string name="devices_current">Сейчас</string>
+  <string name="devices_remote_note">Поиск идёт с телефона, поэтому телевизор должен быть в той же сети.</string>
+  <string name="devices_group_strip">Адресная лента по сети</string>
+  <string name="devices_group_usb">Лента по USB</string>
+  <string name="devices_group_lamps">Умные лампы и панели</string>
+  <string name="devices_group_server">Сервер подсветки</string>
+
+  <!-- Output types -->
+  <string name="output_wled">WLED</string>
+  <string name="output_wled_summary">ESP8266 или ESP32 с прошивкой WLED</string>
+  <string name="output_adalight">Adalight и USB-комплекты</string>
+  <string name="output_adalight_summary">Arduino, ESP, Skydimo и другие платы по USB-кабелю</string>
+  <string name="output_homeassistant">Home Assistant</string>
+  <string name="output_homeassistant_summary">Любые лампы, подключённые к Home Assistant</string>
+  <string name="output_hyperion">Hyperion / HyperHDR</string>
+  <string name="output_hyperion_summary">Картинка уходит на сервер Hyperion или HyperHDR, светом управляет он</string>
+
+  <!-- Controller settings -->
+  <string name="controller_change">Сменить</string>
+  <string name="controller_no_address">адрес не задан</string>
 </resources>

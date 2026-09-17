@@ -3,23 +3,20 @@ package com.vasmarfas.UniversalAmbientLight.ui.home
 import android.content.Context
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
 import com.vasmarfas.UniversalAmbientLight.ui.effects.titleRes
 
 /** Куда уходит свет: «WLED · 192.168.1.50:19446». */
 internal fun describeTarget(context: Context, prefs: Preferences): String {
-    val type = prefs.getString(R.string.pref_key_connection_type) ?: "hyperion"
-    val label = entryFor(
-        context,
-        R.array.pref_list_connection_type,
-        R.array.pref_list_connection_type_values,
-        type
-    )
+    val type = OutputType.of(prefs.getString(R.string.pref_key_connection_type))
+    val label = context.getString(type.titleRes())
     val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
     return when {
-        type.equals("adalight", ignoreCase = true) -> "$label · USB"
+        type == OutputType.ADALIGHT -> "$label · USB"
         host.isEmpty() -> "$label · ${context.getString(R.string.home_target_no_host)}"
-        type.equals("homeassistant", ignoreCase = true) -> "$label · $host"
+        type.defaultPort == 0 || type == OutputType.HOME_ASSISTANT -> "$label · $host"
         else -> "$label · $host:${prefs.getInt(R.string.pref_key_port)}"
     }
 }
