@@ -11,4 +11,5 @@ sealed class Screen(val route: String) {
     object TvRemote : Screen("tv_remote")
     object Delay : Screen("delay")
     object Calibration : Screen("calibration")
+    object Devices : Screen("devices")
 }

@@ -36,6 +36,7 @@ import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.calibration.CalibrationScreen
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
 import com.vasmarfas.UniversalAmbientLight.ui.delay.DelayScreen
+import com.vasmarfas.UniversalAmbientLight.ui.devices.DevicePickerScreen
 import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeSource
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeTarget
@@ -332,8 +333,18 @@ fun AppNavHost(
                 },
                 onDelayClick = {
                     navController.navigate(Screen.Delay.route) { launchSingleTop = true }
+                },
+                onControllerClick = {
+                    navController.navigate(Screen.Devices.route) { launchSingleTop = true }
                 }
             )
+        }
+        composable(Screen.Devices.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "devices", "DevicePickerScreen")
+            }
+            DevicePickerScreen(onBackClick = { navController.popBackStack() })
         }
         composable(Screen.LedLayout.route) {
             val context = LocalContext.current

@@ -104,6 +104,9 @@
     <string name="pref_key_adalight_protocol" translatable="false">pref_key_adalight_protocol</string>
     <string name="pref_default_adalight_protocol" translatable="false">ada</string>
 
+    <!-- Последние адреса по типам контроллеров: «wled=192.168.1.50|hue=192.168.1.10» -->
+    <string name="pref_key_recent_hosts" translatable="false">pref_key_recent_hosts</string>
+
     <!-- Home Assistant -->
     <string name="pref_key_ha_token" translatable="false">pref_key_ha_token</string>
 
