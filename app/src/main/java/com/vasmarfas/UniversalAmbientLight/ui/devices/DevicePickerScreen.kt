@@ -259,7 +259,7 @@ private fun applyController(
     val newPort = when {
         port > 0 -> port
         type != old || host != null -> if (type == OutputType.WLED) {
-            if (prefs.getString(R.string.pref_key_wled_protocol) == "ddp") 4048 else type.defaultPort
+            if (prefs.getString(R.string.pref_key_wled_protocol) == "ddp") OutputType.DDP.defaultPort else type.defaultPort
         } else {
             type.defaultPort
         }

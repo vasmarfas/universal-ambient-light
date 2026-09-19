@@ -392,6 +392,21 @@ class HyperionThread(
                 mWledBrightness
             )
 
+            // DDP понимают не только WLED: xLights, FPP, ESPixelStick - клиент тот же
+            OutputType.DDP -> WLEDClient(
+                mContext,
+                host,
+                mPort,
+                mPriority,
+                mWledColorOrder,
+                "ddp",
+                effectiveSmoothing,
+                mSmoothingPreset,
+                mSettlingTime,
+                effectiveDelayMs,
+                mUpdateFrequency
+            )
+
             OutputType.ADALIGHT -> AdalightClient(
                 mContext, mPriority, mBaudRate, mAdalightProtocol,
                 effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
@@ -412,9 +427,32 @@ class HyperionThread(
                 mConfig.haTurnOffLights
             )
 
+            OutputType.E131 -> E131Client(
+                mContext, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
+                mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.ARTNET -> ArtNetClient(
+                mContext, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
+                mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.TPM2NET -> Tpm2NetClient(
+                mContext, host, mPort, mConfig.dmxLedsPerUniverse, mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.UDP_RAW -> UdpRawClient(mContext, host, mPort, mWledColorOrder, streamSmoothing())
+            OutputType.OPC -> OpcClient(
+                mContext, host, mPort, mConfig.opcChannel, mWledColorOrder, streamSmoothing()
+            )
+
             OutputType.HYPERION -> HyperionFlatBuffers(host, mPort, mPriority)
         }
     }
+
+    private fun streamSmoothing() = LedStreamClient.SmoothingSettings(
+        effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
+    )
 
     private fun handleError(e: IOException) {
         mCallback.onConnectionError(e.hashCode(), e.message)

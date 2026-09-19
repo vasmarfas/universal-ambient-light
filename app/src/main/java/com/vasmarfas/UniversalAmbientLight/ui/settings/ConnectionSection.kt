@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -42,25 +43,33 @@ internal fun ColumnScope.ConnectionSection(
     onControllerClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val type = OutputType.of(state.connectionType)
     SettingsGroup(title = stringResource(R.string.pref_group_connection)) {
 
         val address = when {
-            !type.needsHost -> null
+            !type.needsHost && type != OutputType.E131 -> null
             state.currentHost.isBlank() -> stringResource(R.string.controller_no_address)
             type.defaultPort > 0 -> "${state.currentHost}:${state.currentPort}"
             else -> state.currentHost
         }
         ControllerCard(type, address, onControllerClick)
 
-        if (type.needsHost) {
+        if (type.needsHost || type == OutputType.E131) {
+            val multicastSummary = stringResource(R.string.pref_summary_e131_multicast)
             val noAddressSummary = stringResource(R.string.controller_no_address)
             key(state.connectionType) {
                 EditTextPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_host,
                     title = stringResource(R.string.pref_title_host),
-                    summaryProvider = { it.ifBlank { noAddressSummary } },
+                    summaryProvider = {
+                        when {
+                            it.isNotBlank() -> it
+                            type == OutputType.E131 -> multicastSummary
+                            else -> noAddressSummary
+                        }
+                    },
                     recomposeKey = state.currentHost,
                     onValueChange = { newHost ->
                         state.currentHost = newHost
@@ -112,7 +121,57 @@ internal fun ColumnScope.ConnectionSection(
         }
 
         when (type) {
-            OutputType.WLED -> WledSettings(prefs, state)
+            OutputType.WLED, OutputType.DDP -> WledSettings(prefs, state)
+            OutputType.E131, OutputType.ARTNET -> {
+                EditTextPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_dmx_universe,
+                    title = stringResource(R.string.pref_title_dmx_universe),
+                    summaryProvider = {
+                        resources.getString(R.string.pref_summary_dmx_universe, it.toIntOrNull() ?: 1)
+                    },
+                    keyboardType = KeyboardType.Number,
+                    onValueChange = { AnalyticsHelper.logSettingChanged(context, "dmx_universe", it) }
+                )
+                SliderPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_dmx_leds_per_universe,
+                    title = stringResource(R.string.pref_title_dmx_leds_per_universe),
+                    range = 1..170,
+                    summaryProvider = { resources.getString(R.string.pref_summary_dmx_leds_per_universe, it) },
+                    onValueChange = {
+                        AnalyticsHelper.logSettingChanged(context, "dmx_leds_per_universe", it.toString())
+                    }
+                )
+                ColorOrderPreference(prefs)
+            }
+
+            OutputType.TPM2NET -> {
+                SliderPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_dmx_leds_per_universe,
+                    title = stringResource(R.string.pref_title_tpm2_leds_per_packet),
+                    range = 1..490,
+                    onValueChange = {
+                        AnalyticsHelper.logSettingChanged(context, "tpm2_leds_per_packet", it.toString())
+                    }
+                )
+                ColorOrderPreference(prefs)
+            }
+
+            OutputType.UDP_RAW -> ColorOrderPreference(prefs)
+            OutputType.OPC -> {
+                SliderPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_opc_channel,
+                    title = stringResource(R.string.pref_title_opc_channel),
+                    range = 0..255,
+                    summaryProvider = { resources.getString(R.string.pref_summary_opc_channel, it) },
+                    onValueChange = { AnalyticsHelper.logSettingChanged(context, "opc_channel", it.toString()) }
+                )
+                ColorOrderPreference(prefs)
+            }
+
             OutputType.ADALIGHT -> {
                 ListPreference(
                     prefs = prefs,
@@ -243,6 +302,20 @@ private fun ColumnScope.HyperionSettings(prefs: Preferences, state: SettingsScre
             }
         )
     }
+}
+
+/** Порядок цветов для лент по E1.31, Art-Net и прочим: ключ общий с WLED. */
+@Composable
+private fun ColorOrderPreference(prefs: Preferences) {
+    val context = LocalContext.current
+    ListPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_wled_color_order,
+        title = stringResource(R.string.pref_title_color_order),
+        entriesRes = R.array.pref_list_wled_color_order,
+        entryValuesRes = R.array.pref_list_wled_color_order_values,
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "color_order", it) }
+    )
 }
 
 /** Текущий контроллер крупно, с иконкой: с него начинается настройка подключения. */

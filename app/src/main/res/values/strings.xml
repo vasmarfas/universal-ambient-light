@@ -276,6 +276,9 @@
     <item>230400</item>
     <item>250000</item>
     <item>500000</item>
+    <item>921600</item>
+    <item>1000000</item>
+    <item>2000000</item>
   </string-array>
   <string-array name="pref_list_adalight_baudrate_values" translatable="false">
     <item>9600</item>
@@ -286,6 +289,9 @@
     <item>230400</item>
     <item>250000</item>
     <item>500000</item>
+    <item>921600</item>
+    <item>1000000</item>
+    <item>2000000</item>
   </string-array>
   <string name="pref_title_wled_color_order">WLED Color Order</string>
   <string-array name="pref_list_wled_color_order">
@@ -448,11 +454,23 @@
     <item>ADA (Standard)</item>
     <item>LBAPA (LightBerry APA102)</item>
     <item>AWA (Hyperserial)</item>
+    <item>tpm2</item>
+    <item>Skydimo</item>
+    <item>SEDU</item>
+    <item>KarateLight</item>
+    <item>AtmoLight</item>
+    <item>SP616E</item>
   </string-array>
   <string-array name="pref_list_adalight_protocol_values">
     <item>ada</item>
     <item>lbapa</item>
     <item>awa</item>
+    <item>tpm2</item>
+    <item>skydimo</item>
+    <item>sedu</item>
+    <item>karate</item>
+    <item>atmo</item>
+    <item>sp616e</item>
   </string-array>
 
   <!-- App Specific Strings -->
@@ -715,6 +733,18 @@
   <!-- Output types -->
   <string name="output_wled">WLED</string>
   <string name="output_wled_summary">ESP8266 or ESP32 with WLED firmware</string>
+  <string name="output_ddp">DDP</string>
+  <string name="output_ddp_summary">WLED, ESPixelStick, FPP and other DDP receivers</string>
+  <string name="output_e131">E1.31 (sACN)</string>
+  <string name="output_e131_summary">ESPixelStick, Falcon, FPP, DMX nodes</string>
+  <string name="output_artnet">Art-Net</string>
+  <string name="output_artnet_summary">DMX nodes and pixel controllers</string>
+  <string name="output_tpm2net">tpm2.net</string>
+  <string name="output_tpm2net_summary">Receivers compatible with Jinx!</string>
+  <string name="output_udpraw">UDP raw</string>
+  <string name="output_udpraw_summary">Bare RGB in one packet, up to 490 LEDs</string>
+  <string name="output_opc">Open Pixel Control</string>
+  <string name="output_opc_summary">FadeCandy and fcserver</string>
   <string name="output_adalight">Adalight and USB kits</string>
   <string name="output_adalight_summary">Arduino, ESP, Skydimo and other boards on a USB cable</string>
   <string name="output_homeassistant">Home Assistant</string>
@@ -725,4 +755,14 @@
   <!-- Controller settings -->
   <string name="controller_change">Change</string>
   <string name="controller_no_address">address not set</string>
+  <string name="pref_title_color_order">Color order</string>
+  <string name="pref_title_dmx_universe">Start universe</string>
+  <string name="pref_summary_dmx_universe">%1$d, a longer strip continues into the next universes</string>
+  <string name="pref_title_dmx_leds_per_universe">LEDs per universe</string>
+  <string name="pref_summary_dmx_leds_per_universe">%1$d (170 fill all 510 channels of a universe)</string>
+  <string name="pref_title_tpm2_leds_per_packet">LEDs per packet</string>
+  <string name="pref_title_opc_channel">OPC channel</string>
+  <string name="pref_summary_opc_channel">%1$d (0 means every channel of the server)</string>
+  <string name="pref_summary_e131_multicast">Empty: multicast to 239.255.x.y</string>
+  <string name="home_target_multicast">multicast</string>
 </resources>
