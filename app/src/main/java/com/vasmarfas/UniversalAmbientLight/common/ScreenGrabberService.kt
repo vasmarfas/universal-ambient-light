@@ -484,7 +484,10 @@ class ScreenGrabberService : Service() {
             haBrightnessMax = haBrightnessMax,
             haDarkOffEnabled = haDarkOffEnabled,
             haDarkThreshold = haDarkThreshold,
-            haTurnOffLights = haTurnOffLights
+            haTurnOffLights = haTurnOffLights,
+            dmxUniverse = prefs.getInt(R.string.pref_key_dmx_universe),
+            dmxLedsPerUniverse = prefs.getInt(R.string.pref_key_dmx_leds_per_universe),
+            opcChannel = prefs.getInt(R.string.pref_key_opc_channel),
         )
         val thread = HyperionThread(mReceiver, baseContext, config)
         if (mCalibrating) thread.setCalibrating(true)
@@ -1780,6 +1783,9 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_ha2_dark_off,
             R.string.pref_key_ha2_dark_threshold,
             R.string.pref_key_ha2_turn_off_lights,
+            R.string.pref_key_dmx_universe,
+            R.string.pref_key_dmx_leds_per_universe,
+            R.string.pref_key_opc_channel,
         )
 
         /** Параметры эффекта: применяются на ходу, без перезапуска. */
@@ -1825,7 +1831,7 @@ class ScreenGrabberService : Service() {
                 prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
             val type = OutputType.of(connectionType)
 
-            // Адрес не нужен только USB-ленте
+            // Адрес не нужен USB и E1.31 (без него - мультикаст)
             if (type.needsHost) {
                 val host = prefs.getString(R.string.pref_key_host, null)?.trim()
                 if (host.isNullOrEmpty() || host == "0.0.0.0") {

@@ -13,6 +13,12 @@ enum class OutputType(
     val needsHost: Boolean = true,
 ) {
     WLED("wled", Group.STRIP, 19446),
+    DDP("ddp", Group.STRIP, 4048),
+    E131("e131", Group.STRIP, E131Client.DEFAULT_PORT, needsHost = false),
+    ARTNET("artnet", Group.STRIP, ArtNetClient.DEFAULT_PORT),
+    TPM2NET("tpm2net", Group.STRIP, Tpm2NetClient.DEFAULT_PORT),
+    UDP_RAW("udpraw", Group.STRIP, UdpRawClient.DEFAULT_PORT),
+    OPC("opc", Group.STRIP, OpcClient.DEFAULT_PORT),
     ADALIGHT("adalight", Group.USB, 0, needsHost = false),
     HOME_ASSISTANT("homeassistant", Group.LAMPS, 8123),
     HYPERION("hyperion", Group.SERVER, 19400);

@@ -25,13 +25,25 @@ class AdalightClient(
     enum class ProtocolType {
         ADA,    // Standard Adalight
         LBAPA,  // LightBerry APA102
-        AWA     // Hyperserial
+        AWA,    // Hyperserial
+        TPM2,
+        SKYDIMO,
+        SEDU,
+        KARATE,
+        ATMO,
+        SP616E
     }
 
     private val mBaudRate: Int = if (baudRate > 0) baudRate else 115200
     private val mProtocol = when (protocol.lowercase()) {
         "lbapa", "1" -> ProtocolType.LBAPA
         "awa", "2" -> ProtocolType.AWA
+        "tpm2" -> ProtocolType.TPM2
+        "skydimo" -> ProtocolType.SKYDIMO
+        "sedu" -> ProtocolType.SEDU
+        "karate" -> ProtocolType.KARATE
+        "atmo" -> ProtocolType.ATMO
+        "sp616e" -> ProtocolType.SP616E
         else -> ProtocolType.ADA
     }
 
@@ -374,6 +386,12 @@ class AdalightClient(
             ProtocolType.ADA -> createAdaPacket(leds)
             ProtocolType.LBAPA -> createLbapaPacket(leds)
             ProtocolType.AWA -> createAwaPacket(leds)
+            ProtocolType.TPM2 -> createTpm2Packet(leds)
+            ProtocolType.SKYDIMO -> createSkydimoPacket(leds)
+            ProtocolType.SEDU -> createSeduPacket(leds)
+            ProtocolType.KARATE -> createKaratePacket(leds)
+            ProtocolType.ATMO -> createAtmoPacket(leds)
+            ProtocolType.SP616E -> createSp616ePacket(leds)
         }
     }
 
@@ -492,6 +510,93 @@ class AdalightClient(
         return packet
     }
 
+    /** TPM2 по последовательному порту: стартовый байт 0xC9, в отличие от 0x9C у tpm2.net. */
+    private fun createTpm2Packet(leds: Array<ColorRgb>): ByteArray {
+        val dataSize = leds.size * 3
+        val packet = ByteArray(4 + dataSize + 1)
+        packet[0] = 0xC9.toByte()
+        packet[1] = 0xDA.toByte()
+        packet[2] = (dataSize shr 8).toByte()
+        packet[3] = dataSize.toByte()
+        writeRgb(packet, 4, leds, leds.size)
+        packet[packet.size - 1] = 0x36
+        return packet
+    }
+
+    /** Skydimo: заголовок как у Ada, но число светодиодов одним байтом и без контрольной суммы. */
+    private fun createSkydimoPacket(leds: Array<ColorRgb>): ByteArray {
+        val count = minOf(leds.size, 255)
+        val packet = ByteArray(6 + count * 3)
+        packet[0] = 'A'.code.toByte()
+        packet[1] = 'd'.code.toByte()
+        packet[2] = 'a'.code.toByte()
+        packet[5] = count.toByte()
+        writeRgb(packet, 6, leds, count)
+        return packet
+    }
+
+    /**
+     * SEDU: кадр фиксированной длины, режим выбирается по объёму данных; хвост добивается
+     * нулями. Больше 1024 светодиодов платы не принимают.
+     */
+    private fun createSeduPacket(leds: Array<ColorRgb>): ByteArray {
+        val count = minOf(leds.size, 1024)
+        val (mode, size) = SEDU_FRAMES.first { it.second >= count * 3 }
+        val packet = ByteArray(size + 3)
+        packet[0] = 0x5A
+        packet[1] = mode.toByte()
+        writeRgb(packet, 2, leds, count)
+        packet[packet.size - 1] = 0xA5.toByte()
+        return packet
+    }
+
+    /**
+     * KarateLight ждёт ровно 8 или 16 каналов в порядке G, B, R; лишние светодиоды
+     * отбрасываются, недостающие гаснут. Контрольная сумма: XOR всех байт, кроме неё самой.
+     */
+    private fun createKaratePacket(leds: Array<ColorRgb>): ByteArray {
+        val count = if (leds.size <= 8) 8 else 16
+        val packet = ByteArray(4 + count * 3)
+        packet[0] = 0xAA.toByte()
+        packet[1] = 0x12
+        packet[3] = (count * 3).toByte()
+        for (i in 0 until minOf(count, leds.size)) {
+            packet[4 + i * 3] = leds[i].green.toByte()
+            packet[5 + i * 3] = leds[i].blue.toByte()
+            packet[6 + i * 3] = leds[i].red.toByte()
+        }
+        var checksum = packet[0].toInt() xor packet[1].toInt()
+        for (i in 3 until packet.size) checksum = checksum xor packet[i].toInt()
+        packet[2] = checksum.toByte()
+        return packet
+    }
+
+    /** AtmoLight: ровно пять каналов, 15 байт данных; лишние светодиоды не уходят. */
+    private fun createAtmoPacket(leds: Array<ColorRgb>): ByteArray {
+        val packet = ByteArray(4 + ATMO_CHANNELS * 3)
+        packet[0] = 0xFF.toByte()
+        packet[3] = (ATMO_CHANNELS * 3).toByte()
+        writeRgb(packet, 4, leds, minOf(leds.size, ATMO_CHANNELS))
+        return packet
+    }
+
+    /** SP616E: голый RGB и 0xFF в конце кадра, без заголовка и длины. */
+    private fun createSp616ePacket(leds: Array<ColorRgb>): ByteArray {
+        val packet = ByteArray(leds.size * 3 + 1)
+        writeRgb(packet, 0, leds, leds.size)
+        packet[packet.size - 1] = 0xFF.toByte()
+        return packet
+    }
+
+    private fun writeRgb(packet: ByteArray, from: Int, leds: Array<ColorRgb>, count: Int) {
+        var offset = from
+        for (i in 0 until count) {
+            packet[offset++] = leds[i].red.toByte()
+            packet[offset++] = leds[i].green.toByte()
+            packet[offset++] = leds[i].blue.toByte()
+        }
+    }
+
     private data class PresetValues(
         val settlingTime: Int,
         val outputDelayMs: Long,
@@ -517,5 +622,10 @@ class AdalightClient(
         // Бюджет ожидания хендшейка. Покрывает окно перезагрузки MCU (~1.5–2 c) после подъёма DTR.
         private const val HANDSHAKE_TIMEOUT_MS = 2500L
         private const val HANDSHAKE_READ_TIMEOUT_MS = 250
+
+        private const val ATMO_CHANNELS = 5
+
+        /** Режимы кадра SEDU: код режима и длина данных в байтах. */
+        private val SEDU_FRAMES = listOf(0xA1 to 256, 0xA2 to 512, 0xB0 to 768, 0xB1 to 1536, 0xB2 to 3072)
     }
 }

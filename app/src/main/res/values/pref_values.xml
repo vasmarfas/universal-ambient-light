@@ -104,6 +104,14 @@
     <string name="pref_key_adalight_protocol" translatable="false">pref_key_adalight_protocol</string>
     <string name="pref_default_adalight_protocol" translatable="false">ada</string>
 
+    <!-- DMX по сети (E1.31, Art-Net) и tpm2.net: первая вселенная и светодиодов в пакете -->
+    <string name="pref_key_dmx_universe" translatable="false">pref_key_dmx_universe</string>
+    <integer name="pref_default_dmx_universe" translatable="false">1</integer>
+    <string name="pref_key_dmx_leds_per_universe" translatable="false">pref_key_dmx_leds_per_universe</string>
+    <integer name="pref_default_dmx_leds_per_universe" translatable="false">170</integer>
+    <string name="pref_key_opc_channel" translatable="false">pref_key_opc_channel</string>
+    <integer name="pref_default_opc_channel" translatable="false">0</integer>
+
     <!-- Последние адреса по типам контроллеров: «wled=192.168.1.50|hue=192.168.1.10» -->
     <string name="pref_key_recent_hosts" translatable="false">pref_key_recent_hosts</string>
 

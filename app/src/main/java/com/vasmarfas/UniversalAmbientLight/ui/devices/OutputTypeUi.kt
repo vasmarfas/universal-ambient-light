@@ -13,6 +13,12 @@ import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 @StringRes
 fun OutputType.titleRes(): Int = when (this) {
     OutputType.WLED -> R.string.output_wled
+    OutputType.DDP -> R.string.output_ddp
+    OutputType.E131 -> R.string.output_e131
+    OutputType.ARTNET -> R.string.output_artnet
+    OutputType.TPM2NET -> R.string.output_tpm2net
+    OutputType.UDP_RAW -> R.string.output_udpraw
+    OutputType.OPC -> R.string.output_opc
     OutputType.ADALIGHT -> R.string.output_adalight
     OutputType.HOME_ASSISTANT -> R.string.output_homeassistant
     OutputType.HYPERION -> R.string.output_hyperion
@@ -21,6 +27,12 @@ fun OutputType.titleRes(): Int = when (this) {
 @StringRes
 fun OutputType.summaryRes(): Int = when (this) {
     OutputType.WLED -> R.string.output_wled_summary
+    OutputType.DDP -> R.string.output_ddp_summary
+    OutputType.E131 -> R.string.output_e131_summary
+    OutputType.ARTNET -> R.string.output_artnet_summary
+    OutputType.TPM2NET -> R.string.output_tpm2net_summary
+    OutputType.UDP_RAW -> R.string.output_udpraw_summary
+    OutputType.OPC -> R.string.output_opc_summary
     OutputType.ADALIGHT -> R.string.output_adalight_summary
     OutputType.HOME_ASSISTANT -> R.string.output_homeassistant_summary
     OutputType.HYPERION -> R.string.output_hyperion_summary

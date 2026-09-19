@@ -15,6 +15,7 @@ internal fun describeTarget(context: Context, prefs: Preferences): String {
     val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
     return when {
         type == OutputType.ADALIGHT -> "$label · USB"
+        host.isEmpty() && type == OutputType.E131 -> "$label · ${context.getString(R.string.home_target_multicast)}"
         host.isEmpty() -> "$label · ${context.getString(R.string.home_target_no_host)}"
         type.defaultPort == 0 || type == OutputType.HOME_ASSISTANT -> "$label · $host"
         else -> "$label · $host:${prefs.getInt(R.string.pref_key_port)}"

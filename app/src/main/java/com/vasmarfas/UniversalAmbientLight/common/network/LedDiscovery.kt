@@ -7,16 +7,24 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Поиск контроллеров в локальной сети. Кто объявляет себя по mDNS (WLED, Hyperion,
- * HyperHDR, Home Assistant), находится через NsdManager.
+ * HyperHDR, Home Assistant), находится через NsdManager. Узлы Art-Net mDNS не умеют,
+ * их ищем широковещательным запросом.
  *
  * Находки приходят в onFound на главном потоке по мере ответов, каждая пара «тип и адрес»
- * один раз. mDNS слушает до [stop].
+ * один раз. mDNS слушает до [stop], широковещательные запросы отрабатывают за пару секунд.
  */
 class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
 
@@ -50,6 +58,7 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
             Log.w(TAG, "Multicast lock failed: ${e.message}")
         }
         mNsd?.let { nsd -> for (service in SERVICES) browse(nsd, service) }
+        probe("artnet") { pollArtNet() }
     }
 
     /**
@@ -100,6 +109,19 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
         if (mStopped || host.isBlank() || !mSeen.add("${type.id}|$host")) return
         val found = Found(type, host, port, name.ifBlank { host })
         mMain.post { if (!mStopped) mOnFound(found) }
+    }
+
+    private fun probe(name: String, block: () -> Unit) {
+        Thread({
+            try {
+                block()
+            } catch (e: IOException) {
+                // Нет Wi-Fi или сеть режет широковещание: этот тип просто не найдётся
+                Log.w(TAG, "Probe $name failed: ${e.message}")
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Probe $name not allowed: ${e.message}")
+            }
+        }, "LedDiscovery-$name").start()
     }
 
     private fun browse(nsd: NsdManager, service: Service) {
@@ -177,8 +199,38 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
         return address?.hostAddress
     }
 
+    /**
+     * ArtPoll на широковещательный адрес. Узлы отвечают ArtPollReply на порт 6454 отправителя,
+     * а не на порт, с которого ушёл запрос, поэтому сокет занимает именно его.
+     */
+    private fun pollArtNet() {
+        val socket = DatagramSocket(null)
+        socket.use {
+            it.reuseAddress = true
+            it.broadcast = true
+            it.soTimeout = 300
+            it.bind(InetSocketAddress(ArtNetClient.DEFAULT_PORT))
+            it.send(
+                DatagramPacket(ART_POLL, ART_POLL.size, InetAddress.getByName("255.255.255.255"), ArtNetClient.DEFAULT_PORT)
+            )
+            val buffer = ByteArray(1024)
+            val deadline = SystemClock.elapsedRealtime() + PROBE_MS
+            while (!mStopped && SystemClock.elapsedRealtime() < deadline) {
+                val packet = DatagramPacket(buffer, buffer.size)
+                try {
+                    it.receive(packet)
+                } catch (_: SocketTimeoutException) {
+                    continue
+                }
+                val name = artPollReplyName(packet.data, packet.length) ?: continue
+                report(OutputType.ARTNET, packet.address.hostAddress.orEmpty(), 0, name)
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "LedDiscovery"
+        private const val PROBE_MS = 2500
 
         private val SERVICES = listOf(
             // WLED объявляет веб-интерфейс, а поток принимает на порту своего протокола
@@ -188,5 +240,27 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
             Service("_hyperhdr-http._tcp", OutputType.HYPERION, OutputType.HYPERION.defaultPort),
             Service("_home-assistant._tcp", OutputType.HOME_ASSISTANT),
         )
+
+        private val ART_NET_ID = "Art-Net\u0000".toByteArray(Charsets.US_ASCII)
+        private const val OP_POLL_REPLY = 0x2100
+
+        /** ArtPoll версии 14 без флагов: ответить один раз. */
+        private val ART_POLL = ART_NET_ID + byteArrayOf(0x00, 0x20, 0x00, 14, 0x00, 0x00)
+
+        /** Имя узла из ArtPollReply: короткое, а если пусто - длинное; null - это не ответ узла. */
+        internal fun artPollReplyName(data: ByteArray, length: Int): String? {
+            if (length < 108) return null
+            for (i in ART_NET_ID.indices) if (data[i] != ART_NET_ID[i]) return null
+            val opCode = (data[8].toInt() and 0xFF) or ((data[9].toInt() and 0xFF) shl 8)
+            if (opCode != OP_POLL_REPLY) return null
+            val short = cString(data, 26, 18)
+            return short.ifBlank { cString(data, 44, 64) }.ifBlank { "Art-Net" }
+        }
+
+        private fun cString(data: ByteArray, offset: Int, max: Int): String {
+            var end = offset
+            while (end < offset + max && data[end] != 0.toByte()) end++
+            return String(data, offset, end - offset, Charsets.US_ASCII).trim()
+        }
     }
 }

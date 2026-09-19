@@ -38,4 +38,7 @@ data class ConnectionConfig(
     val haDarkOffEnabled: Boolean = true,
     val haDarkThreshold: Int = 10,
     val haTurnOffLights: Boolean = true,
+    val dmxUniverse: Int = 1,
+    val dmxLedsPerUniverse: Int = 170,
+    val opcChannel: Int = 0,
 )
