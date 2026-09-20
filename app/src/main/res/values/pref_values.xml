@@ -112,6 +112,16 @@
     <string name="pref_key_opc_channel" translatable="false">pref_key_opc_channel</string>
     <integer name="pref_default_opc_channel" translatable="false">0</integer>
 
+    <!-- Умные лампы: ключи доступа и лампы с зонами, формат тот же, что у Home Assistant.
+         Ритм и яркость ламп берутся из общих настроек pref_key_ha_* -->
+    <string name="pref_key_hue_username" translatable="false">pref_key_hue_username</string>
+    <string name="pref_key_hue_lamps" translatable="false">pref_key_hue_lamps</string>
+    <string name="pref_key_wiz_lamps" translatable="false">pref_key_wiz_lamps</string>
+    <string name="pref_key_yeelight_lamps" translatable="false">pref_key_yeelight_lamps</string>
+    <string name="pref_key_lifx_lamps" translatable="false">pref_key_lifx_lamps</string>
+    <string name="pref_key_govee_lamps" translatable="false">pref_key_govee_lamps</string>
+    <string name="pref_key_nanoleaf_token" translatable="false">pref_key_nanoleaf_token</string>
+
     <!-- Последние адреса по типам контроллеров: «wled=192.168.1.50|hue=192.168.1.10» -->
     <string name="pref_key_recent_hosts" translatable="false">pref_key_recent_hosts</string>
 

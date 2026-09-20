@@ -446,12 +446,30 @@ class HyperionThread(
                 mContext, host, mPort, mConfig.opcChannel, mWledColorOrder, streamSmoothing()
             )
 
+            OutputType.HUE -> HueClient(host, mConfig.hueUsername, mConfig.lamps, lampSettings())
+
+            OutputType.WIZ -> WizClient(mConfig.lamps, lampSettings())
+            OutputType.YEELIGHT -> YeelightClient(mConfig.lamps, lampSettings())
+            OutputType.LIFX -> LifxClient(mConfig.lamps, lampSettings())
+            OutputType.GOVEE -> GoveeClient(mConfig.lamps, lampSettings())
+            OutputType.NANOLEAF -> NanoleafClient(host, mPort, mConfig.nanoleafToken)
             OutputType.HYPERION -> HyperionFlatBuffers(host, mPort, mPriority)
         }
     }
 
     private fun streamSmoothing() = LedStreamClient.SmoothingSettings(
         effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
+    )
+
+    private fun lampSettings() = ZoneLampClient.LampSettings(
+        mConfig.haUpdateIntervalMs,
+        mConfig.haChangeThreshold,
+        mConfig.haTransitionMs,
+        mConfig.haBrightnessMode,
+        mConfig.haBrightnessMax,
+        mConfig.haDarkOffEnabled,
+        mConfig.haDarkThreshold,
+        mConfig.haTurnOffLights
     )
 
     private fun handleError(e: IOException) {

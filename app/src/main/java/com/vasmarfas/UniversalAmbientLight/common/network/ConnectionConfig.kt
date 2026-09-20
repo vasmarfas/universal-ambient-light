@@ -41,4 +41,8 @@ data class ConnectionConfig(
     val dmxUniverse: Int = 1,
     val dmxLedsPerUniverse: Int = 170,
     val opcChannel: Int = 0,
+    /** Лампы основного подключения с зонами - тем же форматом, что и у Home Assistant. */
+    val lamps: String = "",
+    val hueUsername: String = "",
+    val nanoleafToken: String = "",
 )

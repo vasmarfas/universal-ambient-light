@@ -62,14 +62,19 @@ import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
+import com.vasmarfas.UniversalAmbientLight.ui.settings.OutputLampsDialog
 import kotlinx.coroutines.delay
+
+/** Лампы, которые отвечают каждая за себя: в списке найденного они собираются в одну строку. */
+private val SELF_ADDRESSED_LAMPS = setOf(OutputType.WIZ, OutputType.YEELIGHT, OutputType.LIFX, OutputType.GOVEE)
 
 private const val SEARCH_MS = 6000L
 
 /**
  * Выбор контроллера: сверху то, что нашлось в сети, ниже все типы по группам. Выбор сразу
- * пишет тип, адрес и порт в настройки. С телефона-пульта ищет телефон, а пишется всё в
- * настройки телевизора.
+ * пишет тип, адрес и порт в настройки; мосту Hue и панелям Nanoleaf следом нужно
+ * подключение кнопкой, лампам - зоны экрана. С телефона-пульта ищет телефон, а пишется
+ * всё в настройки телевизора.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -94,11 +99,28 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
         searching = false
     }
 
+    var pairFor by remember { mutableStateOf<OutputType?>(null) }
+    var lampsFor by remember { mutableStateOf<OutputType?>(null) }
+
+    fun proceed(type: OutputType) {
+        val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
+        when {
+            type == OutputType.HUE && host.isNotEmpty() ->
+                if (prefs.getString(R.string.pref_key_hue_username).isNullOrBlank()) pairFor = type else lampsFor = type
+
+            type == OutputType.NANOLEAF && host.isNotEmpty() &&
+                    prefs.getString(R.string.pref_key_nanoleaf_token).isNullOrBlank() -> pairFor = type
+
+            type in SELF_ADDRESSED_LAMPS -> lampsFor = type
+            else -> onBackClick()
+        }
+    }
+
     fun pick(type: OutputType, host: String?, port: Int) {
         applyController(context, prefs, current, type, host, port)
         current = type
         currentHost = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
-        onBackClick()
+        proceed(type)
     }
 
     Scaffold(
@@ -147,8 +169,10 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
                 Hint(stringResource(R.string.devices_remote_note))
             }
 
+            val devices = found.filter { it.type !in SELF_ADDRESSED_LAMPS }
+            val lamps = found.filter { it.type in SELF_ADDRESSED_LAMPS }.groupBy { it.type }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (device in found) {
+                for (device in devices) {
                     val typeTitle = stringResource(device.type.titleRes())
                     val address = if (device.port > 0) "${device.host}:${device.port}" else device.host
                     DeviceRow(
@@ -157,6 +181,16 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
                         subtitle = "$typeTitle · $address",
                         current = device.type == current && device.host == currentHost,
                         onClick = { pick(device.type, device.host, device.port) }
+                    )
+                }
+                for ((type, items) in lamps) {
+                    DeviceRow(
+                        icon = type.group.icon,
+                        title = stringResource(type.titleRes()),
+                        subtitle = stringResource(R.string.devices_lamps_count, items.size) + " · " +
+                                items.joinToString { it.name },
+                        current = type == current,
+                        onClick = { pick(type, null, 0) }
                     )
                 }
             }
@@ -232,6 +266,32 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+
+    pairFor?.let { type ->
+        PairDialog(
+            prefs = prefs,
+            type = type,
+            onPaired = {
+                pairFor = null
+                if (type == OutputType.HUE) lampsFor = type else onBackClick()
+            },
+            onDismiss = { pairFor = null }
+        )
+    }
+    lampsFor?.let { type ->
+        OutputLampsDialog(
+            prefs = prefs,
+            type = type,
+            // Мост и брокер находятся поиском сами, а их лампы - только через них
+            found = if (type in SELF_ADDRESSED_LAMPS) {
+                found.filter { it.type == type }.map { it.host to it.name }
+            } else {
+                emptyList()
+            },
+            onSaved = { onBackClick() },
+            onDismiss = { lampsFor = null }
+        )
+    }
 }
 
 /**
@@ -255,6 +315,9 @@ private fun applyController(
     prefs.putString(R.string.pref_key_connection_type, type.id)
     if (newHost != oldHost) {
         prefs.putString(R.string.pref_key_host, newHost)
+        // Ключ выдан прежним мостом или панелями, к новому адресу он не подойдёт
+        if (type == old && type == OutputType.HUE) prefs.putString(R.string.pref_key_hue_username, "")
+        if (type == old && type == OutputType.NANOLEAF) prefs.putString(R.string.pref_key_nanoleaf_token, "")
     }
     val newPort = when {
         port > 0 -> port

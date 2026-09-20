@@ -3,6 +3,7 @@ package com.vasmarfas.UniversalAmbientLight.ui.home
 import android.content.Context
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
+import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
@@ -13,8 +14,14 @@ internal fun describeTarget(context: Context, prefs: Preferences): String {
     val type = OutputType.of(prefs.getString(R.string.pref_key_connection_type))
     val label = context.getString(type.titleRes())
     val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
+    val lampsKey = type.lampsKey
     return when {
         type == OutputType.ADALIGHT -> "$label · USB"
+        lampsKey != null && !type.needsHost -> {
+            val lamps = HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).size
+            "$label · ${context.getString(R.string.devices_lamps_count, lamps)}"
+        }
+
         host.isEmpty() && type == OutputType.E131 -> "$label · ${context.getString(R.string.home_target_multicast)}"
         host.isEmpty() -> "$label · ${context.getString(R.string.home_target_no_host)}"
         type.defaultPort == 0 || type == OutputType.HOME_ASSISTANT -> "$label · $host"

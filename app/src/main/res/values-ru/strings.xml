@@ -693,6 +693,11 @@
   <string name="sleep_timer_cancel">Отключить таймер</string>
   <string name="sleep_timer_until">Выключится в %1$s</string>
 
+  <!-- More controllers and smart lights -->
+  <string name="error_hue_not_paired">Мост Hue не подключён. Откройте «Настройки», «Подключение» и подключите мост кнопкой на нём.</string>
+  <string name="error_nanoleaf_not_paired">Nanoleaf не подключены. Откройте «Настройки», «Подключение» и подключите панели.</string>
+  <string name="error_no_lamps">Ни одна лампа не привязана к зоне экрана. Откройте «Настройки», «Подключение», «Лампы и зоны».</string>
+
   <!-- Controller picker -->
   <string name="devices_title">Контроллер</string>
   <string name="devices_found">Найдено в сети</string>
@@ -704,6 +709,7 @@
   <string name="devices_sweep_progress">Проверяем адреса: %1$d%%</string>
   <string name="devices_manual">Выбрать по типу</string>
   <string name="devices_current">Сейчас</string>
+  <string name="devices_lamps_count">Ламп: %1$d</string>
   <string name="devices_remote_note">Поиск идёт с телефона, поэтому телевизор должен быть в той же сети.</string>
   <string name="devices_group_strip">Адресная лента по сети</string>
   <string name="devices_group_usb">Лента по USB</string>
@@ -727,6 +733,18 @@
   <string name="output_opc_summary">FadeCandy и fcserver</string>
   <string name="output_adalight">Adalight и USB-комплекты</string>
   <string name="output_adalight_summary">Arduino, ESP, Skydimo и другие платы по USB-кабелю</string>
+  <string name="output_hue">Philips Hue</string>
+  <string name="output_hue_summary">Лампы через мост Hue</string>
+  <string name="output_nanoleaf">Nanoleaf</string>
+  <string name="output_nanoleaf_summary">Shapes, Canvas, Elements, Lines, Light Panels</string>
+  <string name="output_wiz">WiZ</string>
+  <string name="output_wiz_summary">Лампы WiZ Connected, в том числе Philips WiZ</string>
+  <string name="output_yeelight">Yeelight</string>
+  <string name="output_yeelight_summary">Нужно включить LAN Control в приложении Yeelight</string>
+  <string name="output_lifx">LIFX</string>
+  <string name="output_lifx_summary">Лампы LIFX в локальной сети</string>
+  <string name="output_govee">Govee</string>
+  <string name="output_govee_summary">Нужно включить LAN Control в приложении Govee Home</string>
   <string name="output_homeassistant">Home Assistant</string>
   <string name="output_homeassistant_summary">Любые лампы, подключённые к Home Assistant</string>
   <string name="output_hyperion">Hyperion / HyperHDR</string>
@@ -745,4 +763,28 @@
   <string name="pref_summary_opc_channel">%1$d (0 означает все каналы сервера)</string>
   <string name="pref_summary_e131_multicast">Пусто: мультикаст на 239.255.x.y</string>
   <string name="home_target_multicast">мультикаст</string>
+  <string name="pref_title_hue_pairing">Подключение к мосту</string>
+  <string name="pref_title_nanoleaf_pairing">Подключение к панелям</string>
+  <string name="pref_summary_paired">Подключено</string>
+  <string name="pref_summary_not_paired">Не подключено, нажмите, чтобы подключить</string>
+
+  <!-- Pairing -->
+  <string name="action_pair">Подключить</string>
+  <string name="pair_in_progress">Подключаемся…</string>
+  <string name="pair_failed">Не удалось подключиться: %1$s</string>
+  <string name="hue_pair_title">Подключение моста Hue</string>
+  <string name="hue_pair_text">Нажмите круглую кнопку на мосту и в течение 30 секунд нажмите «Подключить».</string>
+  <string name="hue_pair_button_not_pressed">Мост ответил, что кнопку не нажимали. Нажмите её и попробуйте ещё раз.</string>
+  <string name="nanoleaf_pair_title">Подключение Nanoleaf</string>
+  <string name="nanoleaf_pair_text">Удерживайте кнопку питания на контроллере 5-7 секунд, пока индикатор не замигает, и в течение 30 секунд нажмите «Подключить».</string>
+  <string name="nanoleaf_pair_rejected">Nanoleaf отказал: кнопку не удерживали или прошло больше 30 секунд.</string>
+  <string name="pair_need_host">Сначала укажите адрес</string>
+
+  <!-- Lights of other systems -->
+  <string name="lamps_dialog_title">Лампы %1$s</string>
+  <string name="lamps_hint_network">Лампы ищутся в локальной сети. Включите их и проверьте, что они в той же сети Wi-Fi.</string>
+  <string name="lamps_hint_hue">Сначала подключите мост, затем выберите зону для каждой лампы.</string>
+  <string name="lamps_error">Не удалось получить список ламп: %1$s</string>
+  <string name="lamps_lamp_missing">Сейчас не найдена в сети</string>
+  <string name="lamps_identify">Мигнуть</string>
 </resources>

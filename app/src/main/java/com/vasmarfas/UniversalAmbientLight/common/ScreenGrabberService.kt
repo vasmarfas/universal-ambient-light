@@ -488,6 +488,9 @@ class ScreenGrabberService : Service() {
             dmxUniverse = prefs.getInt(R.string.pref_key_dmx_universe),
             dmxLedsPerUniverse = prefs.getInt(R.string.pref_key_dmx_leds_per_universe),
             opcChannel = prefs.getInt(R.string.pref_key_opc_channel),
+            lamps = OutputType.of(mConnectionType).lampsKey?.let { prefs.getString(it, "") }.orEmpty(),
+            hueUsername = prefs.getString(R.string.pref_key_hue_username, "").orEmpty(),
+            nanoleafToken = prefs.getString(R.string.pref_key_nanoleaf_token, "").orEmpty(),
         )
         val thread = HyperionThread(mReceiver, baseContext, config)
         if (mCalibrating) thread.setCalibrating(true)
@@ -1786,6 +1789,13 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_dmx_universe,
             R.string.pref_key_dmx_leds_per_universe,
             R.string.pref_key_opc_channel,
+            R.string.pref_key_hue_username,
+            R.string.pref_key_hue_lamps,
+            R.string.pref_key_wiz_lamps,
+            R.string.pref_key_yeelight_lamps,
+            R.string.pref_key_lifx_lamps,
+            R.string.pref_key_govee_lamps,
+            R.string.pref_key_nanoleaf_token,
         )
 
         /** Параметры эффекта: применяются на ходу, без перезапуска. */
@@ -1831,7 +1841,7 @@ class ScreenGrabberService : Service() {
                 prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
             val type = OutputType.of(connectionType)
 
-            // Адрес не нужен USB и E1.31 (без него - мультикаст)
+            // Адрес не нужен USB, лампам со своими адресами и E1.31 (без него - мультикаст)
             if (type.needsHost) {
                 val host = prefs.getString(R.string.pref_key_host, null)?.trim()
                 if (host.isNullOrEmpty() || host == "0.0.0.0") {
@@ -1841,20 +1851,36 @@ class ScreenGrabberService : Service() {
                     )
                 }
                 val port = prefs.getInt(R.string.pref_key_port, -1)
-                if (port == -1) {
+                // Мосту Hue порт не задаётся, в настройках его поля нет
+                if (type.defaultPort > 0 && port == -1) {
                     return SettingsError(
                         "empty_port",
                         context.getString(R.string.error_empty_port)
                     )
                 }
                 // Порт должен попадать в диапазон 1-65535
-                if (port < 1 || port > 65535) {
+                if (type.defaultPort > 0 && (port < 1 || port > 65535)) {
                     return SettingsError(
                         "invalid_port",
                         context.getString(R.string.error_invalid_port, port),
                         "port: $port"
                     )
                 }
+            }
+
+            if (type == OutputType.HUE && prefs.getString(R.string.pref_key_hue_username, "").isNullOrBlank()) {
+                return SettingsError("hue_not_paired", context.getString(R.string.error_hue_not_paired))
+            }
+            if (type == OutputType.NANOLEAF &&
+                prefs.getString(R.string.pref_key_nanoleaf_token, "").isNullOrBlank()
+            ) {
+                return SettingsError("nanoleaf_not_paired", context.getString(R.string.error_nanoleaf_not_paired))
+            }
+            val lampsKey = type.lampsKey
+            if (lampsKey != null && type != OutputType.HOME_ASSISTANT &&
+                HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).isEmpty()
+            ) {
+                return SettingsError("no_lamps", context.getString(R.string.error_no_lamps))
             }
 
             if ("homeassistant".equals(connectionType, ignoreCase = true)) {

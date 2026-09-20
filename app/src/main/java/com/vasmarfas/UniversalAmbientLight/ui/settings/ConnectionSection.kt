@@ -197,6 +197,27 @@ internal fun ColumnScope.ConnectionSection(
                 )
             }
 
+            OutputType.HUE -> {
+                PairingPreference(
+                    title = stringResource(R.string.pref_title_hue_pairing),
+                    paired = state.pairingKey.isNotBlank(),
+                    onClick = { state.showPairDialog = true }
+                )
+                LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                MainLampBehavior(prefs)
+            }
+
+            OutputType.NANOLEAF -> PairingPreference(
+                title = stringResource(R.string.pref_title_nanoleaf_pairing),
+                paired = state.pairingKey.isNotBlank(),
+                onClick = { state.showPairDialog = true }
+            )
+
+            OutputType.WIZ, OutputType.YEELIGHT, OutputType.LIFX, OutputType.GOVEE -> {
+                LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                MainLampBehavior(prefs)
+            }
+
             OutputType.HOME_ASSISTANT -> HomeAssistantSection(
                 prefs = prefs,
                 analyticsPrefix = "ha",
@@ -315,6 +336,32 @@ private fun ColorOrderPreference(prefs: Preferences) {
         entriesRes = R.array.pref_list_wled_color_order,
         entryValuesRes = R.array.pref_list_wled_color_order_values,
         onValueChange = { AnalyticsHelper.logSettingChanged(context, "color_order", it) }
+    )
+}
+
+@Composable
+private fun PairingPreference(title: String, paired: Boolean, onClick: () -> Unit) {
+    ClickablePreference(
+        title = title,
+        summary = stringResource(if (paired) R.string.pref_summary_paired else R.string.pref_summary_not_paired),
+        onClick = onClick
+    )
+}
+
+/** Лампы основного подключения живут на тех же настройках ритма, что и Home Assistant. */
+@Composable
+private fun ColumnScope.MainLampBehavior(prefs: Preferences) {
+    LampBehaviorSection(
+        prefs = prefs,
+        analyticsPrefix = "lamps",
+        keyUpdateInterval = R.string.pref_key_ha_update_interval,
+        keyChangeThreshold = R.string.pref_key_ha_change_threshold,
+        keyTransition = R.string.pref_key_ha_transition,
+        keyBrightnessMode = R.string.pref_key_ha_brightness_mode,
+        keyBrightness = R.string.pref_key_ha_brightness,
+        keyDarkOff = R.string.pref_key_ha_dark_off,
+        keyDarkThreshold = R.string.pref_key_ha_dark_threshold,
+        keyTurnOffLights = R.string.pref_key_ha_turn_off_lights,
     )
 }
 

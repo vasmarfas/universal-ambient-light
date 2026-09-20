@@ -20,6 +20,12 @@ fun OutputType.titleRes(): Int = when (this) {
     OutputType.UDP_RAW -> R.string.output_udpraw
     OutputType.OPC -> R.string.output_opc
     OutputType.ADALIGHT -> R.string.output_adalight
+    OutputType.HUE -> R.string.output_hue
+    OutputType.NANOLEAF -> R.string.output_nanoleaf
+    OutputType.WIZ -> R.string.output_wiz
+    OutputType.YEELIGHT -> R.string.output_yeelight
+    OutputType.LIFX -> R.string.output_lifx
+    OutputType.GOVEE -> R.string.output_govee
     OutputType.HOME_ASSISTANT -> R.string.output_homeassistant
     OutputType.HYPERION -> R.string.output_hyperion
 }
@@ -34,6 +40,12 @@ fun OutputType.summaryRes(): Int = when (this) {
     OutputType.UDP_RAW -> R.string.output_udpraw_summary
     OutputType.OPC -> R.string.output_opc_summary
     OutputType.ADALIGHT -> R.string.output_adalight_summary
+    OutputType.HUE -> R.string.output_hue_summary
+    OutputType.NANOLEAF -> R.string.output_nanoleaf_summary
+    OutputType.WIZ -> R.string.output_wiz_summary
+    OutputType.YEELIGHT -> R.string.output_yeelight_summary
+    OutputType.LIFX -> R.string.output_lifx_summary
+    OutputType.GOVEE -> R.string.output_govee_summary
     OutputType.HOME_ASSISTANT -> R.string.output_homeassistant_summary
     OutputType.HYPERION -> R.string.output_hyperion_summary
 }
