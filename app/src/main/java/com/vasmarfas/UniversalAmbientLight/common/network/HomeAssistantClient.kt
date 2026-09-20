@@ -269,6 +269,27 @@ class HomeAssistantClient(
             return if (trimmed.contains("://")) trimmed else "http://$trimmed:$port"
         }
 
+        /** Короткая вспышка лампы средствами самого HA, чтобы найти её в комнате. */
+        @Throws(IOException::class)
+        fun flash(host: String, port: Int, token: String, entityId: String) {
+            val connection =
+                URL(baseUrl(host, port) + "/api/services/light/turn_on").openConnection() as HttpURLConnection
+            try {
+                connection.requestMethod = "POST"
+                connection.connectTimeout = CONNECT_TIMEOUT_MS
+                connection.readTimeout = READ_TIMEOUT_MS
+                connection.setRequestProperty("Authorization", "Bearer ${token.trim()}")
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                val body = JSONObject().put("entity_id", entityId).put("flash", "short").toString()
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                val code = connection.responseCode
+                if (code !in 200..299) throw IOException("HTTP $code")
+            } finally {
+                connection.disconnect()
+            }
+        }
+
         /**
          * Список ламп из HA: пары entity_id → отображаемое имя. Блокирует — звать только
          * с фонового потока. Используется диалогом выбора ламп в настройках.

@@ -713,6 +713,11 @@
   <string name="sleep_timer_cancel">Turn the timer off</string>
   <string name="sleep_timer_until">Turns off at %1$s</string>
 
+  <!-- More controllers and smart lights -->
+  <string name="error_hue_not_paired">The Hue bridge is not paired. Open Settings, Connection and pair the bridge with its button.</string>
+  <string name="error_nanoleaf_not_paired">Nanoleaf is not paired. Open Settings, Connection and pair the panels.</string>
+  <string name="error_no_lamps">No lights are assigned to screen zones. Open Settings, Connection, Lights and zones.</string>
+
   <!-- Controller picker -->
   <string name="devices_title">Controller</string>
   <string name="devices_found">Found on the network</string>
@@ -724,6 +729,7 @@
   <string name="devices_sweep_progress">Checking addresses: %1$d%%</string>
   <string name="devices_manual">Choose by type</string>
   <string name="devices_current">Current</string>
+  <string name="devices_lamps_count">Lights: %1$d</string>
   <string name="devices_remote_note">The search runs from this phone, so the TV has to be on the same network.</string>
   <string name="devices_group_strip">Addressable strip over the network</string>
   <string name="devices_group_usb">Strip over USB</string>
@@ -747,6 +753,18 @@
   <string name="output_opc_summary">FadeCandy and fcserver</string>
   <string name="output_adalight">Adalight and USB kits</string>
   <string name="output_adalight_summary">Arduino, ESP, Skydimo and other boards on a USB cable</string>
+  <string name="output_hue">Philips Hue</string>
+  <string name="output_hue_summary">Lights through the Hue bridge</string>
+  <string name="output_nanoleaf">Nanoleaf</string>
+  <string name="output_nanoleaf_summary">Shapes, Canvas, Elements, Lines, Light Panels</string>
+  <string name="output_wiz">WiZ</string>
+  <string name="output_wiz_summary">WiZ Connected lights, Philips WiZ included</string>
+  <string name="output_yeelight">Yeelight</string>
+  <string name="output_yeelight_summary">Needs LAN Control enabled in the Yeelight app</string>
+  <string name="output_lifx">LIFX</string>
+  <string name="output_lifx_summary">LIFX lights on the local network</string>
+  <string name="output_govee">Govee</string>
+  <string name="output_govee_summary">Needs LAN Control enabled in the Govee Home app</string>
   <string name="output_homeassistant">Home Assistant</string>
   <string name="output_homeassistant_summary">Any lights connected to Home Assistant</string>
   <string name="output_hyperion">Hyperion / HyperHDR</string>
@@ -765,4 +783,28 @@
   <string name="pref_summary_opc_channel">%1$d (0 means every channel of the server)</string>
   <string name="pref_summary_e131_multicast">Empty: multicast to 239.255.x.y</string>
   <string name="home_target_multicast">multicast</string>
+  <string name="pref_title_hue_pairing">Bridge pairing</string>
+  <string name="pref_title_nanoleaf_pairing">Panel pairing</string>
+  <string name="pref_summary_paired">Paired</string>
+  <string name="pref_summary_not_paired">Not paired, tap to pair</string>
+
+  <!-- Pairing -->
+  <string name="action_pair">Pair</string>
+  <string name="pair_in_progress">Pairing…</string>
+  <string name="pair_failed">Couldn\'t pair: %1$s</string>
+  <string name="hue_pair_title">Pair the Hue bridge</string>
+  <string name="hue_pair_text">Press the round button on top of the bridge, then tap Pair within 30 seconds.</string>
+  <string name="hue_pair_button_not_pressed">The bridge says its button wasn\'t pressed. Press it and try again.</string>
+  <string name="nanoleaf_pair_title">Pair Nanoleaf</string>
+  <string name="nanoleaf_pair_text">Hold the power button on the controller for 5 to 7 seconds until its light starts flashing, then tap Pair within 30 seconds.</string>
+  <string name="nanoleaf_pair_rejected">Nanoleaf refused: the button wasn\'t held or more than 30 seconds have passed.</string>
+  <string name="pair_need_host">Enter the address first</string>
+
+  <!-- Lights of other systems -->
+  <string name="lamps_dialog_title">%1$s lights</string>
+  <string name="lamps_hint_network">Lights are searched on the local network. Turn them on and check that they are on the same Wi-Fi.</string>
+  <string name="lamps_hint_hue">Pair the bridge first, then pick a zone for each light.</string>
+  <string name="lamps_error">Couldn\'t get the list of lights: %1$s</string>
+  <string name="lamps_lamp_missing">Not found on the network right now</string>
+  <string name="lamps_identify">Blink</string>
 </resources>

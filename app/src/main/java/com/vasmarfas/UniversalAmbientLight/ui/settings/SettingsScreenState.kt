@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 /**
@@ -61,6 +62,20 @@ class SettingsScreenState(prefs: Preferences) {
     /** Лампы Home Assistant с зонами — держится здесь ради живой сводки в настройках. */
     var haLampsSpec by mutableStateOf(prefs.getString(R.string.pref_key_ha_lamps) ?: "")
 
+    /** Лампы основного подключения с зонами: ключ зависит от типа подключения. */
+    var lampsSpec by mutableStateOf(
+        OutputType.of(connectionType).lampsKey?.let { prefs.getString(it) }.orEmpty()
+    )
+
+    /** Ключ доступа к мосту Hue или панелям Nanoleaf; пустой - ещё не подключались. */
+    var pairingKey by mutableStateOf(
+        when (OutputType.of(connectionType)) {
+            OutputType.HUE -> prefs.getString(R.string.pref_key_hue_username).orEmpty()
+            OutputType.NANOLEAF -> prefs.getString(R.string.pref_key_nanoleaf_token).orEmpty()
+            else -> ""
+        }
+    )
+
     /** Дополнительное подключение Home Assistant — работает параллельно с основным. */
     var ha2Enabled by mutableStateOf(prefs.getBoolean(R.string.pref_key_ha2_enabled, false))
     var ha2LampsSpec by mutableStateOf(prefs.getString(R.string.pref_key_ha2_lamps) ?: "")
@@ -70,4 +85,6 @@ class SettingsScreenState(prefs: Preferences) {
     var showAccessibilityDisclosure by mutableStateOf(false)
     var showHaLampsDialog by mutableStateOf(false)
     var showHa2LampsDialog by mutableStateOf(false)
+    var showLampsDialog by mutableStateOf(false)
+    var showPairDialog by mutableStateOf(false)
 }

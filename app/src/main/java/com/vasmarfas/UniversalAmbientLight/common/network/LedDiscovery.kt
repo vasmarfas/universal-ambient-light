@@ -19,9 +19,9 @@ import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Поиск контроллеров в локальной сети. Кто объявляет себя по mDNS (WLED, Hyperion,
- * HyperHDR, Home Assistant), находится через NsdManager. Узлы Art-Net mDNS не умеют,
- * их ищем широковещательным запросом.
+ * Поиск контроллеров и ламп в локальной сети. Кто объявляет себя по mDNS (WLED, Hyperion,
+ * HyperHDR, мост Hue, Nanoleaf, Home Assistant), находится через NsdManager. Лампы WiZ,
+ * Yeelight, LIFX, Govee и узлы Art-Net mDNS не умеют, их ищем широковещательными запросами.
  *
  * Находки приходят в onFound на главном потоке по мере ответов, каждая пара «тип и адрес»
  * один раз. mDNS слушает до [stop], широковещательные запросы отрабатывают за пару секунд.
@@ -54,10 +54,18 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
         try {
             mMulticastLock?.acquire()
         } catch (e: RuntimeException) {
-            // Без блокировки часть прошивок режет ответы mDNS, но искать всё равно можно
+            // Без блокировки часть прошивок режет ответы ламп, но искать всё равно можно
             Log.w(TAG, "Multicast lock failed: ${e.message}")
         }
         mNsd?.let { nsd -> for (service in SERVICES) browse(nsd, service) }
+        probe("wiz") { WizClient.discover(PROBE_MS).forEach { (host, name) -> report(OutputType.WIZ, host, 0, name) } }
+        probe("yeelight") {
+            YeelightClient.discover(PROBE_MS).forEach { (host, name) -> report(OutputType.YEELIGHT, host, 0, name) }
+        }
+        probe("lifx") { LifxClient.discover(PROBE_MS).forEach { (host, name) -> report(OutputType.LIFX, host, 0, name) } }
+        probe("govee") {
+            GoveeClient.discover(PROBE_MS).forEach { (host, name) -> report(OutputType.GOVEE, host, 0, name) }
+        }
         probe("artnet") { pollArtNet() }
     }
 
@@ -238,6 +246,9 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
             Service("_hyperiond-flatbuf._tcp", OutputType.HYPERION),
             // HyperHDR объявляет только веб-интерфейс, FlatBuffers у него на стандартном 19400
             Service("_hyperhdr-http._tcp", OutputType.HYPERION, OutputType.HYPERION.defaultPort),
+            // Мост Hue объявляет HTTPS, а старый API, через который мы работаем, живёт на 80
+            Service("_hue._tcp", OutputType.HUE, 0),
+            Service("_nanoleafapi._tcp", OutputType.NANOLEAF),
             Service("_home-assistant._tcp", OutputType.HOME_ASSISTANT),
         )
 
