@@ -807,4 +807,23 @@
   <string name="lamps_error">Couldn\'t get the list of lights: %1$s</string>
   <string name="lamps_lamp_missing">Not found on the network right now</string>
   <string name="lamps_identify">Blink</string>
+
+  <!-- Home: controller setup hint -->
+  <string name="home_setup_button">Set up the controller</string>
+  <string name="home_setup_no_host">The controller address is not set</string>
+  <string name="home_setup_no_lamps">No lights are assigned to screen zones</string>
+  <string name="home_setup_not_paired">%1$s is not paired yet</string>
+  <string name="home_setup_no_token">The Home Assistant token is not set</string>
+
+  <!-- Connection errors of LED controllers and lights -->
+  <string name="error_device_unreachable">Couldn\'t reach the controller. Check its address and power, and that it is on the same network.</string>
+  <string name="error_device_connection_lost">The connection to the controller was lost, capture stopped.</string>
+  <string name="error_lamps_unreachable">Couldn\'t reach the lights. Check that they are powered and on the same network.</string>
+  <string name="error_lamps_connection_lost">The connection to the lights was lost, capture stopped.</string>
+
+  <!-- WLED LED count check -->
+  <string name="devices_led_mismatch_title">The LED count differs</string>
+  <string name="devices_led_mismatch_text">LEDs in WLED: %1$d, in the app layout: %2$d. With different numbers part of the strip stays dark or the colors land in the wrong place.</string>
+  <string name="devices_led_mismatch_layout">Set up the layout</string>
+  <string name="devices_led_mismatch_later">Not now</string>
 </resources>

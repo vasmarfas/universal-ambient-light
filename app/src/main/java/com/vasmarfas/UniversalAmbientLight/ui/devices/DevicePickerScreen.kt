@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -42,6 +44,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,12 +61,17 @@ import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.network.LedDiscovery
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.network.WLEDClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import com.vasmarfas.UniversalAmbientLight.ui.settings.OutputLampsDialog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Лампы, которые отвечают каждая за себя: в списке найденного они собираются в одну строку. */
 private val SELF_ADDRESSED_LAMPS = setOf(OutputType.WIZ, OutputType.YEELIGHT, OutputType.LIFX, OutputType.GOVEE)
@@ -78,7 +86,7 @@ private const val SEARCH_MS = 6000L
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DevicePickerScreen(onBackClick: () -> Unit) {
+fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
     val context = LocalContext.current
     val remote = LocalRemote.current
     val prefs = rememberSettingsPreferences()
@@ -101,6 +109,9 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
 
     var pairFor by remember { mutableStateOf<OutputType?>(null) }
     var lampsFor by remember { mutableStateOf<OutputType?>(null) }
+    // Светодиодов в самом WLED и в раскладке приложения, если они не совпали
+    var ledMismatch by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val scope = rememberCoroutineScope()
 
     fun proceed(type: OutputType) {
         val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
@@ -120,7 +131,16 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
         applyController(context, prefs, current, type, host, port)
         current = type
         currentHost = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
-        proceed(type)
+        if (host == null || type != OutputType.WLED) {
+            proceed(type)
+            return
+        }
+        // Раскладка короче ленты оставляет её хвост тёмным, длиннее - сдвигает цвета
+        scope.launch {
+            val onDevice = withContext(Dispatchers.IO) { WLEDClient.ledCount(host) }
+            val inLayout = LedLayout.from(prefs).ledCount()
+            if (onDevice != null && onDevice != inLayout) ledMismatch = onDevice to inLayout else onBackClick()
+        }
     }
 
     Scaffold(
@@ -276,6 +296,23 @@ fun DevicePickerScreen(onBackClick: () -> Unit) {
                 if (type == OutputType.HUE) lampsFor = type else onBackClick()
             },
             onDismiss = { pairFor = null }
+        )
+    }
+    ledMismatch?.let { (onDevice, inLayout) ->
+        AlertDialog(
+            onDismissRequest = onBackClick,
+            title = { Text(stringResource(R.string.devices_led_mismatch_title)) },
+            text = { Text(stringResource(R.string.devices_led_mismatch_text, onDevice, inLayout)) },
+            confirmButton = {
+                TextButton(onClick = onLedLayoutClick) {
+                    Text(stringResource(R.string.devices_led_mismatch_layout))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onBackClick) {
+                    Text(stringResource(R.string.devices_led_mismatch_later))
+                }
+            }
         )
     }
     lampsFor?.let { type ->

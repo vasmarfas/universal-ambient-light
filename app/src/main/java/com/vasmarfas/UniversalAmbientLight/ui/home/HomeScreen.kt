@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
@@ -132,6 +133,9 @@ fun MainScreen(
     onLeaveReviewClick: () -> Unit = {},
     // null - таймер сна недоступен (старый ТВ); 0 минут отменяет таймер
     onSleepTimer: ((minutes: Int) -> Unit)? = null,
+    // Чего не хватает контроллеру; null - всё настроено и кнопка настройки не нужна
+    setupHint: String? = null,
+    onSetupClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // В режиме камеры фоном идёт превью камеры с углами
@@ -320,6 +324,33 @@ fun MainScreen(
                     .widthIn(max = 420.dp)
                     .padding(horizontal = 16.dp)
             )
+
+            if (setupHint != null && !isRunning) {
+                var setupFocused by remember { mutableStateOf(false) }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = setupHint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = onSetupClick,
+                    border = focusableOutline(setupFocused),
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .onFocusChanged { setupFocused = it.isFocused }
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.home_setup_button))
+                }
+            }
 
             if (onSleepTimer != null && isRunning) {
                 var showSleepDialog by remember { mutableStateOf(false) }

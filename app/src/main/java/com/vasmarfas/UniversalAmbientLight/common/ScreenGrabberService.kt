@@ -205,6 +205,8 @@ class ScreenGrabberService : Service() {
             if (!mHasConnected) {
                 mStartError = connectionErrorText(
                     R.string.error_adalight_unreachable,
+                    R.string.error_lamps_unreachable,
+                    R.string.error_device_unreachable,
                     R.string.error_server_unreachable
                 )
                 haltStartup()
@@ -213,19 +215,30 @@ class ScreenGrabberService : Service() {
             } else {
                 mStartError = connectionErrorText(
                     R.string.error_adalight_connection_lost,
+                    R.string.error_lamps_connection_lost,
+                    R.string.error_device_connection_lost,
                     R.string.error_connection_lost
                 )
                 stopSelf()
             }
         }
 
-        /** У Adalight своя формулировка ошибки: там нет ни адреса, ни сервера. */
+        /** Сервер, контроллер, лампы и Adalight на USB ломаются по-разному, и текст у каждого свой. */
         private fun connectionErrorText(
             @StringRes adalight: Int,
-            @StringRes network: Int,
+            @StringRes lamps: Int,
+            @StringRes device: Int,
+            @StringRes server: Int,
         ): String {
-            val isAdalight = "adalight".equals(mConnectionType, ignoreCase = true)
-            return resources.getString(if (isAdalight) adalight else network)
+            val type = OutputType.of(mConnectionType)
+            return resources.getString(
+                when {
+                    type == OutputType.ADALIGHT -> adalight
+                    type == OutputType.HYPERION || type == OutputType.HOME_ASSISTANT -> server
+                    type.isLamps -> lamps
+                    else -> device
+                }
+            )
         }
 
         override fun onReceiveStatus(isCapturing: Boolean) {

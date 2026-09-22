@@ -3,10 +3,14 @@ package com.vasmarfas.UniversalAmbientLight.common.network
 import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.util.LedDataExtractor
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.URL
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -675,5 +679,30 @@ class WLEDClient(
         private const val MAX_LEDS_HYPERION_RAW = 490
         private const val MAX_LEDS_PER_PACKET_DNRGB = 489
         private const val WLED_TIMEOUT_SECONDS: Byte = 5
+        private const val INFO_TIMEOUT_MS = 1500
+
+        /** Сколько светодиодов настроено в самом WLED; null - не ответил или это не WLED. */
+        fun ledCount(host: String): Int? {
+            val connection = try {
+                URL("http://${host.trim()}/json/info").openConnection() as HttpURLConnection
+            } catch (e: IOException) {
+                return null
+            }
+            return try {
+                connection.connectTimeout = INFO_TIMEOUT_MS
+                connection.readTimeout = INFO_TIMEOUT_MS
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
+                val text = connection.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+                JSONObject(text).optJSONObject("leds")?.optInt("count")?.takeIf { it > 0 }
+            } catch (e: IOException) {
+                Log.w(TAG, "WLED info from $host failed: ${e.message}")
+                null
+            } catch (e: JSONException) {
+                Log.w(TAG, "WLED info from $host is not JSON: ${e.message}")
+                null
+            } finally {
+                connection.disconnect()
+            }
+        }
     }
 }

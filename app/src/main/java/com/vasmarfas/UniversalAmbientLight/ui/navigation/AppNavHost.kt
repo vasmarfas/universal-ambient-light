@@ -40,6 +40,7 @@ import com.vasmarfas.UniversalAmbientLight.ui.devices.DevicePickerScreen
 import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeSource
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeTarget
+import com.vasmarfas.UniversalAmbientLight.ui.home.setupIssue
 import com.vasmarfas.UniversalAmbientLight.ui.home.HelpDialog
 import com.vasmarfas.UniversalAmbientLight.ui.home.HomeStatus
 import com.vasmarfas.UniversalAmbientLight.ui.home.LowRatingDialog
@@ -100,6 +101,7 @@ fun AppNavHost(
             }
             var target by remember(prefs) { mutableStateOf(describeTarget(context, prefs)) }
             var source by remember(prefs) { mutableStateOf(describeSource(context, prefs)) }
+            var setupHint by remember(prefs) { mutableStateOf(setupIssue(context, prefs)) }
             val lifecycleOwner = LocalLifecycleOwner.current
             DisposableEffect(lifecycleOwner, prefs) {
                 val observer = LifecycleEventObserver { _, event ->
@@ -108,6 +110,7 @@ fun AppNavHost(
                             prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
                         target = describeTarget(context, prefs)
                         source = describeSource(context, prefs)
+                        setupHint = setupIssue(context, prefs)
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -179,6 +182,10 @@ fun AppNavHost(
                 localPreview = remote == null,
                 remoteEntries = remoteEntries,
                 onSleepTimer = if (sleepSupported) onSleepTimer else null,
+                setupHint = setupHint,
+                onSetupClick = {
+                    navController.navigate(Screen.Devices.route) { launchSingleTop = true }
+                },
                 topContent = {
                     if (remote != null) {
                         RemoteBanner(
@@ -344,7 +351,14 @@ fun AppNavHost(
             LaunchedEffect(Unit) {
                 AnalyticsHelper.logScreenView(context, "devices", "DevicePickerScreen")
             }
-            DevicePickerScreen(onBackClick = { navController.popBackStack() })
+            DevicePickerScreen(
+                onBackClick = { navController.popBackStack() },
+                onLedLayoutClick = {
+                    navController.navigate(Screen.LedLayout.route) {
+                        popUpTo(Screen.Devices.route) { inclusive = true }
+                    }
+                }
+            )
         }
         composable(Screen.LedLayout.route) {
             val context = LocalContext.current
