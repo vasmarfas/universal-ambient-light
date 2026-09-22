@@ -29,6 +29,30 @@ internal fun describeTarget(context: Context, prefs: Preferences): String {
     }
 }
 
+/**
+ * Чего не хватает, чтобы подсветке было куда светить; null - контроллер настроен.
+ * Проверяет то же, что сервис перед запуском, но отвечает коротко, для главного экрана.
+ */
+internal fun setupIssue(context: Context, prefs: Preferences): String? {
+    val type = OutputType.of(prefs.getString(R.string.pref_key_connection_type))
+    fun blank(key: Int) = prefs.getString(key).isNullOrBlank()
+    val lampsKey = type.lampsKey
+    return when {
+        type.needsHost && blank(R.string.pref_key_host) -> context.getString(R.string.home_setup_no_host)
+        type == OutputType.HUE && blank(R.string.pref_key_hue_username) ||
+                type == OutputType.NANOLEAF && blank(R.string.pref_key_nanoleaf_token) ->
+            context.getString(R.string.home_setup_not_paired, context.getString(type.titleRes()))
+
+        type == OutputType.HOME_ASSISTANT && blank(R.string.pref_key_ha_token) ->
+            context.getString(R.string.home_setup_no_token)
+
+        lampsKey != null && HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).isEmpty() ->
+            context.getString(R.string.home_setup_no_lamps)
+
+        else -> null
+    }
+}
+
 /** Откуда берётся картинка: камера, эффект или способ захвата экрана без технических хвостов. */
 internal fun describeSource(context: Context, prefs: Preferences): String {
     val source = prefs.getString(R.string.pref_key_capture_source) ?: "screen"

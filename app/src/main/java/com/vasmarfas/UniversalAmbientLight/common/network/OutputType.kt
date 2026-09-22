@@ -33,6 +33,11 @@ enum class OutputType(
 
     enum class Group { STRIP, USB, LAMPS, SERVER }
 
+    /** Лампы с привязкой к зонам экрана вместо адресной ленты. */
+    val isLamps: Boolean
+        get() = this == HUE || this == WIZ || this == YEELIGHT || this == LIFX || this == GOVEE ||
+                this == HOME_ASSISTANT
+
     /** Где лежат лампы с зонами; у Home Assistant - свой ключ с его сущностями. */
     val lampsKey: Int?
         get() = when (this) {

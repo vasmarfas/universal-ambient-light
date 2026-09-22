@@ -787,4 +787,23 @@
   <string name="lamps_error">Не удалось получить список ламп: %1$s</string>
   <string name="lamps_lamp_missing">Сейчас не найдена в сети</string>
   <string name="lamps_identify">Мигнуть</string>
+
+  <!-- Home: controller setup hint -->
+  <string name="home_setup_button">Настроить контроллер</string>
+  <string name="home_setup_no_host">Не задан адрес контроллера</string>
+  <string name="home_setup_no_lamps">Лампы не привязаны к зонам экрана</string>
+  <string name="home_setup_not_paired">%1$s ещё не подключён</string>
+  <string name="home_setup_no_token">Не задан токен Home Assistant</string>
+
+  <!-- Connection errors of LED controllers and lights -->
+  <string name="error_device_unreachable">Не удалось связаться с контроллером. Проверьте адрес, питание и что он в той же сети.</string>
+  <string name="error_device_connection_lost">Связь с контроллером потеряна, захват остановлен.</string>
+  <string name="error_lamps_unreachable">Не удалось связаться с лампами. Проверьте, что они включены и в той же сети.</string>
+  <string name="error_lamps_connection_lost">Связь с лампами потеряна, захват остановлен.</string>
+
+  <!-- WLED LED count check -->
+  <string name="devices_led_mismatch_title">Число светодиодов не совпадает</string>
+  <string name="devices_led_mismatch_text">Светодиодов в WLED: %1$d, в раскладке приложения: %2$d. Когда числа разные, часть ленты не горит или цвета попадают не туда.</string>
+  <string name="devices_led_mismatch_layout">Настроить раскладку</string>
+  <string name="devices_led_mismatch_later">Не сейчас</string>
 </resources>
