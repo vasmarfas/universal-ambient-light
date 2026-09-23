@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
     private var mSetupRequiredMessage by mutableStateOf<String?>(null)
     private var mMediaProjectionManager: MediaProjectionManager? = null
     private var mPermissionDeniedCount = 0
+    private var mOverlayRequested = false
     private var mTclWarningShown = false
     private lateinit var appUpdateManager: AppUpdateManager
     private var currentEffect by mutableStateOf(EffectMode.RAINBOW)
@@ -466,8 +467,13 @@ class MainActivity : ComponentActivity() {
         // Заодно пробуем общие shell-разрешения
         PermissionHelper.tryGrantProjectMediaViaShell(this)
 
-        // На первой попытке проверяем разрешение на наложение поверх окон
-        if (mPermissionDeniedCount == 0 && !PermissionHelper.canDrawOverlays(this)) {
+        // Наложение спрашиваем один раз: если его не выдали, идём дальше к диалогу захвата.
+        // Иначе на Fire TV Stick (Fire OS 7), где наложение не выдано, кнопка запуска
+        // каждый раз возвращается к запросу overlay и до MediaProjection не доходит.
+        if (mPermissionDeniedCount == 0 && !mOverlayRequested
+            && !PermissionHelper.canDrawOverlays(this)
+        ) {
+            mOverlayRequested = true
             Log.d(TAG, "Requesting overlay permission first")
             AnalyticsHelper.logPermissionRequested(this, "SYSTEM_ALERT_WINDOW")
             PermissionHelper.requestOverlayPermission(this, REQUEST_OVERLAY_PERMISSION)

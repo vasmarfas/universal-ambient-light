@@ -1,7 +1,9 @@
 package com.vasmarfas.UniversalAmbientLight.ui.theme
 
 import android.app.Activity
+import android.content.res.Resources
 import android.os.Build
+import android.util.Log
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -13,6 +15,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+
+private const val TAG = "AppTheme"
 
 private val DarkColorScheme = darkColorScheme(
     primary = AmbientCyan80,
@@ -38,7 +42,16 @@ fun AppTheme(
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            // Палитру Material You собирают из ресурсов android.R.color.system_*, и часть
+            // прошивок их не отдаёт, хотя объявляет Android 12+: Resources.NotFoundException
+            // прилетает прямо из composition и роняет запуск MainActivity.
+            try {
+                if (darkTheme) dynamicDarkColorScheme(context)
+                else dynamicLightColorScheme(context)
+            } catch (e: Resources.NotFoundException) {
+                Log.w(TAG, "Dynamic color palette unavailable, using static scheme", e)
+                if (darkTheme) DarkColorScheme else LightColorScheme
+            }
         }
 
         darkTheme -> DarkColorScheme

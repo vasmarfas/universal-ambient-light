@@ -254,6 +254,17 @@ adb shell am start -a com.vasmarfas.UniversalAmbientLight.action.TURN_OFF
 2. Разрешите автозапуск для Universal Ambient Light.
 3. Либо через **"Центр безопасности"** (Safety Guard) добавьте приложение в исключения.
 
+### Fire TV
+Если на Fire TV Stick кнопка запуска ничего не делает, выдайте разрешения на наложение и захват экрана через adb. На стике включите **Параметры разработчика > Отладка ADB**, подключитесь с компьютера командой `adb connect <ip-стика>:5555` и выполните:
+
+```
+adb shell appops set com.vasmarfas.UniversalAmbientLight SYSTEM_ALERT_WINDOW allow
+adb shell appops set com.vasmarfas.UniversalAmbientLight PROJECT_MEDIA allow
+adb shell am force-stop com.vasmarfas.UniversalAmbientLight
+```
+
+Проверено на Fire TV Stick HD с Fire OS 7.7.1.6. Метод захвата Accessibility требует Android 11 и на Fire OS 7 (Android 9) не работает.
+
 ### Воспроизведение 4K/HDR контента
 Проблема с воспроизведением видео высокого качества (2K/4K/HDR) при включенной подсветке является аппаратным ограничением многих телевизоров. Встроенные процессоры часто не справляются с одновременным декодированием тяжелого видео и захватом экрана. Это проблема, которую редко удается решить программно.
 

@@ -251,6 +251,17 @@ On TCL devices, aggressive system battery optimization may kill background servi
 2. Enable Auto-Start for Universal Ambient Light.
 3. Alternatively, check the "Safety Guard" app and add the app to exceptions.
 
+### Fire TV
+If the start button does nothing on a Fire TV Stick, grant the overlay and screen capture permissions over adb. On the Stick enable **Developer options > ADB debugging**, connect from a computer with `adb connect <stick-ip>:5555` and run:
+
+```
+adb shell appops set com.vasmarfas.UniversalAmbientLight SYSTEM_ALERT_WINDOW allow
+adb shell appops set com.vasmarfas.UniversalAmbientLight PROJECT_MEDIA allow
+adb shell am force-stop com.vasmarfas.UniversalAmbientLight
+```
+
+Tested on Fire TV Stick HD with Fire OS 7.7.1.6. The Accessibility capture method needs Android 11 and does not work on Fire OS 7 (Android 9).
+
 ### High-Quality Video Playback (4K/HDR)
 Playback issues with high-quality video (2K/4K/HDR) while the ambient light is active are a hardware limitation of many TVs. Built-in processors often cannot handle simultaneous heavy video decoding and screen capturing. This is a deep-seated issue that is rarely fixable via software.
 

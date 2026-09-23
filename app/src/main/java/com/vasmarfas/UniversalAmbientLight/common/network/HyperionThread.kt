@@ -75,6 +75,11 @@ class HyperionThread(
     // который поток захвата не трогает
     private var mSendBuffer: ByteArray? = null
 
+    // Кадр под повторы keepalive. mSendBuffer для этого не годится: его перезаписывают до
+    // входа в замок. Буфер переиспользуется — свежая копия на каждом кадре при 1080p это
+    // 6 МБ мусора за кадр, и ТВ-боксы со 128 МБ кучи не переживали такой темп (OOM 1.4.3).
+    private var mKeepAliveBuffer: ByteArray? = null
+
     private val mListener = object : HyperionThreadListener {
         override fun sendFrame(data: ByteArray, width: Int, height: Int) {
             if (mStandbyPaused.get()) return
@@ -136,10 +141,18 @@ class HyperionThread(
                         mPriority,
                         FRAME_DURATION
                     )
-                    // Держим стабильную копию для повторов keepalive.
-                    mLastSentFrame = FrameData(buffer.copyOf(), frame.width, frame.height)
 
                     if (client is HyperionFlatBuffers) {
+                        // Стабильная копия для повторов keepalive. Нужна только Hyperion:
+                        // у WLED, Adalight и Home Assistant свой keepalive, кадр им не нужен
+                        var keepAlive = mKeepAliveBuffer
+                        if (keepAlive == null || keepAlive.size != buffer.size) {
+                            keepAlive = ByteArray(buffer.size)
+                            mKeepAliveBuffer = keepAlive
+                        }
+                        System.arraycopy(buffer, 0, keepAlive, 0, buffer.size)
+                        mLastSentFrame = FrameData(keepAlive, frame.width, frame.height)
+
                         // Под тем же замком, что и keepalive: два читателя одного сокета
                         // поделили бы заголовок ответа и рассинхронизировали поток
                         client.cleanReplies()

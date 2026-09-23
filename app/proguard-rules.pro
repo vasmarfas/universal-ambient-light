@@ -20,6 +20,13 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
+# R8 включён ради вырезания неиспользуемого кода: без минификации APK весит 34 МБ, с ней
+# 17 МБ. Переименование поверх этого экономит 66 КБ, а платить за него приходится тем, что
+# любой код, опознающий классы по именам (обходы багов прошивок в AmbilightApplication,
+# запуск UsbPermissionGranterCli через app_process), требует отдельного правила и молча
+# перестаёт работать в release. Исходники открыты, скрывать в байткоде нечего.
+-dontobfuscate
+
 # dadb, libadb-android и sun-security-android не несут собственных consumer-правил (в отличие
 # от usb-serial-for-android и conscrypt-android, у тех proguard.txt уже в самом AAR) и разбирают
 # протокол ADB/крипто через собственные внутренние классы — сузить до конкретных точек входа

@@ -95,6 +95,7 @@ class AmbilightApplication : Application() {
                 isForegroundServiceTimeout(throwable) -> "ForegroundServiceDidNotStartInTime (OEM blocked FGS)"
                 isDeadSystemException(throwable) -> "DeadSystemException (system_server died)"
                 isProfileVerifierFirmwareBug(throwable) -> "ProfileVerifier NoSuchMethodError (broken framework.jar)"
+                isGoogleCertificatesRejection(throwable) -> "GoogleCertificatesRslt not allowed (uncertified GMS)"
                 else -> null
             }
             if (reason != null) {
@@ -169,6 +170,23 @@ class AmbilightApplication : Application() {
     private fun isProfileVerifierFirmwareBug(t: Throwable): Boolean {
         if (t !is NoSuchMethodError) return false
         return t.stackTrace.any { it.className.startsWith("androidx.profileinstaller.ProfileVerifier") }
+    }
+
+    /**
+     * Play Services отказывается обслуживать наш пакет: `SecurityException:
+     * GoogleCertificatesRslt: not allowed`. Прилетает с потока GoogleApiHandler, когда
+     * Firebase Analytics подключается к сервису измерения, и встречается на ТВ-боксах с
+     * несертифицированной прошивкой (UGOOS X5M, Android 14 на test-keys), где список
+     * разрешённых сертификатов внутри GMS не отрабатывает. Со стороны приложения не
+     * чинится, и ронять из-за телеметрии работающую подсветку незачем.
+     *
+     * Опознаём по тексту: сообщение приходит из процесса Play Services, а вот имена
+     * классов GMS в стеке R8 переименовывает, и проверка по ним не сработала бы как раз
+     * в release-сборке.
+     */
+    private fun isGoogleCertificatesRejection(t: Throwable): Boolean {
+        if (t !is SecurityException) return false
+        return t.message?.contains("GoogleCertificatesRslt") == true
     }
 
     private fun migratePreferences() {
