@@ -3,6 +3,7 @@ package com.vasmarfas.UniversalAmbientLight
 import android.app.Application
 import android.content.Context
 import android.os.DeadSystemException
+import android.os.Looper
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
@@ -89,20 +90,47 @@ class AmbilightApplication : Application() {
     private fun installFrameworkBugFilter() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            val reason = when {
-                isMediaCodecDisplayListenerNpe(throwable) -> "MediaCodec.onDisplayChanged NPE"
-                isReportSizeConfigurationsBug(throwable) -> "ActivityThread.reportSizeConfigurations race"
-                isForegroundServiceTimeout(throwable) -> "ForegroundServiceDidNotStartInTime (OEM blocked FGS)"
-                isDeadSystemException(throwable) -> "DeadSystemException (system_server died)"
-                isProfileVerifierFirmwareBug(throwable) -> "ProfileVerifier NoSuchMethodError (broken framework.jar)"
-                isGoogleCertificatesRejection(throwable) -> "GoogleCertificatesRslt not allowed (uncertified GMS)"
-                else -> null
-            }
-            if (reason != null) {
-                Log.w("AmbilightApplication", "Swallowed framework bug ($reason) on ${thread.name}", throwable)
+            val reason = frameworkBugReason(throwable)
+            if (reason == null) {
+                previous?.uncaughtException(thread, throwable)
                 return@setDefaultUncaughtExceptionHandler
             }
-            previous?.uncaughtException(thread, throwable)
+            Log.w(TAG, "Swallowed framework bug ($reason) on ${thread.name}", throwable)
+            if (thread === Looper.getMainLooper().thread) keepMainLooperAlive(thread, previous)
+        }
+    }
+
+    private fun frameworkBugReason(t: Throwable): String? = when {
+        isMediaCodecDisplayListenerNpe(t) -> "MediaCodec.onDisplayChanged NPE"
+        isReportSizeConfigurationsBug(t) -> "ActivityThread.reportSizeConfigurations race"
+        isForegroundServiceTimeout(t) -> "ForegroundServiceDidNotStartInTime (OEM blocked FGS)"
+        isDeadSystemException(t) -> "DeadSystemException (system_server died)"
+        isProfileVerifierFirmwareBug(t) -> "ProfileVerifier NoSuchMethodError (broken framework.jar)"
+        isGoogleCertificatesRejection(t) -> "GoogleCertificatesRslt not allowed (uncertified GMS)"
+        else -> null
+    }
+
+    /**
+     * К моменту вызова обработчика исключение уже вынесло главный поток из Looper.loop(),
+     * и после возврата из обработчика поток завершается. Процесс при этом не умирает: его
+     * держат потоки захвата, но без главного лупера любое обращение к приложению кончается
+     * ANR. Так было на TCL Smart TV Pro (Android 12) с заблокированным startForeground:
+     * в дампе главный поток стоит в DestroyJavaVM. Поэтому проглоченное на главном потоке
+     * исключение возвращает его в цикл сообщений, а любое другое по-прежнему уходит в
+     * прежний обработчик и роняет процесс.
+     */
+    private fun keepMainLooperAlive(main: Thread, previous: Thread.UncaughtExceptionHandler?) {
+        while (true) {
+            try {
+                Looper.loop()
+            } catch (t: Throwable) {
+                val reason = frameworkBugReason(t)
+                if (reason == null) {
+                    previous?.uncaughtException(main, t)
+                    return
+                }
+                Log.w(TAG, "Swallowed framework bug ($reason) on ${main.name}", t)
+            }
         }
     }
 
@@ -199,5 +227,9 @@ class AmbilightApplication : Application() {
                 prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "AmbilightApplication"
     }
 }

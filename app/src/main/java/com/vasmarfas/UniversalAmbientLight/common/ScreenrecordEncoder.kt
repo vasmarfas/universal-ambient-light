@@ -400,8 +400,14 @@ class ScreenrecordEncoder(
                 codecInThread?.join(300)
             } catch (_: InterruptedException) {
             }
+            // release() отдельно от stop(), как в ScrcpyEncoder: иначе декодер уходит
+            // в финализатор, который на части ТВ виснет и роняет процесс.
             try {
-                decoder?.stop(); decoder?.release()
+                decoder?.stop()
+            } catch (_: Exception) {
+            }
+            try {
+                decoder?.release()
             } catch (_: Exception) {
             }
             try {

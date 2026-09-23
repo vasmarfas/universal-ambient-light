@@ -593,8 +593,15 @@ class ScrcpyEncoder(
             joinQuietly(codecOutThread, 300)
             // Разбор уже останавливаемой сессии: декодер и потоки ADB могли отвалиться
             // раньше нас, поэтому каждый шаг закрываем best-effort и идём дальше.
+            // release() не зависит от stop(): тот бросает на сломанном или не запущенном
+            // кодеке, а неосвобождённый декодер освобождает FinalizerDaemon, и на Xiaomi
+            // MiTV (Android 10) native_finalize висит дольше 10 с и роняет процесс.
             try {
-                decoder?.stop(); decoder?.release()
+                decoder?.stop()
+            } catch (_: Exception) {
+            }
+            try {
+                decoder?.release()
             } catch (_: Exception) {
             }
             try {
