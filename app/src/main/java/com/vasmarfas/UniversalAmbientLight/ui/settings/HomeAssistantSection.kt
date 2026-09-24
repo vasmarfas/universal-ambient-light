@@ -9,7 +9,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
@@ -76,14 +75,17 @@ internal fun ColumnScope.HomeAssistantSection(
         }
     )
 
-    EditTextPreference(
+    SliderPreference(
         prefs = prefs,
         keyRes = keyChangeThreshold,
         title = stringResource(R.string.pref_title_ha_change_threshold),
-        summaryProvider = { it },
-        keyboardType = KeyboardType.Number,
+        range = 0..255,
         onValueChange = {
-            AnalyticsHelper.logSettingChanged(context, "${analyticsPrefix}_change_threshold", it)
+            AnalyticsHelper.logSettingChanged(
+                context,
+                "${analyticsPrefix}_change_threshold",
+                it.toString()
+            )
         }
     )
 
@@ -117,14 +119,20 @@ internal fun ColumnScope.HomeAssistantSection(
     )
     if (brightnessMode == HomeAssistantClient.BRIGHTNESS_MODE_SCREEN) {
         val brightnessMaxSummary = stringResource(R.string.pref_summary_ha_brightness_max)
-        EditTextPreference(
+        SliderPreference(
             prefs = prefs,
             keyRes = keyBrightness,
             title = stringResource(R.string.pref_title_ha_brightness),
-            summaryProvider = { value -> if (value == "255") brightnessMaxSummary else value },
-            keyboardType = KeyboardType.Number,
+            range = 1..255,
+            summaryProvider = { value ->
+                if (value == 255) brightnessMaxSummary else value.toString()
+            },
             onValueChange = {
-                AnalyticsHelper.logSettingChanged(context, "${analyticsPrefix}_brightness", it)
+                AnalyticsHelper.logSettingChanged(
+                    context,
+                    "${analyticsPrefix}_brightness",
+                    it.toString()
+                )
             }
         )
     }
@@ -145,14 +153,17 @@ internal fun ColumnScope.HomeAssistantSection(
         )
     }
     if (darkOffEnabled) {
-        EditTextPreference(
+        SliderPreference(
             prefs = prefs,
             keyRes = keyDarkThreshold,
             title = stringResource(R.string.pref_title_ha_dark_threshold),
-            summaryProvider = { it },
-            keyboardType = KeyboardType.Number,
+            range = 1..255,
             onValueChange = {
-                AnalyticsHelper.logSettingChanged(context, "${analyticsPrefix}_dark_threshold", it)
+                AnalyticsHelper.logSettingChanged(
+                    context,
+                    "${analyticsPrefix}_dark_threshold",
+                    it.toString()
+                )
             }
         )
     }

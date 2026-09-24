@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
@@ -34,43 +33,45 @@ internal fun ColumnScope.CameraIdleSection(prefs: Preferences, state: SettingsSc
                     )
                 }
             )
-            EditTextPreference(
+            // Диапазоны те же, в которые AppOptions зажимает значения при чтении
+            SliderPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_camera_idle_timeout,
                 title = stringResource(R.string.pref_title_camera_idle_timeout),
+                range = 5..3600,
+                step = 5,
                 summaryProvider = { "$it $secondsUnit" },
-                keyboardType = KeyboardType.Number,
                 onValueChange = { newValue ->
                     AnalyticsHelper.logSettingChanged(
                         context,
                         "camera_idle_timeout",
-                        newValue
+                        newValue.toString()
                     )
                 }
             )
-            EditTextPreference(
+            SliderPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_camera_idle_dark_level,
                 title = stringResource(R.string.pref_title_camera_idle_dark_level),
-                keyboardType = KeyboardType.Number,
+                range = 0..96,
                 onValueChange = { newValue ->
                     AnalyticsHelper.logSettingChanged(
                         context,
                         "camera_idle_dark_level",
-                        newValue
+                        newValue.toString()
                     )
                 }
             )
-            EditTextPreference(
+            SliderPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_camera_idle_motion_level,
                 title = stringResource(R.string.pref_title_camera_idle_motion_level),
-                keyboardType = KeyboardType.Number,
+                range = 1..64,
                 onValueChange = { newValue ->
                     AnalyticsHelper.logSettingChanged(
                         context,
                         "camera_idle_motion_level",
-                        newValue
+                        newValue.toString()
                     )
                 }
             )

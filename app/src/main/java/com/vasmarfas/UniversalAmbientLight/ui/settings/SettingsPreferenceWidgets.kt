@@ -21,6 +21,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,12 +29,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -42,9 +47,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.components.dpadAdjust
+import com.vasmarfas.UniversalAmbientLight.ui.components.focusHighlight
+import com.vasmarfas.UniversalAmbientLight.ui.components.NumberInputDialog
+import com.vasmarfas.UniversalAmbientLight.ui.components.snapToStep
 import kotlinx.coroutines.launch
 
 /**
@@ -77,6 +88,8 @@ fun CheckBoxPreference(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .focusHighlight(interactionSource)
             .toggleable(
                 value = checked,
                 interactionSource = interactionSource,
@@ -89,7 +102,7 @@ fun CheckBoxPreference(
                     onValueChange?.invoke(it)
                 }
             )
-            .padding(16.dp),
+            .padding(horizontal = 8.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -148,12 +161,14 @@ fun EditTextPreference(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .focusHighlight(interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 onClick = { showDialog = true }
             )
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 16.dp)
     ) {
         Text(text = title, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -164,20 +179,20 @@ fun EditTextPreference(
     }
 
     if (showDialog) {
-        // rememberSaveable — введённый текст не теряется при повороте экрана
-        var tempValue by rememberSaveable(showDialog) { mutableStateOf(value) }
-        val keyboardController = LocalSoftwareKeyboardController.current
-
-        LaunchedEffect(showDialog) {
-            if (showDialog) {
-                tempValue = value
-            }
+        // Весь текст выделен: новое значение набирается поверх старого, без стирания по
+        // символу — на экранной клавиатуре ТВ это десяток нажатий пульта.
+        // rememberSaveable — введённый текст не теряется при повороте экрана.
+        var tempValue by rememberSaveable(showDialog, stateSaver = TextFieldValue.Saver) {
+            mutableStateOf(TextFieldValue(value, TextRange(0, value.length)))
         }
+        val keyboardController = LocalSoftwareKeyboardController.current
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
         fun applyValue() {
             // Обрезаем пробелы: случайный пробел с экранной клавиатуры прошёл бы проверку
             // «не пусто» и всплыл бы позже недоступным хостом.
-            value = tempValue.trim()
+            value = tempValue.text.trim()
             prefs.putString(keyRes, value)
             onValueChange?.invoke(value)
             keyboardController?.hide()
@@ -198,7 +213,8 @@ fun EditTextPreference(
                     keyboardActions = KeyboardActions(
                         onDone = { applyValue() }
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.focusRequester(focusRequester)
                 )
             },
             confirmButton = {
@@ -258,12 +274,14 @@ fun ListPreference(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .focusHighlight(interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 onClick = { showDialog = true }
             )
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 16.dp)
     ) {
         Text(text = title, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -274,6 +292,15 @@ fun ListPreference(
     }
 
     if (showDialog) {
+        // С пульта фокус сразу на текущем значении: иначе он встаёт на первый пункт, и
+        // «открыл и закрыл OK» молча меняет настройку.
+        val selectedFocus = remember { FocusRequester() }
+        val selectedIndex = entryValues.indexOf(value)
+        LaunchedEffect(Unit) {
+            if (selectedIndex >= 0 && selectedIndex !in disabledIndices) {
+                runCatching { selectedFocus.requestFocus() }
+            }
+        }
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text(title) },
@@ -285,6 +312,14 @@ fun ListPreference(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(
+                                    if (index == selectedIndex) {
+                                        Modifier.focusRequester(selectedFocus)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .focusHighlight(interactionSource)
                                 .then(
                                     if (isDisabled) Modifier
                                     else Modifier.clickable(
@@ -330,6 +365,7 @@ fun ListPreference(
 fun ClickablePreference(
     title: String,
     summary: String? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -340,12 +376,16 @@ fun ClickablePreference(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .focusHighlight(interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = indication,
+                enabled = enabled,
                 onClick = onClick
             )
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 16.dp)
+            .alpha(if (enabled) 1f else 0.5f)
     ) {
         Text(
             text = title,
@@ -359,5 +399,83 @@ fun ClickablePreference(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+
+/**
+ * Число с ползунком. Значение пишется в настройки на каждом шаге: цвет и яркость сервис
+ * подхватывает прямо в идущем захвате, и результат сразу виден на ленте.
+ *
+ * Сам ползунок фокус не берёт — он съедал бы стрелки вверх и вниз, и пульт застревал бы
+ * на нём. С пульта значение меняют стрелки влево и вправо на всей строке, OK открывает
+ * точный ввод; на телефоне строку можно тянуть пальцем или нажать для ввода числа.
+ */
+@Composable
+fun SliderPreference(
+    prefs: Preferences,
+    keyRes: Int,
+    title: String,
+    range: IntRange,
+    step: Int = 1,
+    summaryProvider: (Int) -> String = { it.toString() },
+    onValueChange: ((Int) -> Unit)? = null,
+    recomposeKey: Any? = null,
+) {
+    var value by remember(keyRes, recomposeKey) { mutableIntStateOf(prefs.getInt(keyRes)) }
+    var showDialog by rememberSaveable(recomposeKey) { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    fun update(newValue: Int) {
+        val clamped = newValue.coerceIn(range)
+        if (clamped == value) return
+        value = clamped
+        prefs.putInt(keyRes, clamped)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .focusHighlight(interactionSource)
+            .dpadAdjust(
+                onStep = { direction, multiplier -> update(value + direction * step * multiplier) },
+                // Аналитика — по отпусканию кнопки, а не на каждый шаг автоповтора
+                onRelease = { onValueChange?.invoke(value) }
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = { showDialog = true }
+            )
+            .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 4.dp)
+    ) {
+        Text(text = title, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = summaryProvider(value),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Slider(
+            value = value.coerceIn(range).toFloat(),
+            onValueChange = { update(snapToStep(it, range, step)) },
+            onValueChangeFinished = { onValueChange?.invoke(value) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            modifier = Modifier.focusProperties { canFocus = false }
+        )
+    }
+
+    if (showDialog) {
+        NumberInputDialog(
+            title = title,
+            initial = value,
+            range = range,
+            onConfirm = {
+                update(it)
+                onValueChange?.invoke(value)
+                showDialog = false
+            },
+            onDismiss = { showDialog = false }
+        )
     }
 }

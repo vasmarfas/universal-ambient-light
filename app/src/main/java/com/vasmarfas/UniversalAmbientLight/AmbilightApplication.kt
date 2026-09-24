@@ -222,8 +222,10 @@ class AmbilightApplication : Application() {
         // Миграция: ключ pref_key_lighting_was_active появился позже. Для тех, у кого
         // автозапуск был включён до его появления, считаем подсветку активной, чтобы старт
         // с загрузки продолжил работать после обновления.
+        // Только явно включённый автозапуск: по умолчанию он включён, и на чистой установке
+        // миграция посчитала бы подсветку работавшей и зажгла её после первой перезагрузки.
         if (!prefs.contains(R.string.pref_key_lighting_was_active)) {
-            if (prefs.getBoolean(R.string.pref_key_boot)) {
+            if (prefs.contains(R.string.pref_key_boot) && prefs.getBoolean(R.string.pref_key_boot)) {
                 prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
             }
         }

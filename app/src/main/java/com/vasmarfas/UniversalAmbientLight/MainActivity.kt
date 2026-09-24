@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,12 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.BootActivity
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
+import com.vasmarfas.UniversalAmbientLight.common.remote.PairingPayload
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteCallException
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteClient
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteControlService
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
@@ -53,7 +60,10 @@ import com.vasmarfas.UniversalAmbientLight.ui.home.EffectMode
 import com.vasmarfas.UniversalAmbientLight.ui.home.next
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.Screen
+import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
+import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberRemoteSnapshot
 import com.vasmarfas.UniversalAmbientLight.ui.theme.AppTheme
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
 
@@ -62,6 +72,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private var mRecorderRunning by mutableStateOf(false)
+
+    // Последняя ошибка сервиса — на карточке состояния главного экрана до следующего запуска
+    private var mLastError by mutableStateOf<String?>(null)
+    // Отказ телевизора выполнить команду пульта; своя ошибка у ТВ приходит его статусом
+    private var mRemoteError by mutableStateOf<String?>(null)
+    private var mRemotePending by mutableStateOf(false)
+    private var mPendingPayload by mutableStateOf<PairingPayload?>(null)
+
+    // Ошибка ТВ, которая уже висела до нажатия: ожидание снимает только новая
+    private var mStaleRemoteError: String? = null
+
+    private val mRemoteListener = RemoteSession.Listener { snapshot ->
+        val freshError = snapshot.error != null && snapshot.error != mStaleRemoteError
+        if (snapshot.running || freshError || snapshot.tv == null) mRemotePending = false
+    }
 
     private var mSetupRequiredMessage by mutableStateOf<String?>(null)
     private var mMediaProjectionManager: MediaProjectionManager? = null
@@ -116,6 +141,7 @@ class MainActivity : ComponentActivity() {
             mRecorderRunning = checked
 
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
+            mLastError = if (checked) null else error
             val tclBlocked =
                 intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
 
@@ -193,26 +219,43 @@ class MainActivity : ComponentActivity() {
 
         maybeRequestBatteryOptimizationExemption()
 
+        RemoteSession.init(this)
+        RemoteSession.addListener(mRemoteListener)
+        // Сервер для телефона живёт своим foreground-сервисом; открытие приложения — повод
+        // поднять его, если система его выгрузила
+        RemoteControlService.startIfEnabled(this)
+        handlePairingLink(intent)
+
         setContent {
             AppTheme {
                 val navController = rememberNavController()
+                val remote = rememberRemoteSnapshot()
+                val remoteActive = remote.tv != null
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavHost(
-                        navController = navController,
-                        isRunning = mRecorderRunning,
-                        onToggleClick = { toggleScreenCapture() },
-                        onEffectsClick = {
-                            currentEffect = currentEffect.next()
-                            AnalyticsHelper.logEffectChanged(
-                                this@MainActivity,
-                                currentEffect.name.lowercase()
-                            )
-                        },
-                        effectMode = currentEffect
-                    )
+                    CompositionLocalProvider(LocalRemote provides remote.takeIf { remoteActive }) {
+                        AppNavHost(
+                            navController = navController,
+                            isRunning = mRecorderRunning,
+                            onToggleClick = {
+                                if (remoteActive) toggleRemoteCapture() else toggleScreenCapture()
+                            },
+                            onEffectsClick = {
+                                currentEffect = currentEffect.next()
+                                AnalyticsHelper.logEffectChanged(
+                                    this@MainActivity,
+                                    currentEffect.name.lowercase()
+                                )
+                            },
+                            effectMode = currentEffect,
+                            lastError = if (remoteActive) mRemoteError else mLastError,
+                            remotePending = mRemotePending,
+                            pendingPayload = mPendingPayload,
+                            onPayloadConsumed = { mPendingPayload = null }
+                        )
+                    }
 
                     mSetupRequiredMessage?.let { message ->
                         AlertDialog(
@@ -254,6 +297,27 @@ class MainActivity : ComponentActivity() {
         AnalyticsHelper.logBatteryOptimizationRequested(this)
 
         PermissionHelper.requestIgnoreBatteryOptimizations(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        RemoteSession.onForeground()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        RemoteSession.onBackground()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handlePairingLink(intent)
+    }
+
+    /** QR с телевизора, распознанный системной камерой, открывает приложение ссылкой. */
+    private fun handlePairingLink(intent: Intent?) {
+        val link = intent?.dataString ?: return
+        PairingPayload.parse(link)?.let { mPendingPayload = it }
     }
 
     override fun onResume() {
@@ -319,6 +383,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        RemoteSession.removeListener(mRemoteListener)
         try {
             unregisterReceiver(mMessageReceiver)
         } catch (_: IllegalArgumentException) {
@@ -397,6 +462,58 @@ class MainActivity : ComponentActivity() {
         mSessionEverConnected = false
     }
 
+    /**
+     * Кнопка питания в режиме пульта: команду выполняет телевизор. Ответ ждём в фоне —
+     * запуск с согласием MediaProjection на ТВ длится, пока пользователь не нажмёт OK пультом.
+     */
+    private fun toggleRemoteCapture() {
+        val snapshot = RemoteSession.snapshot
+        if (snapshot.connection != RemoteSession.Connection.CONNECTED) {
+            Toast.makeText(this, R.string.remote_error_offline, Toast.LENGTH_SHORT).show()
+            RemoteSession.reconnectNow()
+            return
+        }
+        val start = !(snapshot.running || snapshot.alive)
+        mRemotePending = start
+        mRemoteError = null
+        mStaleRemoteError = snapshot.error
+        val action = if (start) RemoteProtocol.CAPTURE_START else RemoteProtocol.CAPTURE_STOP
+        Thread({
+            val result = runCatching {
+                RemoteSession.call(
+                    RemoteProtocol.OP_CAPTURE,
+                    JSONObject().put("action", action),
+                    RemoteClient.LONG_TIMEOUT_MS
+                )
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                result.onSuccess { reply ->
+                    if (reply.optBoolean("confirm")) {
+                        Toast.makeText(this, reply.optString("msg"), Toast.LENGTH_LONG).show()
+                    }
+                    // Диалог на ТВ могли отклонить или не заметить — статус тогда не придёт
+                    if (start) {
+                        window.decorView.postDelayed(
+                            { mRemotePending = false },
+                            REMOTE_PENDING_TIMEOUT_MS
+                        )
+                    }
+                }.onFailure { error ->
+                    mRemotePending = false
+                    val message = error.message ?: getString(R.string.remote_error_offline)
+                    // Отказ ТВ из-за настроек (пустой адрес и т.п.) ведёт в настройки — это
+                    // настройки телевизора, и поправить их можно прямо отсюда
+                    if (start && error is RemoteCallException) {
+                        mSetupRequiredMessage = message
+                    } else {
+                        mRemoteError = message
+                    }
+                }
+            }
+        }, "remote-capture").start()
+    }
+
     private fun toggleScreenCapture() {
         if (!mRecorderRunning) {
             // Ловим отсутствующие адрес, порт и количество светодиодов здесь, иначе пользователь
@@ -410,6 +527,7 @@ class MainActivity : ComponentActivity() {
 
             val prefs = Preferences(this)
             prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
+            mLastError = null
             val captureSource =
                 prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
 
@@ -580,6 +698,8 @@ class MainActivity : ComponentActivity() {
             if (resultCode != RESULT_OK) {
                 mPermissionDeniedCount++
                 mRecorderRunning = false
+                // Подсветка так и не включилась — автозапуску нечего возвращать
+                Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
                 if (mPermissionDeniedCount >= 2) {
                     if (TclBypass.isTclDevice()) {
                         TclBypass.showTclHelpDialog(this) { requestScreenCapture() }
@@ -718,5 +838,6 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_CAMERA_PERMISSION = 5
         private const val TAG = "MainActivity"
         private const val PREF_NOTIF_PERMISSION_ASKED = "notif_permission_asked"
+        private const val REMOTE_PENDING_TIMEOUT_MS = 45_000L
     }
 }

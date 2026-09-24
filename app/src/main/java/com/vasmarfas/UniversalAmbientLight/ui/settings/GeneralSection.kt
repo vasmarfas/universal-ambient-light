@@ -4,12 +4,16 @@ import android.app.Activity
 import android.content.Context
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 
 /**
  * Общие настройки и отладочная информация.
@@ -17,16 +21,39 @@ import com.vasmarfas.UniversalAmbientLight.R
 @Composable
 internal fun ColumnScope.GeneralSection(prefs: Preferences, state: SettingsScreenState) {
     val context = LocalContext.current
+    val remote = LocalRemote.current
     SettingsGroup(title = stringResource(R.string.pref_group_general)) {
         CheckBoxPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_boot,
             title = stringResource(R.string.pref_title_boot),
+            summary = stringResource(R.string.pref_summary_boot),
             onValueChange = { enabled ->
                 AnalyticsHelper.logBootStartEnabled(context, enabled)
                 AnalyticsHelper.logSettingChanged(context, "boot_start", enabled.toString())
             }
         )
+        // Без согласия на запись экрана и права на окна поверх других Android 10+ не даёт
+        // включить подсветку самой после сна ТВ — на телефоне это обычный диалог и не нужно
+        val isTv = remember { DeviceProfile.isTv(context) }
+        if (remote != null || isTv) {
+            val ready = remember(remote?.caps) {
+                val caps = remote?.caps
+                if (remote != null) {
+                    caps != null && caps.projectMedia && caps.overlay
+                } else {
+                    PermissionHelper.hasProjectMediaPermission(context) &&
+                            PermissionHelper.canDrawOverlays(context)
+                }
+            }
+            ClickablePreference(
+                title = stringResource(R.string.adb_grant_title),
+                summary = stringResource(
+                    if (ready) R.string.autostart_permissions_ok else R.string.autostart_permissions_missing
+                ),
+                onClick = { state.showAdbPairingDialog = true }
+            )
+        }
         CheckBoxPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_standby_keepalive,
@@ -40,7 +67,8 @@ internal fun ColumnScope.GeneralSection(prefs: Preferences, state: SettingsScree
                 )
             }
         )
-        ListPreference(
+        // Язык — интерфейса этого устройства, телевизору с телефона его не задают
+        if (remote == null) ListPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_language,
             title = stringResource(R.string.pref_title_language),

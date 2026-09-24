@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Favorite
@@ -32,25 +33,34 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground
@@ -110,6 +120,21 @@ private fun focusableOutline(focused: Boolean): BorderStroke =
         }
     )
 
+/**
+ * Содержимое карточки состояния под кнопками. Ошибка остаётся на экране до следующего
+ * запуска: toast на ТВ исчезает раньше, чем его успевают прочитать с дивана.
+ */
+data class HomeStatus(
+    val running: Boolean,
+    val pending: Boolean = false,
+    val error: String? = null,
+    val target: String? = null,
+    val source: String? = null,
+)
+
+/** Вход в удалённое управление: на ТВ — показать QR, на телефоне — выбрать телевизор. */
+data class RemoteEntry(val label: String, val icon: ImageVector, val onClick: () -> Unit)
+
 @Composable
 fun MainScreen(
     isRunning: Boolean,
@@ -118,6 +143,12 @@ fun MainScreen(
     onEffectsClick: () -> Unit,
     effectMode: EffectMode,
     captureSource: String = "screen",
+    status: HomeStatus = HomeStatus(running = isRunning),
+    // Эффекты рисуются на экране этого устройства — при управлении телевизором с телефона
+    // они ничего не дают, как и превью камеры телефона
+    localPreview: Boolean = true,
+    remoteEntry: RemoteEntry? = null,
+    topContent: @Composable () -> Unit = {},
     onHelpClick: () -> Unit = {},
     onSupportClick: () -> Unit = {},
     onReportIssueClick: () -> Unit = {},
@@ -125,12 +156,12 @@ fun MainScreen(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // В режиме камеры фоном идёт превью камеры с углами
-        if (captureSource == "camera") {
+        if (captureSource == "camera" && localPreview) {
             CameraPreviewBackground(isCapturing = isRunning)
         }
 
         // В режиме экрана — анимированный фон, но только когда захват запущен
-        if (isRunning && captureSource != "camera") {
+        if (isRunning && captureSource != "camera" && localPreview) {
             val infiniteTransition = rememberInfiniteTransition(label = "effects")
 
             when (effectMode) {
@@ -355,12 +386,26 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             var effectsFocused by remember { mutableStateOf(false) }
             var powerFocused by remember { mutableStateOf(false) }
             var settingsFocused by remember { mutableStateOf(false) }
+
+            // С пульта фокус сразу на кнопке включения: без него первое нажатие OK после
+            // запуска ничего не делает, пока не нажата стрелка. На телефоне фокус не
+            // трогаем — иначе вокруг кнопки висело бы кольцо фокуса.
+            val powerFocus = remember { FocusRequester() }
+            val inputModeManager = LocalInputModeManager.current
+            LaunchedEffect(Unit) {
+                if (inputModeManager.inputMode == InputMode.Keyboard) {
+                    runCatching { powerFocus.requestFocus() }
+                }
+            }
+
+            topContent()
 
             // Эффекты рисуются на экране устройства и попадают на ленту через захват
             // экрана — в режиме камеры кнопка ничего не меняет
@@ -371,7 +416,7 @@ fun MainScreen(
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 // Кнопка эффектов (слева)
-                Box(
+                if (localPreview) Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(80.dp)
@@ -432,6 +477,7 @@ fun MainScreen(
                         onClick = onToggleClick,
                         modifier = Modifier
                             .size(112.dp)
+                            .focusRequester(powerFocus)
                             .onFocusChanged { powerFocused = it.isFocused }
                     ) {
                         Icon(
@@ -476,19 +522,14 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Строка состояния
-            if (isRunning) {
-                Text(
-                    text = stringResource(id = R.string.status_grabber_running),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
+            StatusCard(
+                status = status,
+                modifier = Modifier
+                    .widthIn(max = 420.dp)
+                    .padding(horizontal = 16.dp)
+            )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Столбец кнопок помощи и поддержки. Ширина ограничена: на ТВ кнопки
             // растягивались во весь экран. Рамка при фокусе — состояние d-pad на
@@ -500,6 +541,25 @@ fun MainScreen(
                     .widthIn(max = 420.dp)
                     .padding(horizontal = 16.dp)
             ) {
+                if (remoteEntry != null) {
+                    var remoteFocused by remember { mutableStateOf(false) }
+                    FilledTonalButton(
+                        onClick = remoteEntry.onClick,
+                        border = if (remoteFocused) focusableOutline(true) else null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { remoteFocused = it.isFocused }
+                    ) {
+                        Icon(
+                            imageVector = remoteEntry.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(remoteEntry.label)
+                    }
+                }
+
                 var helpFocused by remember { mutableStateOf(false) }
                 OutlinedButton(
                     onClick = onHelpClick,
@@ -569,6 +629,67 @@ fun MainScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.leave_review))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusCard(status: HomeStatus, modifier: Modifier = Modifier) {
+    val error = status.error?.takeIf { !status.running }
+    val failed = error != null
+    val dotColor = when {
+        failed -> MaterialTheme.colorScheme.error
+        status.running -> Color(0xFF4CAF50)
+        status.pending -> Color(0xFFFFB300)
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val title = when {
+        failed -> stringResource(R.string.home_status_error)
+        status.running -> stringResource(R.string.status_grabber_running)
+        status.pending -> stringResource(R.string.home_status_starting)
+        else -> stringResource(R.string.home_status_stopped)
+    }
+    // Полупрозрачная подложка: за карточкой может крутиться анимация эффектов
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(dotColor, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(text = title, style = MaterialTheme.typography.titleMedium)
+            }
+            status.target?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+            status.source?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (error != null) {
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
     }

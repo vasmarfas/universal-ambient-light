@@ -44,6 +44,8 @@ class ToggleActivity : AppCompatActivity() {
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
             if (resultCode == RESULT_OK && data != null) {
                 startScreenRecorder(this, resultCode, data)
+            } else {
+                Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
             }
 
             finish()

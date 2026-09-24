@@ -2,6 +2,7 @@ package com.vasmarfas.UniversalAmbientLight.ui.settings
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.vasmarfas.UniversalAmbientLight.R
@@ -50,6 +51,12 @@ class SettingsScreenState(prefs: Preferences) {
 
     /** Метод захвата до открытия предупреждения о доступности — на случай отказа. */
     var previousCaptureMethod by mutableStateOf(captureMethod)
+
+    /**
+     * Растёт при откате выбора метода: список уже показал новое значение, и без смены ключа
+     * так бы и показывал его, хотя в настройках остался прежний метод.
+     */
+    var captureMethodRevision by mutableIntStateOf(0)
 
     /** Лампы Home Assistant с зонами — держится здесь ради живой сводки в настройках. */
     var haLampsSpec by mutableStateOf(prefs.getString(R.string.pref_key_ha_lamps) ?: "")

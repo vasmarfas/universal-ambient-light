@@ -39,6 +39,8 @@ import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
+import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 
 internal const val MAX_LEDS_VISUALIZATION = 5000
 
@@ -51,7 +53,8 @@ fun LedLayoutScreen(
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    val prefs = remember { Preferences(context) }
+    // В режиме пульта раскладка правится у телевизора — через зеркало его настроек
+    val prefs = rememberSettingsPreferences()
 
     val legacyX = prefs.getInt(R.string.pref_key_x_led)
     val legacyY = prefs.getInt(R.string.pref_key_y_led)
@@ -200,7 +203,18 @@ fun LedLayoutScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.pref_title_led_layout)) },
+                title = {
+                    Column {
+                        Text(stringResource(R.string.pref_title_led_layout))
+                        LocalRemote.current?.tv?.let {
+                            Text(
+                                text = stringResource(R.string.remote_banner_title, it.name),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(

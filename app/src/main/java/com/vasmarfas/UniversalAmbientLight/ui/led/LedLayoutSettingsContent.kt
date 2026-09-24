@@ -7,27 +7,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.components.NumberStepper
 
 /**
  * Панель параметров раскладки: количество светодиодов по сторонам, стартовый угол,
@@ -70,73 +65,39 @@ internal fun LedLayoutSettingsContent(
     direction: String,
     onDirectionChange: (String) -> Unit,
 ) {
-    val keyboardController = LocalSoftwareKeyboardController.current
-
     // Количество светодиодов по сторонам (порядок: левая, верх, правая, низ)
-    OutlinedTextField(
-        value = leftLedText,
-        onValueChange = onLeftLedTextChange,
-        label = { Text(stringResource(R.string.led_layout_left_count_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        isError = leftLedText.isNotEmpty() && leftLedText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_left_count_label),
+        value = leftLedText.toIntOrNull() ?: 0,
+        onValueChange = { onLeftLedTextChange(it.toString()) },
+        range = 0..MAX_LEDS_PER_SIDE
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = topLedText,
-        onValueChange = onTopLedTextChange,
-        label = { Text(stringResource(R.string.led_layout_top_count_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        isError = topLedText.isNotEmpty() && topLedText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_top_count_label),
+        value = topLedText.toIntOrNull() ?: 0,
+        onValueChange = { onTopLedTextChange(it.toString()) },
+        range = 0..MAX_LEDS_PER_SIDE
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = rightLedText,
-        onValueChange = onRightLedTextChange,
-        label = { Text(stringResource(R.string.led_layout_right_count_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        isError = rightLedText.isNotEmpty() && rightLedText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_right_count_label),
+        value = rightLedText.toIntOrNull() ?: 0,
+        onValueChange = { onRightLedTextChange(it.toString()) },
+        range = 0..MAX_LEDS_PER_SIDE
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = bottomLedText,
-        onValueChange = onBottomLedTextChange,
-        label = { Text(stringResource(R.string.led_layout_bottom_count_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        isError = bottomLedText.isNotEmpty() && bottomLedText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_bottom_count_label),
+        value = bottomLedText.toIntOrNull() ?: 0,
+        onValueChange = { onBottomLedTextChange(it.toString()) },
+        range = 0..MAX_LEDS_PER_SIDE
     )
 
     Spacer(modifier = Modifier.height(24.dp))
@@ -184,19 +145,11 @@ internal fun LedLayoutSettingsContent(
     Spacer(modifier = Modifier.height(16.dp))
 
     // Разрыв снизу
-    OutlinedTextField(
-        value = bottomGapText,
-        onValueChange = onBottomGapTextChange,
-        label = { Text(stringResource(R.string.led_layout_bottom_gap_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        isError = bottomGapText.isNotEmpty() && bottomGapText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_bottom_gap_label),
+        value = bottomGapText.toIntOrNull() ?: 0,
+        onValueChange = { onBottomGapTextChange(it.toString()) },
+        range = 0..MAX_LEDS_PER_SIDE
     )
 
     Spacer(modifier = Modifier.height(16.dp))
@@ -210,142 +163,64 @@ internal fun LedLayoutSettingsContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = captureMarginLeftText,
-        onValueChange = onCaptureMarginLeftTextChange,
-        label = { Text(stringResource(R.string.led_layout_capture_margin_left_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        supportingText = {
-            Text(
-                text = stringResource(R.string.led_layout_capture_margin_left_help),
-                fontSize = 12.sp
-            )
-        },
-        isError = captureMarginLeftText.isNotEmpty() && captureMarginLeftText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_capture_margin_left_label),
+        value = captureMarginLeftText.toIntOrNull() ?: 0,
+        onValueChange = { onCaptureMarginLeftTextChange(it.toString()) },
+        range = 0..40,
+        supportingText = stringResource(R.string.led_layout_capture_margin_left_help)
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = captureMarginTopText,
-        onValueChange = onCaptureMarginTopTextChange,
-        label = { Text(stringResource(R.string.led_layout_capture_margin_top_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        supportingText = {
-            Text(
-                text = stringResource(R.string.led_layout_capture_margin_top_help),
-                fontSize = 12.sp
-            )
-        },
-        isError = captureMarginTopText.isNotEmpty() && captureMarginTopText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_capture_margin_top_label),
+        value = captureMarginTopText.toIntOrNull() ?: 0,
+        onValueChange = { onCaptureMarginTopTextChange(it.toString()) },
+        range = 0..40,
+        supportingText = stringResource(R.string.led_layout_capture_margin_top_help)
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = captureMarginRightText,
-        onValueChange = onCaptureMarginRightTextChange,
-        label = { Text(stringResource(R.string.led_layout_capture_margin_right_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        supportingText = {
-            Text(
-                text = stringResource(R.string.led_layout_capture_margin_right_help),
-                fontSize = 12.sp
-            )
-        },
-        isError = captureMarginRightText.isNotEmpty() && captureMarginRightText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_capture_margin_right_label),
+        value = captureMarginRightText.toIntOrNull() ?: 0,
+        onValueChange = { onCaptureMarginRightTextChange(it.toString()) },
+        range = 0..40,
+        supportingText = stringResource(R.string.led_layout_capture_margin_right_help)
     )
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-        value = captureMarginBottomText,
-        onValueChange = onCaptureMarginBottomTextChange,
-        label = { Text(stringResource(R.string.led_layout_capture_margin_bottom_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        supportingText = {
-            Text(
-                text = stringResource(R.string.led_layout_capture_margin_bottom_help),
-                fontSize = 12.sp
-            )
-        },
-        isError = captureMarginBottomText.isNotEmpty() && captureMarginBottomText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_capture_margin_bottom_label),
+        value = captureMarginBottomText.toIntOrNull() ?: 0,
+        onValueChange = { onCaptureMarginBottomTextChange(it.toString()) },
+        range = 0..40,
+        supportingText = stringResource(R.string.led_layout_capture_margin_bottom_help)
     )
 
     Spacer(modifier = Modifier.height(16.dp))
 
     // Сдвиг светодиодов по периметру
-    OutlinedTextField(
-        value = ledOffsetText,
-        onValueChange = onLedOffsetTextChange,
-        label = { Text(stringResource(R.string.led_layout_offset_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        supportingText = {
-            Text(
-                text = stringResource(R.string.led_layout_offset_help),
-                fontSize = 12.sp
-            )
-        },
-        isError = ledOffsetText.isNotEmpty() && ledOffsetText.toIntOrNull() == null
+    NumberStepper(
+        label = stringResource(R.string.led_layout_offset_label),
+        value = ledOffsetText.toIntOrNull() ?: 0,
+        onValueChange = { onLedOffsetTextChange(it.toString()) },
+        range = -MAX_LEDS_PER_SIDE..MAX_LEDS_PER_SIDE,
+        supportingText = stringResource(R.string.led_layout_offset_help)
     )
 
     Spacer(modifier = Modifier.height(16.dp))
 
     // Глубина сканирования
-    OutlinedTextField(
-        value = scanDepthText,
-        onValueChange = onScanDepthTextChange,
-        label = { Text(stringResource(R.string.led_layout_scan_depth_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { keyboardController?.hide() }
-        ),
-        supportingText = {
-            Text(
-                text = stringResource(R.string.led_layout_scan_depth_help),
-                fontSize = 12.sp
-            )
-        },
-        isError = scanDepthText.isNotEmpty() && (scanDepthText.toIntOrNull() == null || scanDepthText.toInt() !in 1..50)
+    NumberStepper(
+        label = stringResource(R.string.led_layout_scan_depth_label),
+        value = scanDepthText.toIntOrNull() ?: 0,
+        onValueChange = { onScanDepthTextChange(it.toString()) },
+        range = 1..50,
+        supportingText = stringResource(R.string.led_layout_scan_depth_help)
     )
 
     Spacer(modifier = Modifier.height(24.dp))

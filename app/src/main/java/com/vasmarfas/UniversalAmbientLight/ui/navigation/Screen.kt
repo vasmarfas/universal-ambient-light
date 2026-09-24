@@ -5,4 +5,6 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object LedLayout : Screen("led_layout")
     object CameraSetup : Screen("camera_setup")
+    object RemoteHost : Screen("remote_host")
+    object RemoteTvs : Screen("remote_tvs")
 }

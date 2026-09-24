@@ -1,6 +1,7 @@
 package com.vasmarfas.UniversalAmbientLight.ui.settings
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,10 +33,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Группа «Захват»: источник и метод захвата, качество, частота кадров и цветокоррекция.
@@ -42,6 +50,8 @@ import com.vasmarfas.UniversalAmbientLight.R
 @Composable
 internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScreenState, onLedLayoutClick: () -> Unit, onCameraSetupClick: () -> Unit) {
     val context = LocalContext.current
+    val remote = LocalRemote.current
+    val scope = rememberCoroutineScope()
     SettingsGroup(title = stringResource(R.string.pref_group_capturing)) {
         // Источник захвата: экран или камера
         key(state.captureSource) {
@@ -61,28 +71,44 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
 
         // Метод захвата (MediaProjection, Screencap, Accessibility)
         if (state.captureSource == "screen") {
+            // Доступные методы решает устройство, которое снимает экран: в режиме пульта —
+            // телевизор (флейвор, MTK, служба доступности), а не телефон
+            val remoteCaps = remote?.caps
             ListPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_capture_method,
                 title = stringResource(R.string.pref_title_capture_method),
                 entriesRes = R.array.pref_list_capture_method,
                 entryValuesRes = R.array.pref_list_capture_method_values,
-                recomposeKey = state.captureMethod,
-                disabledIndices = remember {
+                recomposeKey = state.captureMethod to state.captureMethodRevision,
+                disabledIndices = remember(remoteCaps) {
                     val entryValues =
                         context.resources.getStringArray(R.array.pref_list_capture_method_values)
-                    val disabled = mutableSetOf<Int>()
-                    entryValues.forEachIndexed { index, value ->
-                        when (value) {
-                            "mtk_thal_capture" -> if (!MtkThalCaptureEncoder.isAvailable()) disabled.add(
-                                index
-                            )
+                    entryValues.indices.filter { index ->
+                        val value = entryValues[index]
+                        if (remoteCaps != null) {
+                            value !in remoteCaps.methods
+                        } else {
+                            value == "mtk_thal_capture" && !MtkThalCaptureEncoder.isAvailable()
                         }
-                    }
-                    disabled
+                    }.toSet()
                 },
                 onValueChange = { newMethod ->
-                    if (newMethod == "accessibility") {
+                    if (newMethod == "accessibility" && remote != null) {
+                        if (remoteCaps?.accessibilityOn != true) {
+                            // Службу доступности включают пультом на самом ТВ, с телефона её
+                            // не включить — выбор откатываем
+                            prefs.putString(R.string.pref_key_capture_method, state.captureMethod)
+                            state.captureMethodRevision++
+                            Toast.makeText(
+                                context,
+                                R.string.remote_accessibility_on_tv,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            state.captureMethod = newMethod
+                        }
+                    } else if (newMethod == "accessibility") {
                         // Смотрим, включена ли служба
                         if (AccessibilityCaptureService.getInstance() == null) {
                             // ListPreference уже сохранил выбор в настройки — откатываем его
@@ -131,11 +157,31 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
         }
 
         // Настройка углов камеры (только когда выбран источник «камера»)
-        if (state.captureSource == "camera") {
+        if (state.captureSource == "camera" && remote == null) {
             ClickablePreference(
                 title = stringResource(R.string.pref_title_camera_setup),
                 summary = stringResource(R.string.pref_summary_camera_setup),
                 onClick = { onCameraSetupClick() }
+            )
+        } else if (state.captureSource == "camera") {
+            // Углы тянут по живому превью камеры ТВ — с телефона его не видно. Автопоиск
+            // экрана в кадре работает и удалённо: камеру держит сервис на ТВ
+            val detectStarted = stringResource(R.string.remote_detect_frame_started)
+            ClickablePreference(
+                title = stringResource(R.string.camera_auto_frame_button),
+                summary = stringResource(R.string.remote_detect_frame_summary),
+                onClick = {
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching { RemoteSession.call(RemoteProtocol.OP_DETECT_FRAME) }
+                        }
+                        Toast.makeText(
+                            context,
+                            result.exceptionOrNull()?.message ?: detectStarted,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             )
         }
 
@@ -204,69 +250,30 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
             // Увеличивается при каждой правке цвета и обновляет живое превью ниже.
             var colorPrefsVersion by remember { mutableIntStateOf(0) }
 
-            EditTextPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_color_brightness,
-                title = stringResource(R.string.pref_title_color_brightness),
-                summaryProvider = { "${it}%" },
-                keyboardType = KeyboardType.Number,
-                onValueChange = { newValue ->
-                    colorPrefsVersion++
-                    AnalyticsHelper.logSettingChanged(context, "color_brightness", newValue)
-                }
-            )
-            EditTextPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_color_contrast,
-                title = stringResource(R.string.pref_title_color_contrast),
-                summaryProvider = { "${it}%" },
-                keyboardType = KeyboardType.Number,
-                onValueChange = { newValue ->
-                    colorPrefsVersion++
-                    AnalyticsHelper.logSettingChanged(context, "color_contrast", newValue)
-                }
-            )
-            EditTextPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_color_black_level,
-                title = stringResource(R.string.pref_title_color_black_level),
-                summaryProvider = { "${it}%" },
-                keyboardType = KeyboardType.Number,
-                onValueChange = { newValue ->
-                    colorPrefsVersion++
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "color_black_level",
-                        newValue
-                    )
-                }
-            )
-            EditTextPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_color_white_level,
-                title = stringResource(R.string.pref_title_color_white_level),
-                summaryProvider = { "${it}%" },
-                keyboardType = KeyboardType.Number,
-                onValueChange = { newValue ->
-                    colorPrefsVersion++
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "color_white_level",
-                        newValue
-                    )
-                }
-            )
-            EditTextPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_color_saturation,
-                title = stringResource(R.string.pref_title_color_saturation),
-                summaryProvider = { "${it}%" },
-                keyboardType = KeyboardType.Number,
-                onValueChange = { newValue ->
-                    colorPrefsVersion++
-                    AnalyticsHelper.logSettingChanged(context, "color_saturation", newValue)
-                }
-            )
+            listOf(
+                Triple(R.string.pref_key_color_brightness, R.string.pref_title_color_brightness, 0..200),
+                Triple(R.string.pref_key_color_contrast, R.string.pref_title_color_contrast, 0..200),
+                Triple(R.string.pref_key_color_black_level, R.string.pref_title_color_black_level, 0..100),
+                Triple(R.string.pref_key_color_white_level, R.string.pref_title_color_white_level, 0..100),
+                Triple(R.string.pref_key_color_saturation, R.string.pref_title_color_saturation, 0..200)
+            ).forEach { (keyRes, titleRes, range) ->
+                val keyName = stringResource(keyRes)
+                SliderPreference(
+                    prefs = prefs,
+                    keyRes = keyRes,
+                    title = stringResource(titleRes),
+                    range = range,
+                    summaryProvider = { "${it}%" },
+                    onValueChange = { newValue ->
+                        colorPrefsVersion++
+                        AnalyticsHelper.logSettingChanged(
+                            context,
+                            keyName.removePrefix("pref_key_"),
+                            newValue.toString()
+                        )
+                    }
+                )
+            }
 
             // Поканальная коррекция (issue #21).
             Text(
@@ -276,46 +283,23 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
             )
             listOf(
-                R.string.pref_key_color_brightness_r to R.string.pref_title_color_brightness_r,
-                R.string.pref_key_color_brightness_g to R.string.pref_title_color_brightness_g,
-                R.string.pref_key_color_brightness_b to R.string.pref_title_color_brightness_b
-            ).forEach { (keyRes, titleRes) ->
+                Triple(R.string.pref_key_color_brightness_r, R.string.pref_title_color_brightness_r, 0..200),
+                Triple(R.string.pref_key_color_brightness_g, R.string.pref_title_color_brightness_g, 0..200),
+                Triple(R.string.pref_key_color_brightness_b, R.string.pref_title_color_brightness_b, 0..200),
+                Triple(R.string.pref_key_color_gamma_r, R.string.pref_title_color_gamma_r, 10..500),
+                Triple(R.string.pref_key_color_gamma_g, R.string.pref_title_color_gamma_g, 10..500),
+                Triple(R.string.pref_key_color_gamma_b, R.string.pref_title_color_gamma_b, 10..500)
+            ).forEach { (keyRes, titleRes, range) ->
                 val keyName = stringResource(keyRes)
-                EditTextPreference(
+                SliderPreference(
                     prefs = prefs,
                     keyRes = keyRes,
                     title = stringResource(titleRes),
+                    range = range,
                     summaryProvider = { "${it}%" },
-                    keyboardType = KeyboardType.Number,
                     onValueChange = { newValue ->
                         colorPrefsVersion++
-                        AnalyticsHelper.logSettingChanged(
-                            context,
-                            keyName,
-                            newValue
-                        )
-                    }
-                )
-            }
-            listOf(
-                R.string.pref_key_color_gamma_r to R.string.pref_title_color_gamma_r,
-                R.string.pref_key_color_gamma_g to R.string.pref_title_color_gamma_g,
-                R.string.pref_key_color_gamma_b to R.string.pref_title_color_gamma_b
-            ).forEach { (keyRes, titleRes) ->
-                val keyName = stringResource(keyRes)
-                EditTextPreference(
-                    prefs = prefs,
-                    keyRes = keyRes,
-                    title = stringResource(titleRes),
-                    summaryProvider = { "${it}%" },
-                    keyboardType = KeyboardType.Number,
-                    onValueChange = { newValue ->
-                        colorPrefsVersion++
-                        AnalyticsHelper.logSettingChanged(
-                            context,
-                            keyName,
-                            newValue
-                        )
+                        AnalyticsHelper.logSettingChanged(context, keyName, newValue.toString())
                     }
                 )
             }

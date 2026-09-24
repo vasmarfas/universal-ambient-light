@@ -11,10 +11,15 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Обёртка над SharedPreferences: значения по умолчанию собраны в ресурсах.
  * Числа хранятся строками — так их понимает EditTextPreference.
+ *
+ * [preferences] подменяется на зеркало настроек телевизора, когда экран настроек управляет
+ * им с телефона: ключи и умолчания те же, меняется только хранилище.
  */
-class Preferences(context: Context) {
+class Preferences(
+    context: Context,
+    private val preferences: SharedPreferences = defaultSharedPreferences(context),
+) {
 
-    private val preferences = defaultSharedPreferences(context)
     private val resources = context.resources
 
     fun contains(@StringRes keyResourceId: Int): Boolean = preferences.contains(key(keyResourceId))

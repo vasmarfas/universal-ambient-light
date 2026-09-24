@@ -165,6 +165,14 @@ class BootActivity : AppCompatActivity() {
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
             if (resultCode == RESULT_OK && data != null) {
                 startScreenRecorder(this, resultCode, data)
+            } else {
+                // Отказ в диалоге — тоже решение пользователя: иначе сторож автозапуска
+                // показывал бы этот диалог снова каждые несколько минут
+                Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
+                ScreenGrabberService.notifyNotStarted(
+                    this,
+                    getString(R.string.error_media_projection_denied)
+                )
             }
             finish()
         }

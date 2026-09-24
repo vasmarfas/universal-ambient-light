@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
@@ -33,27 +32,27 @@ internal fun ColumnScope.BorderDetectionSection(prefs: Preferences, state: Setti
                 )
             }
         )
-        EditTextPreference(
+        SliderPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_border_threshold,
             title = stringResource(R.string.pref_title_border_threshold),
+            range = 0..64,
             summaryProvider = { "$it $rgbUnit" },
-            keyboardType = KeyboardType.Number,
             onValueChange = { newValue ->
-                AnalyticsHelper.logSettingChanged(context, "border_threshold", newValue)
+                AnalyticsHelper.logSettingChanged(context, "border_threshold", newValue.toString())
             }
         )
-        EditTextPreference(
+        SliderPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_border_check_interval,
             title = stringResource(R.string.pref_title_border_check_interval),
+            range = 1..300,
             summaryProvider = { "$it $framesUnit" },
-            keyboardType = KeyboardType.Number,
             onValueChange = { newValue ->
                 AnalyticsHelper.logSettingChanged(
                     context,
                     "border_check_interval",
-                    newValue
+                    newValue.toString()
                 )
             }
         )

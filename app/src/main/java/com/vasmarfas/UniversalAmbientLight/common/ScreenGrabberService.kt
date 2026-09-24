@@ -99,6 +99,46 @@ class ScreenGrabberService : Service() {
     private var mPrefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? =
         null
 
+    // Куда энкодер отдаёт кадры. Потоки вывода пересоздаются под тем же энкодером, когда
+    // меняют адрес, протокол или сглаживание, — захват, а с ним и согласие MediaProjection,
+    // при этом не трогается
+    @Volatile
+    private var mOutput: HyperionThread.HyperionThreadListener? = null
+    private var mGate: OutputGate? = null
+
+    // Правки настроек во время захвата копятся и применяются разом: пресет сглаживания или
+    // ползунок пишут несколько ключей подряд
+    private var mPendingOutputRestart = false
+    private var mPendingCaptureRestart = false
+    private var mPendingSessionRestart = false
+    private val mApplySettings = Runnable { applyPendingSettings() }
+
+    /**
+     * Выход одного энкодера. После отцепления (перезапуск захвата с новыми настройками)
+     * старый энкодер больше ничего не шлёт: его прощальные чёрные кадры и disconnect
+     * погасили бы уже работающий новый вывод.
+     */
+    private inner class OutputGate : HyperionThread.HyperionThreadListener {
+        @Volatile
+        var attached = true
+
+        override fun sendFrame(data: ByteArray, width: Int, height: Int) {
+            if (attached) mOutput?.sendFrame(data, width, height)
+        }
+
+        override fun clear() {
+            if (attached) mOutput?.clear()
+        }
+
+        override fun disconnect() {
+            if (attached) mOutput?.disconnect()
+        }
+
+        override fun sendStatus(isGrabbing: Boolean) {
+            if (attached) mOutput?.sendStatus(isGrabbing)
+        }
+    }
+
     private val mReceiver = object : HyperionThreadBroadcaster {
         override fun onConnected() {
             if (DEBUG) Log.d(TAG, "Connected to Hyperion server")
@@ -263,6 +303,8 @@ class ScreenGrabberService : Service() {
             Log.i(TAG, "Detected restricted manufacturer, attempting shell bypass")
             TclBypass.tryShellBypass(this)
         }
+
+        AutoStart.scheduleWatchdog(this)
 
         super.onCreate()
     }
@@ -429,6 +471,7 @@ class ScreenGrabberService : Service() {
         } else if (ha2Enabled) {
             Log.w(TAG, "Additional Home Assistant output enabled but not fully configured, skipping")
         }
+        mOutput = DualHyperionThreadListener(thread.receiver, mSecondaryHyperionThread?.receiver)
 
         mStartError = null
         return true
@@ -446,6 +489,25 @@ class ScreenGrabberService : Service() {
         if (intent == null || intent.action == null) {
             val nullItem = if (intent == null) "intent" else "action"
             if (DEBUG) Log.v(TAG, "Null $nullItem provided to start command")
+            // START_STICKY: система подняла сервис заново после гибели процесса (частая история
+            // у ТВ, выгружающих приложения на время сна). Подсветка работала — возвращаем её
+            if (intent == null && mHyperionThread == null && AutoStart.shouldResume(this)) {
+                val prefs = Preferences(this)
+                val source = prefs.getString(R.string.pref_key_capture_source, "screen")
+                val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                val adalight = "adalight".equals(
+                    prefs.getString(R.string.pref_key_connection_type, "hyperion"),
+                    ignoreCase = true
+                )
+                if (source == "screen" && method != "media_projection" && !adalight) {
+                    Log.i(TAG, "Restarted by the system after the process died, resuming capture")
+                    return onStartCommand(Intent(this, javaClass).setAction(ACTION_START), flags, startId)
+                }
+                // Остальным путям нужен диалог (согласие на запись экрана, разрешения на USB и
+                // камеру) — их поднимает CaptureLauncher, когда этот экземпляр уже остановлен
+                val app = applicationContext
+                mHandler?.postDelayed({ AutoStart.resume(app) }, SESSION_RESTART_DELAY_MS)
+            }
             stopSelf()
             return START_NOT_STICKY
         } else {
@@ -553,7 +615,12 @@ class ScreenGrabberService : Service() {
                     if (mHyperionThread == null) stopSelf()
                 }
 
-                ACTION_EXIT -> stopSelf()
+                ACTION_EXIT -> {
+                    // «Выход» из уведомления, плитки и ярлыка — решение пользователя: автозапуск
+                    // и сторож больше не должны поднимать подсветку
+                    Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
+                    stopSelf()
+                }
             }
         }
         return START_STICKY
@@ -573,6 +640,7 @@ class ScreenGrabberService : Service() {
         }
 
         unregisterColorPrefsListener()
+        mHandler?.removeCallbacks(mApplySettings)
         mActiveOptions = null
 
         mStandby?.releaseAll()
@@ -747,9 +815,11 @@ class ScreenGrabberService : Service() {
         return false
     }
 
-    /** Listener энкодера: основной канал плюс дополнительный вывод на HA, если он включён. */
-    private fun receiverFor(thread: HyperionThread): HyperionThread.HyperionThreadListener =
-        DualHyperionThreadListener(thread.receiver, mSecondaryHyperionThread?.receiver)
+    /** Выход нового энкодера; прежний энкодер при этом отцепляется. */
+    private fun newGate(): HyperionThread.HyperionThreadListener {
+        mGate?.attached = false
+        return OutputGate().also { mGate = it }
+    }
 
     private fun startCameraCapture() {
         if (DEBUG) Log.v(TAG, "Starting camera capture")
@@ -769,7 +839,7 @@ class ScreenGrabberService : Service() {
 
         val encoder = CameraEncoder(
             this,
-            receiverFor(thread),
+            newGate(),
             options,
             corners
         )
@@ -821,6 +891,7 @@ class ScreenGrabberService : Service() {
         val secondary = mSecondaryHyperionThread
         mHyperionThread = null
         mSecondaryHyperionThread = null
+        mOutput = null
         if (thread == null && secondary == null) return
         thread?.interrupt()
         secondary?.interrupt()
@@ -915,7 +986,7 @@ class ScreenGrabberService : Service() {
                 "Creating encoder: " + metrics.widthPixels + "x" + metrics.heightPixels
             )
             val encoder = ScreenEncoder(
-                receiverFor(thread),
+                newGate(),
                 projection,
                 metrics.widthPixels,
                 metrics.heightPixels,
@@ -965,7 +1036,7 @@ class ScreenGrabberService : Service() {
                 if (DEBUG) Log.v(TAG, "Creating Accessibility encoder")
                 val encoder = AccessibilityEncoder(
                     accessibilityService,
-                    receiverFor(thread),
+                    newGate(),
                     metrics.widthPixels,
                     metrics.heightPixels,
                     options
@@ -985,7 +1056,7 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.v(TAG, "Creating ADB encoder on port $adbPort")
             val encoder = AdbEncoder(
                 this.applicationContext,
-                receiverFor(thread),
+                newGate(),
                 metrics.widthPixels,
                 metrics.heightPixels,
                 options,
@@ -1001,7 +1072,7 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.v(TAG, "Creating screenrecord (H.264 stream) encoder on port $adbPort")
             val encoder = ScreenrecordEncoder(
                 this.applicationContext,
-                receiverFor(thread),
+                newGate(),
                 metrics.widthPixels,
                 metrics.heightPixels,
                 options,
@@ -1025,7 +1096,7 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.v(TAG, "Creating scrcpy encoder on port $adbPort")
             val encoder = ScrcpyEncoder(
                 this.applicationContext,
-                receiverFor(thread),
+                newGate(),
                 metrics.widthPixels,
                 metrics.heightPixels,
                 options,
@@ -1048,7 +1119,7 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.v(TAG, "Creating MTK THAL Capture encoder")
             val encoder = MtkThalCaptureEncoder(
                 this.applicationContext,
-                receiverFor(thread),
+                newGate(),
                 metrics.widthPixels,
                 metrics.heightPixels,
                 options,
@@ -1070,7 +1141,7 @@ class ScreenGrabberService : Service() {
         if (DEBUG) Log.v(TAG, "Creating screencap encoder (root=$useRoot)")
         val encoder = ScreencapEncoder(
             this.applicationContext,
-            receiverFor(thread),
+            newGate(),
             metrics.widthPixels,
             metrics.heightPixels,
             options,
@@ -1138,7 +1209,7 @@ class ScreenGrabberService : Service() {
             val options = buildAppOptions(prefs)
 
             val encoder = ScreenEncoder(
-                receiverFor(thread),
+                newGate(),
                 projection,
                 metrics.widthPixels,
                 metrics.heightPixels,
@@ -1160,6 +1231,12 @@ class ScreenGrabberService : Service() {
             releaseResource()
             notifyActivity()
             stopSelf()
+            // Старое согласие не годится — просим новое тем же путём, что и при включении ТВ:
+            // с выданным через ADB PROJECT_MEDIA диалог подтверждается сам
+            if (AutoStart.shouldResume(this)) {
+                val app = applicationContext
+                mHandler?.postDelayed({ AutoStart.resume(app) }, SESSION_RESTART_DELAY_MS)
+            }
         }
     }
 
@@ -1179,6 +1256,8 @@ class ScreenGrabberService : Service() {
             mHyperionThread = null
             mSecondaryHyperionThread?.interrupt()
             mSecondaryHyperionThread = null
+            mOutput = null
+            mGate = null
         } else {
             // Энкодера нет — закрывать соединение некому, кроме нас
             shutDownHyperionThread()
@@ -1286,6 +1365,12 @@ class ScreenGrabberService : Service() {
             getString(R.string.pref_key_camera_idle_motion_level),
             getString(R.string.pref_key_camera_idle_static),
         )
+        val outputKeys = OUTPUT_KEYS.map { getString(it) }.toSet()
+        val captureKeys = CAPTURE_KEYS.map { getString(it) }.toSet()
+        val sessionKeys = setOf(
+            getString(R.string.pref_key_capture_source),
+            getString(R.string.pref_key_capture_method)
+        )
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == null) return@OnSharedPreferenceChangeListener
@@ -1293,9 +1378,132 @@ class ScreenGrabberService : Service() {
                 if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
                 if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
                 if (key in cameraIdleKeys) mActiveOptions?.refreshCameraIdleSettings(prefs)
+                // Остальное вступало в силу только после ручного перезапуска подсветки; с
+                // телефона правят посреди фильма, и ждать перезапуска там некому
+                val output = key in outputKeys
+                val capture = key in captureKeys
+                val session = key in sessionKeys
+                if (output || capture || session) {
+                    mPendingOutputRestart = mPendingOutputRestart || output
+                    mPendingCaptureRestart = mPendingCaptureRestart || capture
+                    mPendingSessionRestart = mPendingSessionRestart || session
+                    mHandler?.removeCallbacks(mApplySettings)
+                    mHandler?.postDelayed(mApplySettings, APPLY_SETTINGS_DELAY_MS)
+                }
             }
         sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
         mPrefsListener = listener
+    }
+
+    private fun applyPendingSettings() {
+        val session = mPendingSessionRestart
+        val capture = mPendingCaptureRestart
+        val output = mPendingOutputRestart
+        mPendingSessionRestart = false
+        mPendingCaptureRestart = false
+        mPendingOutputRestart = false
+        if (mActiveBackend == null || mHyperionThread == null) return
+
+        when {
+            session -> restartSession()
+            capture -> {
+                // Сначала энкодер: ему нужен живой HyperionThread, а restartOutput обнуляет его
+                // до конца пересоздания. Шлюз нового энкодера сам подхватит новый вывод
+                restartCapture()
+                if (output) restartOutput()
+            }
+
+            output -> restartOutput()
+        }
+    }
+
+    /**
+     * Новый способ или источник захвата — это другой тип foreground-сервиса и, возможно,
+     * новое согласие. Честнее перезапустить подсветку целиком тем же путём, что и кнопка.
+     */
+    private fun restartSession() {
+        Log.i(TAG, "Capture source or method changed, restarting the session")
+        stopAllCapture()
+        stopSelf()
+        val app = applicationContext
+        mHandler?.postDelayed({ CaptureLauncher.start(app) }, SESSION_RESTART_DELAY_MS)
+    }
+
+    /** Пересоздаёт потоки вывода под работающим энкодером. */
+    private fun restartOutput() {
+        val oldPrimary = mHyperionThread ?: return
+        val oldSecondary = mSecondaryHyperionThread
+        Log.i(TAG, "Connection settings changed, restarting the output")
+        mOutput = null
+        mHyperionThread = null
+        mSecondaryHyperionThread = null
+        oldPrimary.interrupt()
+        oldSecondary?.interrupt()
+        Thread({
+            // Старый вывод закрываем до нового: Adalight заново открывает тот же USB-порт
+            try {
+                oldPrimary.receiver.disconnect()
+            } catch (e: Exception) {
+                Log.w(TAG, "Old output shutdown failed: ${e.message}")
+            }
+            try {
+                oldSecondary?.receiver?.disconnect()
+            } catch (e: Exception) {
+                Log.w(TAG, "Old additional output shutdown failed: ${e.message}")
+            }
+            mHandler?.post {
+                // Пока закрывался старый вывод, подсветку могли выключить
+                if (mActiveBackend == null || mHyperionThread != null) return@post
+                // Новые настройки проверяются как при старте: при ошибке — тот же текст и остановка
+                mHasConnected = false
+                if (!prepared()) haltStartup()
+            }
+        }, "hyperion-restart").apply { isDaemon = true }.start()
+    }
+
+    /** Пересоздаёт энкодер с новыми частотой, качеством и числом светодиодов. */
+    private fun restartCapture() {
+        val backend = mActiveBackend ?: return
+        val prefs = Preferences(this)
+        mFrameRate = prefs.getInt(R.string.pref_key_framerate)
+        mCaptureQuality = prefs.getString(R.string.pref_key_capture_quality, "128")
+            ?.toIntOrNull() ?: 128
+        mHorizontalLEDCount = prefs.getInt(R.string.pref_key_x_led)
+        mVerticalLEDCount = prefs.getInt(R.string.pref_key_y_led)
+        mSendAverageColor = prefs.getBoolean(R.string.pref_key_use_avg_color)
+        Log.i(TAG, "Capture settings changed, recreating ${backend.javaClass.simpleName}")
+
+        when (backend) {
+            is ScreenEncoder -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // Android 14+ не отдаёт вторую проекцию по тому же согласию — новые
+                    // параметры захвата вступят в силу при следующем запуске
+                    Log.i(TAG, "MediaProjection cannot be reused on this Android, keeping the encoder")
+                    return
+                }
+                restartEncoderFromSavedProjection()
+            }
+
+            is CameraEncoder -> {
+                mGate?.attached = false
+                backend.stopRecordingNoDisconnect()
+                mActiveBackend = null
+                startCameraCapture()
+            }
+
+            else -> {
+                mGate?.attached = false
+                backend.stopRecording()
+                mActiveBackend = null
+                val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+                    ?: "media_projection"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    startAlternativeRecord(method)
+                } else {
+                    restartSession()
+                }
+            }
+        }
     }
 
     private fun unregisterColorPrefsListener() {
@@ -1336,6 +1544,62 @@ class ScreenGrabberService : Service() {
         const val EXTRA_RESULT_DATA = BASE + "EXTRA_RESULT_DATA"
         private const val NOTIFICATION_ID = 1
         private const val NOTIFICATION_EXIT_INTENT_ID = 2
+        private const val APPLY_SETTINGS_DELAY_MS = 1200L
+        private const val SESSION_RESTART_DELAY_MS = 700L
+
+        /** Настройки вывода: меняются пересозданием HyperionThread под тем же энкодером. */
+        private val OUTPUT_KEYS = intArrayOf(
+            R.string.pref_key_connection_type,
+            R.string.pref_key_host,
+            R.string.pref_key_port,
+            R.string.pref_key_priority,
+            R.string.pref_key_reconnect,
+            R.string.pref_key_reconnect_delay,
+            R.string.pref_key_adalight_baudrate,
+            R.string.pref_key_adalight_protocol,
+            R.string.pref_key_wled_color_order,
+            R.string.pref_key_wled_protocol,
+            R.string.pref_key_wled_rgbw,
+            R.string.pref_key_wled_brightness,
+            R.string.pref_key_smoothing_enabled,
+            R.string.pref_key_smoothing_preset,
+            R.string.pref_key_settling_time,
+            R.string.pref_key_output_delay,
+            R.string.pref_key_update_frequency,
+            R.string.pref_key_ha_token,
+            R.string.pref_key_ha_lamps,
+            R.string.pref_key_ha_update_interval,
+            R.string.pref_key_ha_change_threshold,
+            R.string.pref_key_ha_transition,
+            R.string.pref_key_ha_brightness_mode,
+            R.string.pref_key_ha_brightness,
+            R.string.pref_key_ha_dark_off,
+            R.string.pref_key_ha_dark_threshold,
+            R.string.pref_key_ha_turn_off_lights,
+            R.string.pref_key_ha2_enabled,
+            R.string.pref_key_ha2_host,
+            R.string.pref_key_ha2_port,
+            R.string.pref_key_ha2_token,
+            R.string.pref_key_ha2_lamps,
+            R.string.pref_key_ha2_update_interval,
+            R.string.pref_key_ha2_change_threshold,
+            R.string.pref_key_ha2_transition,
+            R.string.pref_key_ha2_brightness_mode,
+            R.string.pref_key_ha2_brightness,
+            R.string.pref_key_ha2_dark_off,
+            R.string.pref_key_ha2_dark_threshold,
+            R.string.pref_key_ha2_turn_off_lights,
+        )
+
+        /** Настройки, которые энкодер берёт при создании. */
+        private val CAPTURE_KEYS = intArrayOf(
+            R.string.pref_key_framerate,
+            R.string.pref_key_capture_quality,
+            R.string.pref_key_use_avg_color,
+            R.string.pref_key_adb_port,
+            R.string.pref_key_x_led,
+            R.string.pref_key_y_led,
+        )
 
         private var sMediaProjection: MediaProjection? = null
 
@@ -1416,6 +1680,19 @@ class ScreenGrabberService : Service() {
             }
 
             return null
+        }
+
+        /**
+         * Подсветка не запустилась ещё до сервиса (отказ в согласии на запись экрана), и
+         * сказать об этом экранам и телефону-пульту, кроме нас, некому.
+         */
+        @JvmStatic
+        fun notifyNotStarted(context: Context, error: String) {
+            val intent = Intent(BROADCAST_FILTER)
+            intent.putExtra(BROADCAST_TAG, false)
+            intent.putExtra(BROADCAST_ERROR, error)
+            intent.setPackage(context.packageName)
+            context.sendBroadcast(intent)
         }
 
         /** True, пока экземпляр сервиса жив (onCreate→onDestroy). */

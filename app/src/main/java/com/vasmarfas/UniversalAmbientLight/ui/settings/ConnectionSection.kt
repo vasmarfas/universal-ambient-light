@@ -152,19 +152,19 @@ internal fun ColumnScope.ConnectionSection(prefs: Preferences, state: SettingsSc
                     }
                 )
                 if (state.reconnectEnabled) {
-                    EditTextPreference(
+                    val secondsUnit = stringResource(R.string.unit_seconds)
+                    SliderPreference(
                         prefs = prefs,
                         keyRes = R.string.pref_key_reconnect_delay,
                         title = stringResource(R.string.pref_title_reconnect_delay),
-                        summaryProvider = { it },
-                        keyboardType = KeyboardType.Number,
-                        onValueChange = { newDelay ->
-                            val delayInt = newDelay.toIntOrNull() ?: 0
-                            AnalyticsHelper.logReconnectDelayChanged(context, delayInt)
+                        range = 1..60,
+                        summaryProvider = { "$it $secondsUnit" },
+                        onValueChange = { delay ->
+                            AnalyticsHelper.logReconnectDelayChanged(context, delay)
                             AnalyticsHelper.logSettingChanged(
                                 context,
                                 "reconnect_delay",
-                                newDelay
+                                delay.toString()
                             )
                         }
                     )
@@ -259,19 +259,21 @@ internal fun ColumnScope.ConnectionSection(prefs: Preferences, state: SettingsSc
                 }
             )
             val brightnessMaxSummary = stringResource(R.string.pref_summary_wled_brightness_max)
-            EditTextPreference(
+            SliderPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_wled_brightness,
                 title = stringResource(R.string.pref_title_wled_brightness),
+                range = 0..255,
                 // 255 — не «максимальная яркость», а «не трогать цвета вовсе», это стоит
                 // проговорить: иначе значение по умолчанию выглядит как обычный максимум
-                summaryProvider = { value -> if (value == "255") brightnessMaxSummary else value },
-                keyboardType = KeyboardType.Number,
+                summaryProvider = { value ->
+                    if (value == 255) brightnessMaxSummary else value.toString()
+                },
                 onValueChange = { newBrightness ->
                     AnalyticsHelper.logSettingChanged(
                         context,
                         "wled_brightness",
-                        newBrightness
+                        newBrightness.toString()
                     )
                 }
             )

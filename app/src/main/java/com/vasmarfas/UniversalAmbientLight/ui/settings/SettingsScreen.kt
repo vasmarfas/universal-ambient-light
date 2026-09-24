@@ -40,11 +40,15 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
-import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
+import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,20 +59,35 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onLedLayoutClick: () -> Unit = {},
     onCameraSetupClick: () -> Unit = {},
+    onRemoteHostClick: () -> Unit = {},
+    onRemoteTvsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val prefs = remember { Preferences(context) }
+    val remote = LocalRemote.current
+    // В режиме пульта — зеркало настроек телевизора: все секции ниже правят его, не зная об этом
+    val prefs = rememberSettingsPreferences()
 
     LaunchedEffect(Unit) {
         AnalyticsHelper.logSettingsOpened(context)
     }
 
-    val state = remember { SettingsScreenState(prefs) }
+    val state = remember(prefs) { SettingsScreenState(prefs) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.pref_title)) },
+                title = {
+                    Column {
+                        Text(stringResource(R.string.pref_title))
+                        remote?.tv?.let {
+                            Text(
+                                text = stringResource(R.string.remote_banner_title, it.name),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -80,18 +99,32 @@ fun SettingsScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            ConnectionSection(prefs, state)
-            HomeAssistantSecondarySection(prefs, state)
-            CaptureSection(prefs, state, onLedLayoutClick, onCameraSetupClick)
-            CameraIdleSection(prefs, state)
-            BorderDetectionSection(prefs, state)
-            SmoothingSection(prefs, state)
-            GeneralSection(prefs, state)
+        // Новый снимок настроек с ТВ пересоздаёт поля — они перечитывают значения. Ключ —
+        // ревизия, а не сам prefs: объект пересоздаётся при каждом возврате на экран, и
+        // прокрутка теряла бы сохранённое место
+        key(remote?.tv?.id, remote?.revision) {
+            Column(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                if (remote != null && remote.connection != RemoteSession.Connection.CONNECTED) {
+                    Text(
+                        text = stringResource(R.string.remote_settings_offline),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+                ConnectionSection(prefs, state)
+                HomeAssistantSecondarySection(prefs, state)
+                CaptureSection(prefs, state, onLedLayoutClick, onCameraSetupClick)
+                CameraIdleSection(prefs, state)
+                BorderDetectionSection(prefs, state)
+                SmoothingSection(prefs, state)
+                if (remote == null) RemoteSection(onRemoteHostClick, onRemoteTvsClick)
+                GeneralSection(prefs, state)
+            }
         }
     }
 
@@ -100,6 +133,7 @@ fun SettingsScreen(
             onDismissRequest = {
                 // Отказ без подтверждения — возвращаем прежний метод
                 state.captureMethod = state.previousCaptureMethod
+                state.captureMethodRevision++
                 prefs.putString(R.string.pref_key_capture_method, state.previousCaptureMethod)
                 state.showAccessibilityDisclosure = false
             },
@@ -132,6 +166,7 @@ fun SettingsScreen(
                     onClick = {
                         // Возвращаем прежний метод
                         state.captureMethod = state.previousCaptureMethod
+                        state.captureMethodRevision++
                         prefs.putString(R.string.pref_key_capture_method, state.previousCaptureMethod)
                         state.showAccessibilityDisclosure = false
                     }
@@ -147,7 +182,16 @@ fun SettingsScreen(
         // миллисекунд, и синхронно в композиции он подвешивал бы кадр открытия диалога
         var debugInfo by remember { mutableStateOf("…") }
         LaunchedEffect(Unit) {
-            debugInfo = withContext(Dispatchers.IO) { DebugInfoHelper.getDebugInfo(context) }
+            debugInfo = withContext(Dispatchers.IO) {
+                if (remote != null) {
+                    // Отладка нужна про телевизор, а не про телефон-пульт
+                    runCatching {
+                        RemoteSession.call(RemoteProtocol.OP_DEBUG_INFO).optString("text")
+                    }.getOrElse { it.message.orEmpty() }
+                } else {
+                    DebugInfoHelper.getDebugInfo(context)
+                }
+            }
         }
         AlertDialog(
             onDismissRequest = { state.showDebugDialog = false },
@@ -271,9 +315,12 @@ fun SettingsScreen(
         )
     }
     if (state.showAdbPairingDialog) {
+        val actions = remember(remote != null) {
+            if (remote != null) RemoteAdbActions() else LocalAdbActions(context, prefs)
+        }
         AdbPairingDialog(
             context = context,
-            prefs = prefs,
+            actions = actions,
             onDismiss = { state.showAdbPairingDialog = false }
         )
     }

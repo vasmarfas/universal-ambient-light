@@ -7,8 +7,8 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
@@ -69,24 +69,24 @@ internal fun ColumnScope.SmoothingSection(prefs: Preferences, state: SettingsScr
             }
         )
         key(state.smoothingPreset) {
-            EditTextPreference(
+            // Клиенты сглаживания всё равно зажимают оба значения в 0–1000 мс
+            val resources = LocalResources.current
+            SliderPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_settling_time,
                 title = stringResource(R.string.pref_title_settling_time),
-                summaryProvider = { value ->
-                    context.getString(R.string.unit_ms, value?.toIntOrNull() ?: 50)
-                },
-                keyboardType = KeyboardType.Number,
+                range = 0..1000,
+                step = 10,
+                summaryProvider = { value -> resources.getString(R.string.unit_ms, value) },
                 recomposeKey = state.smoothingPreset
             )
-            EditTextPreference(
+            SliderPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_output_delay,
                 title = stringResource(R.string.pref_title_output_delay),
-                summaryProvider = { value ->
-                    context.getString(R.string.unit_ms, value?.toIntOrNull() ?: 0)
-                },
-                keyboardType = KeyboardType.Number,
+                range = 0..1000,
+                step = 10,
+                summaryProvider = { value -> resources.getString(R.string.unit_ms, value) },
                 recomposeKey = state.smoothingPreset
             )
             ListPreference(

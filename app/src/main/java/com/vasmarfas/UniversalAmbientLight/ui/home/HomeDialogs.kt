@@ -311,7 +311,7 @@ fun UrlDialog(
     )
 }
 
-private fun generateQRCode(content: String, size: Int): ImageBitmap? {
+internal fun generateQRCode(content: String, size: Int): ImageBitmap? {
     return try {
         val hints = hashMapOf<EncodeHintType, Any>().apply {
             put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H)

@@ -17,7 +17,8 @@ Android 8.0 and newer, on both phones and Android TV.
   corners — for TVs where screen capture is unavailable.
 - **Network discovery**: scans the local network for LED servers.
 - **Tunable pipeline**: capture quality, frame rate, color smoothing and latency.
-- **Auto-start** on device boot and **auto-reconnect** after a connection drop.
+- **Auto-start** after boot, TV sleep and app updates, **auto-reconnect** after a connection drop.
+- **Phone remote**: pair with the TV by QR code, then start, stop and change every lighting setting of the TV from the phone, including during a movie.
 - **Average color mode**: sends one dominant color instead of a full strip, for weak devices.
 - **Quick Settings tile** for switching the light on and off.
 
@@ -225,6 +226,26 @@ WS2812B GND  → GND Arduino
 
 ## Android TV Features
 This application is fully optimized for Android TV, including support for the Leanback Launcher and D-pad navigation. For easier text entry (IP addresses), we recommend using the "Google TV" or "Android TV Remote" app on your phone.
+
+## Phone Remote
+The lighting on a TV can be controlled from a phone running the same app: turn it on and off and change any setting, including in the middle of a movie in another app. Color, brightness and LED layout apply immediately; controller address, protocol and smoothing apply within a second without restarting the capture.
+
+1. On the TV: home screen → **Control from a phone** (or Settings → Remote control). The screen shows a QR code, the address and the pairing code.
+2. On the phone: home screen → **TV remote** → **Scan QR code**. If the camera cannot read it, type the address and the code manually.
+3. The phone remembers the TV and reconnects on the next launch. **Disconnect** on the home screen switches the phone back to its own lighting.
+
+The phone and the TV must be on the same local network. The connection is encrypted with AES-256-GCM using the key from the QR code; **Change the pairing code** on the TV disconnects all phones. While access is on, the TV keeps a background service with a notification: without it the phone could not turn the lighting on when the app on the TV is closed.
+
+The phone is also handy for setting up ADB on the TV itself: the 6-digit code from Wireless debugging is typed on the phone, and the TV finds the pairing port by itself.
+
+Camera corners are dragged on the TV itself; from the phone only the automatic screen search is available.
+
+## Auto-start
+**Grab on Boot** (on by default) brings the lighting back after the TV boots, wakes from sleep or the app updates, if the lighting was on before. After sleep a system alarm watchdog restarts it, so it also comes back on firmware that unloads apps while the TV sleeps.
+
+Capture methods without MediaProjection (Scrcpy/ADB, Screencap, Accessibility, Camera) need nothing else. MediaProjection on Android 10+ requires an on-screen confirmation, and Android will not show it from the background until the app holds permissions that can only be granted over ADB. After pairing ADB, open Settings → **Autostart permissions** → **Grant via ADB**; from then on the lighting starts without dialogs.
+
+If the firmware force-stops the app while the TV sleeps, nothing can bring it back until the next boot: this is a firmware limitation.
 
 ## External Control (KeyMapper, Tasker, remote buttons)
 The app exposes a transparent toggle activity that any automation tool able to start an activity can use — for example [KeyMapper](https://github.com/keymapperorg/KeyMapper) to bind a remote button:
