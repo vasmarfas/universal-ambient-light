@@ -66,9 +66,13 @@ fun PairDialog(
                 try {
                     Result.success(
                         if (hue) {
-                            R.string.pref_key_hue_username to HueClient.pair(host, Build.MODEL)
+                            val credentials = HueClient.pair(host, Build.MODEL)
+                            listOf(
+                                R.string.pref_key_hue_username to credentials.username,
+                                R.string.pref_key_hue_clientkey to credentials.clientKey
+                            )
                         } else {
-                            R.string.pref_key_nanoleaf_token to NanoleafClient.pair(host, port)
+                            listOf(R.string.pref_key_nanoleaf_token to NanoleafClient.pair(host, port))
                         }
                     )
                 } catch (e: IOException) {
@@ -76,8 +80,8 @@ fun PairDialog(
                 }
             }
             busy = false
-            result.onSuccess { (key, value) ->
-                prefs.putString(key, value)
+            result.onSuccess { values ->
+                for ((key, value) in values) prefs.putString(key, value)
                 onPaired()
             }.onFailure { e ->
                 error = when (e) {

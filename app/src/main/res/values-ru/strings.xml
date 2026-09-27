@@ -806,4 +806,31 @@
   <string name="devices_led_mismatch_text">Светодиодов в WLED: %1$d, в раскладке приложения: %2$d. Когда числа разные, часть ленты не горит или цвета попадают не туда.</string>
   <string name="devices_led_mismatch_layout">Настроить раскладку</string>
   <string name="devices_led_mismatch_later">Не сейчас</string>
+
+  <!-- Hue entertainment area -->
+  <string name="pref_title_hue_area">Зона развлечений</string>
+  <string name="pref_summary_hue_area_none">Не используется, лампы получают цвет по одной</string>
+  <string name="hue_area_none">Лампы по одной</string>
+  <string name="hue_area_none_summary">Несколько обновлений в секунду, зоны выбираются здесь</string>
+  <string name="hue_area_summary">Поток до 25 раз в секунду, места ламп из приложения Hue</string>
+  <string name="hue_area_hint">Зоны создаются в приложении Hue, раздел «Зоны развлечений». Их лампам мост передаёт цвет потоком, каждая берёт цвет своего места вокруг экрана.</string>
+  <string name="hue_area_empty">На мосту пока нет зон развлечений.</string>
+  <string name="hue_area_no_key">Мост подключала прежняя версия приложения, без ключа потока. Чтобы работать через зону, подключите его заново.</string>
+  <string name="hue_area_repair">Подключить заново</string>
+  <string name="hue_area_error">Не удалось получить зоны: %1$s</string>
+  <string name="pref_summary_hue_area_lamps">Лампы и их места задаёт зона в приложении Hue</string>
+  <string name="error_hue_no_clientkey">Мост Hue нужно подключить заново: для зоны развлечений нужен ключ потока. Откройте Настройки, Подключение.</string>
+  <string name="home_setup_hue_repair">Мост Hue нужно подключить заново</string>
+  <string name="hue_area_loading">Спрашиваю мост…</string>
+
+  <!-- Zigbee2MQTT -->
+  <string name="output_z2m">Zigbee2MQTT</string>
+  <string name="output_z2m_summary">Лампы Zigbee через брокер MQTT</string>
+  <string name="pref_title_mqtt_username">Пользователь MQTT</string>
+  <string name="pref_summary_mqtt_no_login">Без входа</string>
+  <string name="pref_title_mqtt_password">Пароль MQTT</string>
+  <string name="pref_summary_mqtt_password_empty">Не задан</string>
+  <string name="pref_summary_mqtt_password_set">Сохранён</string>
+  <string name="pref_title_z2m_base_topic">Базовая тема Zigbee2MQTT</string>
+  <string name="lamps_hint_z2m">Список ламп приходит от брокера, его там держит сам Zigbee2MQTT. Проверьте адрес брокера, вход и базовую тему.</string>
 </resources>

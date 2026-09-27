@@ -41,9 +41,11 @@ import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantZone
 import com.vasmarfas.UniversalAmbientLight.common.network.HueClient
 import com.vasmarfas.UniversalAmbientLight.common.network.LifxClient
+import com.vasmarfas.UniversalAmbientLight.common.network.MqttLink
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.network.WizClient
 import com.vasmarfas.UniversalAmbientLight.common.network.YeelightClient
+import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
 import kotlinx.coroutines.Dispatchers
@@ -345,6 +347,8 @@ internal fun OutputLampsDialog(
         OutputType.GOVEE ->
             stringResource(R.string.lamps_hint_network) + " " + stringResource(R.string.output_govee_summary)
 
+        OutputType.ZIGBEE2MQTT -> stringResource(R.string.lamps_hint_z2m)
+
         else -> stringResource(R.string.lamps_hint_network)
     }
     ZoneLampsDialog(
@@ -364,6 +368,10 @@ internal fun OutputLampsDialog(
                     OutputType.YEELIGHT -> YeelightClient.discover()
                     OutputType.LIFX -> LifxClient.discover()
                     OutputType.GOVEE -> GoveeClient.discover()
+                    OutputType.ZIGBEE2MQTT -> MqttAccess(prefs).run {
+                        Zigbee2MqttClient.lights(host, port, username, password, baseTopic)
+                    }
+
                     else -> emptyList()
                 }
             }
@@ -384,8 +392,22 @@ internal fun OutputLampsDialog(
                 OutputType.YEELIGHT -> YeelightClient.flash(id)
                 OutputType.LIFX -> LifxClient.flash(id)
                 OutputType.GOVEE -> GoveeClient.flash(id)
+                OutputType.ZIGBEE2MQTT -> MqttAccess(prefs).run {
+                    Zigbee2MqttClient.flash(host, port, username, password, baseTopic, id)
+                }
+
                 else -> Unit
             }
         }
     )
+}
+
+/** Брокер из настроек: адрес и порт общие с остальными контроллерами. */
+private class MqttAccess(prefs: Preferences) {
+    val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
+    val port = prefs.getInt(R.string.pref_key_port, MqttLink.DEFAULT_PORT)
+    val username = prefs.getString(R.string.pref_key_mqtt_username).orEmpty()
+    val password = prefs.getString(R.string.pref_key_mqtt_password).orEmpty()
+    val baseTopic = prefs.getString(R.string.pref_key_z2m_base_topic)?.trim()?.ifEmpty { null }
+        ?: Zigbee2MqttClient.DEFAULT_BASE_TOPIC
 }

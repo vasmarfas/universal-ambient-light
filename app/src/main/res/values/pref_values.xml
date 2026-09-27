@@ -120,7 +120,18 @@
     <string name="pref_key_yeelight_lamps" translatable="false">pref_key_yeelight_lamps</string>
     <string name="pref_key_lifx_lamps" translatable="false">pref_key_lifx_lamps</string>
     <string name="pref_key_govee_lamps" translatable="false">pref_key_govee_lamps</string>
+    <string name="pref_key_z2m_lamps" translatable="false">pref_key_z2m_lamps</string>
     <string name="pref_key_nanoleaf_token" translatable="false">pref_key_nanoleaf_token</string>
+
+    <!-- Hue Entertainment: ключ потока из сопряжения и зона развлечений (номер и имя) -->
+    <string name="pref_key_hue_clientkey" translatable="false">pref_key_hue_clientkey</string>
+    <string name="pref_key_hue_area" translatable="false">pref_key_hue_area</string>
+    <string name="pref_key_hue_area_name" translatable="false">pref_key_hue_area_name</string>
+
+    <!-- Брокер MQTT для Zigbee2MQTT; адрес и порт общие с остальными контроллерами -->
+    <string name="pref_key_mqtt_username" translatable="false">pref_key_mqtt_username</string>
+    <string name="pref_key_mqtt_password" translatable="false">pref_key_mqtt_password</string>
+    <string name="pref_key_z2m_base_topic" translatable="false">pref_key_z2m_base_topic</string>
 
     <!-- Последние адреса по типам контроллеров: «wled=192.168.1.50|hue=192.168.1.10» -->
     <string name="pref_key_recent_hosts" translatable="false">pref_key_recent_hosts</string>

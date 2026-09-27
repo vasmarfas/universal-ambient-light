@@ -446,12 +446,23 @@ class HyperionThread(
                 mContext, host, mPort, mConfig.opcChannel, mWledColorOrder, streamSmoothing()
             )
 
-            OutputType.HUE -> HueClient(host, mConfig.hueUsername, mConfig.lamps, lampSettings())
+            OutputType.HUE -> if (mConfig.hueArea.isNotBlank()) {
+                HueEntertainmentClient(
+                    host, mConfig.hueUsername, mConfig.hueClientKey, mConfig.hueArea, mConfig.haTurnOffLights
+                )
+            } else {
+                HueClient(host, mConfig.hueUsername, mConfig.lamps, lampSettings())
+            }
 
             OutputType.WIZ -> WizClient(mConfig.lamps, lampSettings())
             OutputType.YEELIGHT -> YeelightClient(mConfig.lamps, lampSettings())
             OutputType.LIFX -> LifxClient(mConfig.lamps, lampSettings())
             OutputType.GOVEE -> GoveeClient(mConfig.lamps, lampSettings())
+            OutputType.ZIGBEE2MQTT -> Zigbee2MqttClient(
+                host, mPort, mConfig.mqttUsername, mConfig.mqttPassword, mConfig.z2mBaseTopic,
+                mConfig.lamps, lampSettings()
+            )
+
             OutputType.NANOLEAF -> NanoleafClient(host, mPort, mConfig.nanoleafToken)
             OutputType.HYPERION -> HyperionFlatBuffers(host, mPort, mPriority)
         }

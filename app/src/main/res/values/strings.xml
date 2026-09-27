@@ -826,4 +826,31 @@
   <string name="devices_led_mismatch_text">LEDs in WLED: %1$d, in the app layout: %2$d. With different numbers part of the strip stays dark or the colors land in the wrong place.</string>
   <string name="devices_led_mismatch_layout">Set up the layout</string>
   <string name="devices_led_mismatch_later">Not now</string>
+
+  <!-- Hue entertainment area -->
+  <string name="pref_title_hue_area">Entertainment area</string>
+  <string name="pref_summary_hue_area_none">Not used, lights get colors one by one</string>
+  <string name="hue_area_none">Lights one by one</string>
+  <string name="hue_area_none_summary">A few updates per second, zones are picked here</string>
+  <string name="hue_area_summary">Stream up to 25 times per second, places come from the Hue app</string>
+  <string name="hue_area_hint">Areas are created in the Hue app under Entertainment areas. The bridge streams colors to their lights, each light takes the color of its place around the screen.</string>
+  <string name="hue_area_empty">The bridge has no entertainment areas yet.</string>
+  <string name="hue_area_no_key">The bridge was paired by an older version of the app, without a streaming key. Pair it again to use an area.</string>
+  <string name="hue_area_repair">Pair again</string>
+  <string name="hue_area_error">Couldn\'t get the areas: %1$s</string>
+  <string name="pref_summary_hue_area_lamps">Lights and their places are set by the area in the Hue app</string>
+  <string name="error_hue_no_clientkey">The Hue bridge has to be paired again: the entertainment area needs a streaming key. Open Settings, Connection.</string>
+  <string name="home_setup_hue_repair">The Hue bridge has to be paired again</string>
+  <string name="hue_area_loading">Asking the bridge…</string>
+
+  <!-- Zigbee2MQTT -->
+  <string name="output_z2m">Zigbee2MQTT</string>
+  <string name="output_z2m_summary">Zigbee lights through an MQTT broker</string>
+  <string name="pref_title_mqtt_username">MQTT user</string>
+  <string name="pref_summary_mqtt_no_login">No login</string>
+  <string name="pref_title_mqtt_password">MQTT password</string>
+  <string name="pref_summary_mqtt_password_empty">Not set</string>
+  <string name="pref_summary_mqtt_password_set">Saved</string>
+  <string name="pref_title_z2m_base_topic">Zigbee2MQTT base topic</string>
+  <string name="lamps_hint_z2m">The list comes from the broker, Zigbee2MQTT keeps it there. Check the broker address, login and base topic.</string>
 </resources>

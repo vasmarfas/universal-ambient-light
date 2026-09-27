@@ -22,6 +22,9 @@ internal fun describeTarget(context: Context, prefs: Preferences): String {
             "$label · ${context.getString(R.string.devices_lamps_count, lamps)}"
         }
 
+        type == OutputType.HUE && !prefs.getString(R.string.pref_key_hue_area).isNullOrBlank() ->
+            "$label · ${prefs.getString(R.string.pref_key_hue_area_name).orEmpty().ifBlank { host }}"
+
         host.isEmpty() && type == OutputType.E131 -> "$label · ${context.getString(R.string.home_target_multicast)}"
         host.isEmpty() -> "$label · ${context.getString(R.string.home_target_no_host)}"
         type.defaultPort == 0 || type == OutputType.HOME_ASSISTANT -> "$label · $host"
@@ -37,6 +40,7 @@ internal fun setupIssue(context: Context, prefs: Preferences): String? {
     val type = OutputType.of(prefs.getString(R.string.pref_key_connection_type))
     fun blank(key: Int) = prefs.getString(key).isNullOrBlank()
     val lampsKey = type.lampsKey
+    val hueArea = type == OutputType.HUE && !blank(R.string.pref_key_hue_area)
     return when {
         type.needsHost && blank(R.string.pref_key_host) -> context.getString(R.string.home_setup_no_host)
         type == OutputType.HUE && blank(R.string.pref_key_hue_username) ||
@@ -46,7 +50,8 @@ internal fun setupIssue(context: Context, prefs: Preferences): String? {
         type == OutputType.HOME_ASSISTANT && blank(R.string.pref_key_ha_token) ->
             context.getString(R.string.home_setup_no_token)
 
-        lampsKey != null && HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).isEmpty() ->
+        hueArea && blank(R.string.pref_key_hue_clientkey) -> context.getString(R.string.home_setup_hue_repair)
+        lampsKey != null && !hueArea && HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).isEmpty() ->
             context.getString(R.string.home_setup_no_lamps)
 
         else -> null

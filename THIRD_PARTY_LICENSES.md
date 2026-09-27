@@ -24,6 +24,7 @@ The project also uses direct library dependencies from Maven/Google repositories
 
 - `dev.mobile:dadb` — Apache-2.0  
 - `com.github.mik3y:usb-serial-for-android` — MIT  
+- `org.bouncycastle:bctls-jdk15to18` — MIT (Bouncy Castle License)  
 - `com.google.flatbuffers:flatbuffers-java` — Apache-2.0  
 - `com.google.zxing:core` — Apache-2.0  
 - AndroidX libraries (AppCompat, Core KTX, Preference, Leanback, CameraX, Compose, Navigation, etc.) — Apache-2.0  
