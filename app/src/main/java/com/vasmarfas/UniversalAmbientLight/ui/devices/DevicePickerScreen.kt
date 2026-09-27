@@ -78,6 +78,14 @@ private val SELF_ADDRESSED_LAMPS = setOf(OutputType.WIZ, OutputType.YEELIGHT, Ou
 
 private const val SEARCH_MS = 6000L
 
+/** Всё, что выдал или хранит один мост Hue: у другого моста это чужое. */
+private val HUE_BRIDGE_KEYS = listOf(
+    R.string.pref_key_hue_username,
+    R.string.pref_key_hue_clientkey,
+    R.string.pref_key_hue_area,
+    R.string.pref_key_hue_area_name,
+)
+
 /**
  * Выбор контроллера: сверху то, что нашлось в сети, ниже все типы по группам. Выбор сразу
  * пишет тип, адрес и порт в настройки; мосту Hue и панелям Nanoleaf следом нужно
@@ -109,6 +117,7 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
 
     var pairFor by remember { mutableStateOf<OutputType?>(null) }
     var lampsFor by remember { mutableStateOf<OutputType?>(null) }
+    var pickHueArea by remember { mutableStateOf(false) }
     // Светодиодов в самом WLED и в раскладке приложения, если они не совпали
     var ledMismatch by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val scope = rememberCoroutineScope()
@@ -117,12 +126,12 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
         val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
         when {
             type == OutputType.HUE && host.isNotEmpty() ->
-                if (prefs.getString(R.string.pref_key_hue_username).isNullOrBlank()) pairFor = type else lampsFor = type
+                if (prefs.getString(R.string.pref_key_hue_username).isNullOrBlank()) pairFor = type else pickHueArea = true
 
             type == OutputType.NANOLEAF && host.isNotEmpty() &&
                     prefs.getString(R.string.pref_key_nanoleaf_token).isNullOrBlank() -> pairFor = type
 
-            type in SELF_ADDRESSED_LAMPS -> lampsFor = type
+            type in SELF_ADDRESSED_LAMPS || type == OutputType.ZIGBEE2MQTT && host.isNotEmpty() -> lampsFor = type
             else -> onBackClick()
         }
     }
@@ -293,9 +302,27 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
             type = type,
             onPaired = {
                 pairFor = null
-                if (type == OutputType.HUE) lampsFor = type else onBackClick()
+                if (type == OutputType.HUE) pickHueArea = true else onBackClick()
             },
             onDismiss = { pairFor = null }
+        )
+    }
+    if (pickHueArea) {
+        HueAreaDialog(
+            prefs = prefs,
+            onPicked = { area ->
+                pickHueArea = false
+                if (area == null) lampsFor = OutputType.HUE else onBackClick()
+            },
+            onRepair = {
+                pickHueArea = false
+                pairFor = OutputType.HUE
+            },
+            onDismiss = { pickHueArea = false },
+            onNoAreas = {
+                pickHueArea = false
+                lampsFor = OutputType.HUE
+            }
         )
     }
     ledMismatch?.let { (onDevice, inLayout) ->
@@ -353,7 +380,9 @@ private fun applyController(
     if (newHost != oldHost) {
         prefs.putString(R.string.pref_key_host, newHost)
         // Ключ выдан прежним мостом или панелями, к новому адресу он не подойдёт
-        if (type == old && type == OutputType.HUE) prefs.putString(R.string.pref_key_hue_username, "")
+        if (type == old && type == OutputType.HUE) {
+            for (key in HUE_BRIDGE_KEYS) prefs.putString(key, "")
+        }
         if (type == old && type == OutputType.NANOLEAF) prefs.putString(R.string.pref_key_nanoleaf_token, "")
     }
     val newPort = when {

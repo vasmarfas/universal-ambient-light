@@ -28,6 +28,7 @@ enum class OutputType(
     YEELIGHT("yeelight", Group.LAMPS, 0, needsHost = false),
     LIFX("lifx", Group.LAMPS, 0, needsHost = false),
     GOVEE("govee", Group.LAMPS, 0, needsHost = false),
+    ZIGBEE2MQTT("z2m", Group.LAMPS, MqttLink.DEFAULT_PORT),
     HOME_ASSISTANT("homeassistant", Group.LAMPS, 8123),
     HYPERION("hyperion", Group.SERVER, 19400);
 
@@ -36,7 +37,7 @@ enum class OutputType(
     /** Лампы с привязкой к зонам экрана вместо адресной ленты. */
     val isLamps: Boolean
         get() = this == HUE || this == WIZ || this == YEELIGHT || this == LIFX || this == GOVEE ||
-                this == HOME_ASSISTANT
+                this == ZIGBEE2MQTT || this == HOME_ASSISTANT
 
     /** Где лежат лампы с зонами; у Home Assistant - свой ключ с его сущностями. */
     val lampsKey: Int?
@@ -46,6 +47,7 @@ enum class OutputType(
             YEELIGHT -> R.string.pref_key_yeelight_lamps
             LIFX -> R.string.pref_key_lifx_lamps
             GOVEE -> R.string.pref_key_govee_lamps
+            ZIGBEE2MQTT -> R.string.pref_key_z2m_lamps
             HOME_ASSISTANT -> R.string.pref_key_ha_lamps
             else -> null
         }

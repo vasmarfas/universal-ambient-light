@@ -50,6 +50,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.devices.HueAreaDialog
 import com.vasmarfas.UniversalAmbientLight.ui.devices.PairDialog
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
@@ -300,10 +301,28 @@ fun SettingsScreen(
                 state.pairingKey = prefs.getString(
                     if (type == OutputType.HUE) R.string.pref_key_hue_username else R.string.pref_key_nanoleaf_token
                 ).orEmpty()
-                // Мосту сразу нужны лампы: без них подсветке нечего включать
-                if (type == OutputType.HUE && state.lampsSpec.isBlank()) state.showLampsDialog = true
+                // Мосту сразу нужны лампы или зона: без них подсветке нечего включать
+                if (type == OutputType.HUE && state.lampsSpec.isBlank() && state.hueArea.isBlank()) {
+                    state.showHueAreaDialog = true
+                }
             },
             onDismiss = { state.showPairDialog = false }
+        )
+    }
+    if (state.showHueAreaDialog) {
+        HueAreaDialog(
+            prefs = prefs,
+            onPicked = { area ->
+                state.showHueAreaDialog = false
+                state.hueArea = area.orEmpty()
+                state.hueAreaName = prefs.getString(R.string.pref_key_hue_area_name).orEmpty()
+                if (area == null && state.lampsSpec.isBlank()) state.showLampsDialog = true
+            },
+            onRepair = {
+                state.showHueAreaDialog = false
+                state.showPairDialog = true
+            },
+            onDismiss = { state.showHueAreaDialog = false }
         )
     }
     if (state.showHa2LampsDialog) {

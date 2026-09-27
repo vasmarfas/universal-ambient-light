@@ -26,6 +26,7 @@ fun OutputType.titleRes(): Int = when (this) {
     OutputType.YEELIGHT -> R.string.output_yeelight
     OutputType.LIFX -> R.string.output_lifx
     OutputType.GOVEE -> R.string.output_govee
+    OutputType.ZIGBEE2MQTT -> R.string.output_z2m
     OutputType.HOME_ASSISTANT -> R.string.output_homeassistant
     OutputType.HYPERION -> R.string.output_hyperion
 }
@@ -46,6 +47,7 @@ fun OutputType.summaryRes(): Int = when (this) {
     OutputType.YEELIGHT -> R.string.output_yeelight_summary
     OutputType.LIFX -> R.string.output_lifx_summary
     OutputType.GOVEE -> R.string.output_govee_summary
+    OutputType.ZIGBEE2MQTT -> R.string.output_z2m_summary
     OutputType.HOME_ASSISTANT -> R.string.output_homeassistant_summary
     OutputType.HYPERION -> R.string.output_hyperion_summary
 }

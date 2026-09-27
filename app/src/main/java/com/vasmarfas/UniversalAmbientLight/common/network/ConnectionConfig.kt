@@ -45,4 +45,9 @@ data class ConnectionConfig(
     val lamps: String = "",
     val hueUsername: String = "",
     val nanoleafToken: String = "",
+    val hueClientKey: String = "",
+    val hueArea: String = "",
+    val mqttUsername: String = "",
+    val mqttPassword: String = "",
+    val z2mBaseTopic: String = Zigbee2MqttClient.DEFAULT_BASE_TOPIC,
 )

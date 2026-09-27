@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.components.focusHighlight
@@ -203,8 +204,37 @@ internal fun ColumnScope.ConnectionSection(
                     paired = state.pairingKey.isNotBlank(),
                     onClick = { state.showPairDialog = true }
                 )
-                LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
-                MainLampBehavior(prefs)
+                if (state.pairingKey.isNotBlank()) {
+                    ClickablePreference(
+                        title = stringResource(R.string.pref_title_hue_area),
+                        summary = if (state.hueArea.isBlank()) {
+                            stringResource(R.string.pref_summary_hue_area_none)
+                        } else {
+                            state.hueAreaName.ifBlank { state.hueArea }
+                        },
+                        onClick = { state.showHueAreaDialog = true }
+                    )
+                }
+                if (state.hueArea.isBlank()) {
+                    LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                    MainLampBehavior(prefs)
+                } else {
+                    Text(
+                        text = stringResource(R.string.pref_summary_hue_area_lamps),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    CheckBoxPreference(
+                        prefs = prefs,
+                        keyRes = R.string.pref_key_ha_turn_off_lights,
+                        title = stringResource(R.string.pref_title_ha_turn_off_lights),
+                        summary = stringResource(R.string.pref_summary_ha_turn_off_lights),
+                        onValueChange = {
+                            AnalyticsHelper.logSettingChanged(context, "lamps_turn_off_lights", it.toString())
+                        }
+                    )
+                }
             }
 
             OutputType.NANOLEAF -> PairingPreference(
@@ -214,6 +244,12 @@ internal fun ColumnScope.ConnectionSection(
             )
 
             OutputType.WIZ, OutputType.YEELIGHT, OutputType.LIFX, OutputType.GOVEE -> {
+                LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                MainLampBehavior(prefs)
+            }
+
+            OutputType.ZIGBEE2MQTT -> {
+                MqttSettings(prefs)
                 LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
                 MainLampBehavior(prefs)
             }
@@ -323,6 +359,37 @@ private fun ColumnScope.HyperionSettings(prefs: Preferences, state: SettingsScre
             }
         )
     }
+}
+
+/** Вход на брокер и тема, под которой Zigbee2MQTT держит свои устройства. */
+@Composable
+private fun MqttSettings(prefs: Preferences) {
+    val context = LocalContext.current
+    val noLoginSummary = stringResource(R.string.pref_summary_mqtt_no_login)
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_mqtt_username,
+        title = stringResource(R.string.pref_title_mqtt_username),
+        summaryProvider = { it.ifBlank { noLoginSummary } },
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "mqtt_username", if (it.isBlank()) "none" else "set") }
+    )
+    val passwordEmptySummary = stringResource(R.string.pref_summary_mqtt_password_empty)
+    val passwordSetSummary = stringResource(R.string.pref_summary_mqtt_password_set)
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_mqtt_password,
+        title = stringResource(R.string.pref_title_mqtt_password),
+        summaryProvider = { if (it.isBlank()) passwordEmptySummary else passwordSetSummary },
+        keyboardType = KeyboardType.Password,
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "mqtt_password", "set") }
+    )
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_z2m_base_topic,
+        title = stringResource(R.string.pref_title_z2m_base_topic),
+        summaryProvider = { it.ifBlank { Zigbee2MqttClient.DEFAULT_BASE_TOPIC } },
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "z2m_base_topic", it) }
+    )
 }
 
 /** Порядок цветов для лент по E1.31, Art-Net и прочим: ключ общий с WLED. */

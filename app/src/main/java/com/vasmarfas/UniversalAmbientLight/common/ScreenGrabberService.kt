@@ -29,6 +29,7 @@ import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
@@ -504,6 +505,12 @@ class ScreenGrabberService : Service() {
             lamps = OutputType.of(mConnectionType).lampsKey?.let { prefs.getString(it, "") }.orEmpty(),
             hueUsername = prefs.getString(R.string.pref_key_hue_username, "").orEmpty(),
             nanoleafToken = prefs.getString(R.string.pref_key_nanoleaf_token, "").orEmpty(),
+            hueClientKey = prefs.getString(R.string.pref_key_hue_clientkey, "").orEmpty(),
+            hueArea = prefs.getString(R.string.pref_key_hue_area, "").orEmpty(),
+            mqttUsername = prefs.getString(R.string.pref_key_mqtt_username, "").orEmpty(),
+            mqttPassword = prefs.getString(R.string.pref_key_mqtt_password, "").orEmpty(),
+            z2mBaseTopic = prefs.getString(R.string.pref_key_z2m_base_topic, null)?.trim()
+                ?.ifEmpty { null } ?: Zigbee2MqttClient.DEFAULT_BASE_TOPIC
         )
         val thread = HyperionThread(mReceiver, baseContext, config)
         if (mCalibrating) thread.setCalibrating(true)
@@ -1808,6 +1815,12 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_yeelight_lamps,
             R.string.pref_key_lifx_lamps,
             R.string.pref_key_govee_lamps,
+            R.string.pref_key_z2m_lamps,
+            R.string.pref_key_hue_clientkey,
+            R.string.pref_key_hue_area,
+            R.string.pref_key_mqtt_username,
+            R.string.pref_key_mqtt_password,
+            R.string.pref_key_z2m_base_topic,
             R.string.pref_key_nanoleaf_token,
         )
 
@@ -1889,8 +1902,12 @@ class ScreenGrabberService : Service() {
             ) {
                 return SettingsError("nanoleaf_not_paired", context.getString(R.string.error_nanoleaf_not_paired))
             }
+            val hueArea = type == OutputType.HUE && !prefs.getString(R.string.pref_key_hue_area, "").isNullOrBlank()
+            if (hueArea && prefs.getString(R.string.pref_key_hue_clientkey, "").isNullOrBlank()) {
+                return SettingsError("hue_no_clientkey", context.getString(R.string.error_hue_no_clientkey))
+            }
             val lampsKey = type.lampsKey
-            if (lampsKey != null && type != OutputType.HOME_ASSISTANT &&
+            if (lampsKey != null && type != OutputType.HOME_ASSISTANT && !hueArea &&
                 HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).isEmpty()
             ) {
                 return SettingsError("no_lamps", context.getString(R.string.error_no_lamps))

@@ -94,22 +94,50 @@ class HueClient(
         /** Кнопку на мосту не нажали - повторить после нажатия. */
         class LinkButtonException : IOException("Press the button on the Hue bridge")
 
+        /** Имя пользователя для REST и ключ потока для Entertainment API. */
+        data class Credentials(val username: String, val clientKey: String)
+
         /**
          * Регистрирует приложение на мосту. Работает в течение 30 секунд после нажатия
-         * круглой кнопки на мосту; до этого бросает [LinkButtonException].
+         * круглой кнопки на мосту; до этого бросает [LinkButtonException]. Ключ потока мосты
+         * без Entertainment API не выдают, тогда он пустой.
          */
         @Throws(IOException::class)
-        fun pair(host: String, deviceName: String): String {
-            val body = JSONObject().put("devicetype", "uamblight#${deviceName.take(19)}").toString()
+        fun pair(host: String, deviceName: String): Credentials {
+            val body = JSONObject()
+                .put("devicetype", "uamblight#${deviceName.take(19)}")
+                .put("generateclientkey", true)
+                .toString()
             val reply = request("POST", "http://${host.trim()}/api", body)
             val entry = try {
                 JSONArray(reply).optJSONObject(0)
             } catch (e: JSONException) {
                 throw IOException("Unexpected answer from the Hue bridge", e)
             }
-            entry?.optJSONObject("success")?.optString("username")?.takeIf { it.isNotEmpty() }?.let { return it }
+            val success = entry?.optJSONObject("success")
+            val username = success?.optString("username").orEmpty()
+            if (username.isNotEmpty()) return Credentials(username, success?.optString("clientkey").orEmpty())
             if (entry?.optJSONObject("error")?.optInt("type") == ERROR_LINK_BUTTON) throw LinkButtonException()
             throw IOException(errorOf(reply))
+        }
+
+        /** Зоны развлечений из приложения Hue: номер группы и имя. */
+        @Throws(IOException::class)
+        fun entertainmentAreas(host: String, username: String): List<Pair<String, String>> {
+            val reply = request("GET", "http://${host.trim()}/api/${username.trim()}/groups", null)
+            val json = try {
+                JSONObject(reply)
+            } catch (e: JSONException) {
+                throw IOException(errorOf(reply), e)
+            }
+            return json.keys().asSequence()
+                .mapNotNull { id ->
+                    val group = json.optJSONObject(id) ?: return@mapNotNull null
+                    if (group.optString("type") != "Entertainment") return@mapNotNull null
+                    id to group.optString("name").ifEmpty { "Hue $id" }
+                }
+                .sortedBy { it.second.lowercase() }
+                .toList()
         }
 
         /** Один «вдох» лампы, чтобы найти её в комнате. */
@@ -196,7 +224,7 @@ class HueClient(
         }
 
         @Throws(IOException::class)
-        private fun request(method: String, url: String, body: String?): String {
+        internal fun request(method: String, url: String, body: String?): String {
             val connection = URL(url).openConnection() as HttpURLConnection
             try {
                 connection.requestMethod = method

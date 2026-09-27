@@ -20,8 +20,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Поиск контроллеров и ламп в локальной сети. Кто объявляет себя по mDNS (WLED, Hyperion,
- * HyperHDR, мост Hue, Nanoleaf, Home Assistant), находится через NsdManager. Лампы WiZ,
- * Yeelight, LIFX, Govee и узлы Art-Net mDNS не умеют, их ищем широковещательными запросами.
+ * HyperHDR, мост Hue, Nanoleaf, Home Assistant, брокер MQTT), находится через NsdManager.
+ * Лампы WiZ, Yeelight, LIFX, Govee и узлы Art-Net mDNS не умеют, их ищем широковещательными
+ * запросами.
  *
  * Находки приходят в onFound на главном потоке по мере ответов, каждая пара «тип и адрес»
  * один раз. mDNS слушает до [stop], широковещательные запросы отрабатывают за пару секунд.
@@ -250,6 +251,8 @@ class LedDiscovery(context: Context, private val mOnFound: (Found) -> Unit) {
             Service("_hue._tcp", OutputType.HUE, 0),
             Service("_nanoleafapi._tcp", OutputType.NANOLEAF),
             Service("_home-assistant._tcp", OutputType.HOME_ASSISTANT),
+            // Брокер объявляют не все сборки Mosquitto, но если объявил - это готовый адрес
+            Service("_mqtt._tcp", OutputType.ZIGBEE2MQTT),
         )
 
         private val ART_NET_ID = "Art-Net\u0000".toByteArray(Charsets.US_ASCII)
