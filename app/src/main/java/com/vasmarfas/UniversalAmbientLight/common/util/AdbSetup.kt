@@ -6,7 +6,10 @@ import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.R
 import dadb.Dadb
 import io.github.muntashirakon.adb.AdbPairingRequiredException
+import io.github.muntashirakon.adb.AdbStream
 import io.github.muntashirakon.adb.android.AndroidUtils
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 
 /**
  * Подключение приложения к собственному ADB устройства: проверка, сопряжение, выдача
@@ -112,24 +115,33 @@ object AdbSetup {
                 add("pm grant $pkg android.permission.POST_NOTIFICATIONS")
             }
         }
-        return try {
-            for (command in commands) {
+        var lastError: Throwable? = null
+        for (command in commands) {
+            try {
                 val output = shell(context, command).trim()
                 if (output.isNotEmpty()) Log.i(TAG, "$command -> $output")
+            } catch (e: AdbPairingRequiredException) {
+                return Outcome(false, context.getString(R.string.error_adb_pairing_required))
+            } catch (e: Throwable) {
+                // Команды независимы: без deviceidle на урезанной прошивке остальные всё
+                // равно нужны. Что в итоге выдано, решает проверка ниже, а не вывод команд
+                Log.w(TAG, "$command failed: ${e.message}")
+                lastError = e
             }
-            val missing = buildList {
-                if (!PermissionHelper.hasProjectMediaPermission(context)) add("PROJECT_MEDIA")
-                if (!PermissionHelper.canDrawOverlays(context)) add("SYSTEM_ALERT_WINDOW")
-            }
-            if (missing.isEmpty()) {
-                Outcome(true, context.getString(R.string.adb_grant_success))
-            } else {
-                Outcome(false, context.getString(R.string.adb_grant_partial, missing.joinToString()))
-            }
-        } catch (e: AdbPairingRequiredException) {
-            Outcome(false, context.getString(R.string.error_adb_pairing_required))
-        } catch (e: Throwable) {
-            Outcome(false, context.getString(R.string.adb_grant_failed, e.message ?: "?"))
+        }
+        val missing = buildList {
+            if (!PermissionHelper.hasProjectMediaPermission(context)) add("PROJECT_MEDIA")
+            if (!PermissionHelper.canDrawOverlays(context)) add("SYSTEM_ALERT_WINDOW")
+            if (!PermissionHelper.isIgnoringBatteryOptimizations(context)) add("deviceidle")
+        }
+        val error = lastError
+        return when {
+            missing.isEmpty() -> Outcome(true, context.getString(R.string.adb_grant_success))
+            // Не выдано ничего и была ошибка — дело в самом ADB, а не в прошивке
+            missing.size == 3 && error != null ->
+                Outcome(false, context.getString(R.string.adb_grant_failed, error.message ?: "?"))
+
+            else -> Outcome(false, context.getString(R.string.adb_grant_partial, missing.joinToString()))
         }
     }
 
@@ -140,7 +152,7 @@ object AdbSetup {
             if (mgr.isConnected || mgr.autoConnect(context, CONNECT_TIMEOUT_MS)) {
                 val stream = mgr.openStream("shell:$command")
                 return try {
-                    stream.openInputStream().readBytes().toString(Charsets.UTF_8)
+                    readToEnd(stream)
                 } finally {
                     try {
                         stream.close()
@@ -156,5 +168,26 @@ object AdbSetup {
         return Dadb.create("127.0.0.1", port, AdbKeyHelper.getKeyPair(context)).use {
             it.shell(command).allOutput
         }
+    }
+
+    /**
+     * Весь вывод команды. Конец вывода libadb отдаёт не -1, а исключением «Stream closed.»,
+     * если adbd закрыл поток, пока чтение ждало данных: так заканчивается любая команда без
+     * вывода, например `appops set`. Закрытый поток здесь — нормальный конец.
+     */
+    private fun readToEnd(stream: AdbStream): String {
+        val input = stream.openInputStream()
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(4096)
+        while (true) {
+            val count = try {
+                input.read(buffer)
+            } catch (e: IOException) {
+                if (stream.isClosed) break else throw e
+            }
+            if (count < 0) break
+            output.write(buffer, 0, count)
+        }
+        return output.toString(Charsets.UTF_8.name())
     }
 }
