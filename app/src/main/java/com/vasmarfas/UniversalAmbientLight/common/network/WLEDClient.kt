@@ -242,11 +242,14 @@ class WLEDClient(
     override fun disconnect() {
         synchronized(this) {
             mClosed = true
-            mConnected = false
         }
         mSmoothing.stop()
         mKeepAliveExecutor.shutdownNow()
         mResumeExecutor.shutdownNow()
+        // Последний кадр чёрный и мимо сглаживания: с задержкой вывода чёрные кадры из
+        // очереди уйти не успевают, и WLED держал бы последний цвет до своего таймаута
+        sendLedData(Array(LedDataExtractor.getLedCount(mContext)) { ColorRgb(0, 0, 0) })
+        mConnected = false
         val socket = mSocket
         if (socket != null && !socket.isClosed) {
             socket.close()

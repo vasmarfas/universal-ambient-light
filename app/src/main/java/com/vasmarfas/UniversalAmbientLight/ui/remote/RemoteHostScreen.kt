@@ -54,6 +54,7 @@ import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteControlService
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteHostConfig
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.components.RequestLocalNetworkAccess
 import com.vasmarfas.UniversalAmbientLight.ui.home.generateQRCode
 import com.vasmarfas.UniversalAmbientLight.ui.settings.CheckBoxPreference
 import com.vasmarfas.UniversalAmbientLight.ui.settings.ClickablePreference
@@ -76,6 +77,9 @@ fun RemoteHostScreen(onBackClick: () -> Unit) {
     var port by remember { mutableIntStateOf(RemoteControlService.sPort) }
     var clients by remember { mutableStateOf(RemoteControlService.sClients) }
     var confirmReset by remember { mutableStateOf(false) }
+    // Без доступа к сети телефон не достучится до ТВ, даже если QR на экране
+    var networkDenied by remember { mutableStateOf(false) }
+    RequestLocalNetworkAccess { granted -> networkDenied = !granted }
 
     DisposableEffect(Unit) {
         val listener = RemoteControlService.Listener {
@@ -136,6 +140,11 @@ fun RemoteHostScreen(onBackClick: () -> Unit) {
                 when {
                     !enabled -> Text(
                         text = stringResource(R.string.remote_host_disabled),
+                        color = MaterialTheme.colorScheme.error
+                    )
+
+                    networkDenied -> Text(
+                        text = stringResource(R.string.error_local_network),
                         color = MaterialTheme.colorScheme.error
                     )
 
