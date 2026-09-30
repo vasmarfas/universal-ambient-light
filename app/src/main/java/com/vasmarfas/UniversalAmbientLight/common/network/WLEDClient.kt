@@ -3,10 +3,14 @@ package com.vasmarfas.UniversalAmbientLight.common.network
 import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.util.LedDataExtractor
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.URL
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -26,7 +30,7 @@ class WLEDClient(
     updateFrequency: Int = 25,
     rgbw: Boolean = false,
     brightness: Int = 255,
-) : HyperionClient {
+) : HyperionClient, StreamingClient {
 
     enum class Protocol {
         DDP,
@@ -121,13 +125,23 @@ class WLEDClient(
      * Останавливает любую исходящую отправку на время сна ТВ (экран выключен).
      * Сокет остаётся открытым, чтобы возобновление было мгновенным.
      */
-    fun pauseSending() {
+    override fun pauseSending() {
         mPaused = true
         mSmoothing.stop()
     }
 
-    fun resumeSending() {
+    override fun resumeSending() {
         mPaused = false
+    }
+
+    override val delaysOutput = true
+
+    override fun setOutputDelay(ms: Long) {
+        mSmoothing.setOutputDelay(ms)
+    }
+
+    override fun setSmoothingEnabled(enabled: Boolean) {
+        mSmoothing.setEnabled(enabled)
     }
 
     @Throws(IOException::class)
@@ -228,11 +242,14 @@ class WLEDClient(
     override fun disconnect() {
         synchronized(this) {
             mClosed = true
-            mConnected = false
         }
         mSmoothing.stop()
         mKeepAliveExecutor.shutdownNow()
         mResumeExecutor.shutdownNow()
+        // Последний кадр чёрный и мимо сглаживания: с задержкой вывода чёрные кадры из
+        // очереди уйти не успевают, и WLED держал бы последний цвет до своего таймаута
+        sendLedData(Array(LedDataExtractor.getLedCount(mContext)) { ColorRgb(0, 0, 0) })
+        mConnected = false
         val socket = mSocket
         if (socket != null && !socket.isClosed) {
             socket.close()
@@ -665,5 +682,30 @@ class WLEDClient(
         private const val MAX_LEDS_HYPERION_RAW = 490
         private const val MAX_LEDS_PER_PACKET_DNRGB = 489
         private const val WLED_TIMEOUT_SECONDS: Byte = 5
+        private const val INFO_TIMEOUT_MS = 1500
+
+        /** Сколько светодиодов настроено в самом WLED; null - не ответил или это не WLED. */
+        fun ledCount(host: String): Int? {
+            val connection = try {
+                URL("http://${host.trim()}/json/info").openConnection() as HttpURLConnection
+            } catch (e: IOException) {
+                return null
+            }
+            return try {
+                connection.connectTimeout = INFO_TIMEOUT_MS
+                connection.readTimeout = INFO_TIMEOUT_MS
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
+                val text = connection.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+                JSONObject(text).optJSONObject("leds")?.optInt("count")?.takeIf { it > 0 }
+            } catch (e: IOException) {
+                Log.w(TAG, "WLED info from $host failed: ${e.message}")
+                null
+            } catch (e: JSONException) {
+                Log.w(TAG, "WLED info from $host is not JSON: ${e.message}")
+                null
+            } finally {
+                connection.disconnect()
+            }
+        }
     }
 }

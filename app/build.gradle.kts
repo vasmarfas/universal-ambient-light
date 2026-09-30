@@ -136,6 +136,7 @@ dependencies {
     implementation(libs.dadb)
     implementation(libs.libadb.android)
     implementation(libs.conscrypt.android)
+    implementation(libs.bctls)
     implementation(libs.sun.security.android)
     implementation(libs.usb.serial)
 

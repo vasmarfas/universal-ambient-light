@@ -32,8 +32,22 @@ class HyperionThread(
     private val mSmoothingEnabled: Boolean = config.smoothingEnabled
     private val mSmoothingPreset: String = config.smoothingPreset
     private val mSettlingTime: Int = config.settlingTime
-    private val mOutputDelayMs: Long = config.outputDelayMs
     private val mUpdateFrequency: Int = config.updateFrequency
+
+    // Задержку двигают на ходу, глядя на ленту: пересоздание клиента на каждый шаг ползунка
+    // гасило бы её и переподключало
+    @Volatile
+    private var mOutputDelayMs: Long = config.outputDelayMs
+
+    // Автоподбор задержки меряет сам конвейер: на время замера ни сглаживания, ни задержки
+    @Volatile
+    private var mCalibrating = false
+
+    private val effectiveDelayMs: Long
+        get() = if (mCalibrating) 0L else mOutputDelayMs
+
+    private val effectiveSmoothing: Boolean
+        get() = mSmoothingEnabled && !mCalibrating
 
     private val mReconnectDelayMs: Long = (config.reconnectDelaySeconds * 1000).toLong()
     private val mConnectionType: String = config.connectionType
@@ -55,6 +69,9 @@ class HyperionThread(
     private val mSendLock = Any()
     private val mKeepAliveExecutor: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor()
+    private val mDelayExecutor: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "$TAG-delay") }
+    private val mDelayLine = FrameDelayLine()
 
     private val mRecovering = AtomicBoolean(false)
 
@@ -93,6 +110,11 @@ class HyperionThread(
                 return
             }
             if (mExecutor.isShutdown) return
+
+            if (effectiveDelayMs > 0 && (client as? StreamingClient)?.delaysOutput != true) {
+                delayFrame(data, width, height)
+                return
+            }
 
             // sendFrame зовёт единственный поток захвата активного энкодера, поэтому
             // кольцо не нуждается в блокировке
@@ -133,37 +155,15 @@ class HyperionThread(
             System.arraycopy(frame.data, 0, buffer, 0, frame.data.size)
 
             try {
-                synchronized(mSendLock) {
-                    client.setImage(
-                        buffer,
-                        frame.width,
-                        frame.height,
-                        mPriority,
-                        FRAME_DURATION
-                    )
-
-                    if (client is HyperionFlatBuffers) {
-                        // Стабильная копия для повторов keepalive. Нужна только Hyperion:
-                        // у WLED, Adalight и Home Assistant свой keepalive, кадр им не нужен
-                        var keepAlive = mKeepAliveBuffer
-                        if (keepAlive == null || keepAlive.size != buffer.size) {
-                            keepAlive = ByteArray(buffer.size)
-                            mKeepAliveBuffer = keepAlive
-                        }
-                        System.arraycopy(buffer, 0, keepAlive, 0, buffer.size)
-                        mLastSentFrame = FrameData(keepAlive, frame.width, frame.height)
-
-                        // Под тем же замком, что и keepalive: два читателя одного сокета
-                        // поделили бы заголовок ответа и рассинхронизировали поток
-                        client.cleanReplies()
-                    }
-                }
+                deliver(client, buffer, frame.width, frame.height)
             } catch (e: IOException) {
                 handleError(e)
             }
         }
 
         override fun clear() {
+            // Отложенные кадры иначе дошли бы после чёрного и зажгли ленту снова
+            mDelayLine.clear()
             val client = mClient.get()
             if (client != null && client.isConnected()) {
                 try {
@@ -194,6 +194,8 @@ class HyperionThread(
             if (!mKeepAliveExecutor.isShutdown) {
                 mKeepAliveExecutor.shutdownNow()
             }
+            mDelayExecutor.shutdownNow()
+            mDelayLine.clear()
 
             if (!mExecutor.isShutdown) {
                 mExecutor.shutdownNow()
@@ -223,6 +225,74 @@ class HyperionThread(
     val receiver: HyperionThreadListener
         get() = mListener
 
+    /** Кадр уходит клиенту; вызывается с потока отправки или с потока задержки. */
+    @Throws(IOException::class)
+    private fun deliver(client: HyperionClient, buffer: ByteArray, width: Int, height: Int) {
+        synchronized(mSendLock) {
+            client.setImage(buffer, width, height, mPriority, FRAME_DURATION)
+
+            if (client is HyperionFlatBuffers) {
+                // Стабильная копия для повторов keepalive. Нужна только Hyperion:
+                // у WLED, Adalight и Home Assistant свой keepalive, кадр им не нужен
+                var keepAlive = mKeepAliveBuffer
+                if (keepAlive == null || keepAlive.size != buffer.size) {
+                    keepAlive = ByteArray(buffer.size)
+                    mKeepAliveBuffer = keepAlive
+                }
+                System.arraycopy(buffer, 0, keepAlive, 0, buffer.size)
+                mLastSentFrame = FrameData(keepAlive, width, height)
+
+                // Под тем же замком, что и keepalive: два читателя одного сокета
+                // поделили бы заголовок ответа и рассинхронизировали поток
+                client.cleanReplies()
+            }
+        }
+    }
+
+    /**
+     * Каждый кадр ставит себе будильник на своё время: так очередь разбирается ровно в срок
+     * и без отдельного таймера, а кадры, опоздавшие из-за занятого сокета, пропускаются.
+     */
+    private fun delayFrame(data: ByteArray, width: Int, height: Int) {
+        val delay = effectiveDelayMs
+        mDelayLine.push(data, width, height, System.currentTimeMillis() + delay)
+        try {
+            mDelayExecutor.schedule({ sendDueFrame() }, delay, TimeUnit.MILLISECONDS)
+        } catch (_: RejectedExecutionException) {
+            // Вывод уже остановлен - кадр никому не нужен.
+        }
+    }
+
+    private fun sendDueFrame() {
+        val frame = mDelayLine.takeDue(System.currentTimeMillis()) ?: return
+        try {
+            val client = mClient.get()
+            if (!mStandbyPaused.get() && client != null && client.isConnected()) {
+                deliver(client, frame.data, frame.width, frame.height)
+            }
+        } catch (e: IOException) {
+            handleError(e)
+        } finally {
+            mDelayLine.recycle(frame)
+        }
+    }
+
+    fun setOutputDelay(ms: Long) {
+        mOutputDelayMs = ms.coerceIn(0L, 1000L)
+        applyTiming()
+    }
+
+    fun setCalibrating(calibrating: Boolean) {
+        mCalibrating = calibrating
+        applyTiming()
+    }
+
+    private fun applyTiming() {
+        val client = mClient.get() as? StreamingClient ?: return
+        client.setSmoothingEnabled(effectiveSmoothing)
+        client.setOutputDelay(effectiveDelayMs)
+    }
+
     /**
      * Сбрасывает блокировку отправки данных для WLED клиента.
      * Вызывается при включении экрана, чтобы возобновить отправку после ошибки EPERM.
@@ -240,12 +310,7 @@ class HyperionThread(
      */
     fun pauseSending() {
         mStandbyPaused.set(true)
-        when (val client = mClient.get()) {
-            is WLEDClient -> client.pauseSending()
-            is AdalightClient -> client.pauseSending()
-            is HomeAssistantClient -> client.pauseSending()
-            else -> {}
-        }
+        (mClient.get() as? StreamingClient)?.pauseSending()
     }
 
     /**
@@ -253,12 +318,7 @@ class HyperionThread(
      */
     fun resumeSending() {
         mStandbyPaused.set(false)
-        when (val client = mClient.get()) {
-            is WLEDClient -> client.resumeSending()
-            is AdalightClient -> client.resumeSending()
-            is HomeAssistantClient -> client.resumeSending()
-            else -> {}
-        }
+        (mClient.get() as? StreamingClient)?.resumeSending()
     }
 
     override fun run() {
@@ -315,29 +375,44 @@ class HyperionThread(
         }
 
         val host = mHost
-        return if ("wled".equals(mConnectionType, ignoreCase = true)) {
-            WLEDClient(
+        return when (OutputType.of(mConnectionType)) {
+            OutputType.WLED -> WLEDClient(
                 mContext,
                 host,
                 mPort,
                 mPriority,
                 mWledColorOrder,
                 mWledProtocol,
-                mSmoothingEnabled,
+                effectiveSmoothing,
                 mSmoothingPreset,
                 mSettlingTime,
-                mOutputDelayMs,
+                effectiveDelayMs,
                 mUpdateFrequency,
                 mWledRgbw,
                 mWledBrightness
             )
-        } else if ("adalight".equals(mConnectionType, ignoreCase = true)) {
-            AdalightClient(
-                mContext, mPriority, mBaudRate, mAdalightProtocol,
-                mSmoothingEnabled, mSmoothingPreset, mSettlingTime, mOutputDelayMs, mUpdateFrequency
+
+            // DDP понимают не только WLED: xLights, FPP, ESPixelStick - клиент тот же
+            OutputType.DDP -> WLEDClient(
+                mContext,
+                host,
+                mPort,
+                mPriority,
+                mWledColorOrder,
+                "ddp",
+                effectiveSmoothing,
+                mSmoothingPreset,
+                mSettlingTime,
+                effectiveDelayMs,
+                mUpdateFrequency
             )
-        } else if ("homeassistant".equals(mConnectionType, ignoreCase = true)) {
-            HomeAssistantClient(
+
+            OutputType.ADALIGHT -> AdalightClient(
+                mContext, mPriority, mBaudRate, mAdalightProtocol,
+                effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
+            )
+
+            OutputType.HOME_ASSISTANT -> HomeAssistantClient(
                 host,
                 mPort,
                 mConfig.haToken,
@@ -351,11 +426,62 @@ class HyperionThread(
                 mConfig.haDarkThreshold,
                 mConfig.haTurnOffLights
             )
-        } else {
-            // По умолчанию — Hyperion
-            HyperionFlatBuffers(host, mPort, mPriority)
+
+            OutputType.E131 -> E131Client(
+                mContext, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
+                mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.ARTNET -> ArtNetClient(
+                mContext, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
+                mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.TPM2NET -> Tpm2NetClient(
+                mContext, host, mPort, mConfig.dmxLedsPerUniverse, mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.UDP_RAW -> UdpRawClient(mContext, host, mPort, mWledColorOrder, streamSmoothing())
+            OutputType.OPC -> OpcClient(
+                mContext, host, mPort, mConfig.opcChannel, mWledColorOrder, streamSmoothing()
+            )
+
+            OutputType.HUE -> if (mConfig.hueArea.isNotBlank()) {
+                HueEntertainmentClient(
+                    host, mConfig.hueUsername, mConfig.hueClientKey, mConfig.hueArea, mConfig.haTurnOffLights
+                )
+            } else {
+                HueClient(host, mConfig.hueUsername, mConfig.lamps, lampSettings())
+            }
+
+            OutputType.WIZ -> WizClient(mConfig.lamps, lampSettings())
+            OutputType.YEELIGHT -> YeelightClient(mConfig.lamps, lampSettings())
+            OutputType.LIFX -> LifxClient(mConfig.lamps, lampSettings())
+            OutputType.GOVEE -> GoveeClient(mConfig.lamps, lampSettings())
+            OutputType.ZIGBEE2MQTT -> Zigbee2MqttClient(
+                host, mPort, mConfig.mqttUsername, mConfig.mqttPassword, mConfig.z2mBaseTopic,
+                mConfig.lamps, lampSettings()
+            )
+
+            OutputType.NANOLEAF -> NanoleafClient(host, mPort, mConfig.nanoleafToken)
+            OutputType.HYPERION -> HyperionFlatBuffers(host, mPort, mPriority)
         }
     }
+
+    private fun streamSmoothing() = LedStreamClient.SmoothingSettings(
+        effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
+    )
+
+    private fun lampSettings() = ZoneLampClient.LampSettings(
+        mConfig.haUpdateIntervalMs,
+        mConfig.haChangeThreshold,
+        mConfig.haTransitionMs,
+        mConfig.haBrightnessMode,
+        mConfig.haBrightnessMax,
+        mConfig.haDarkOffEnabled,
+        mConfig.haDarkThreshold,
+        mConfig.haTurnOffLights
+    )
 
     private fun handleError(e: IOException) {
         mCallback.onConnectionError(e.hashCode(), e.message)

@@ -41,12 +41,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.devices.HueAreaDialog
+import com.vasmarfas.UniversalAmbientLight.ui.devices.PairDialog
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +66,8 @@ fun SettingsScreen(
     onCameraSetupClick: () -> Unit = {},
     onRemoteHostClick: () -> Unit = {},
     onRemoteTvsClick: () -> Unit = {},
+    onDelayClick: () -> Unit = {},
+    onControllerClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val remote = LocalRemote.current
@@ -116,12 +123,12 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
-                ConnectionSection(prefs, state)
+                ConnectionSection(prefs, state, onControllerClick)
                 HomeAssistantSecondarySection(prefs, state)
                 CaptureSection(prefs, state, onLedLayoutClick, onCameraSetupClick)
                 CameraIdleSection(prefs, state)
                 BorderDetectionSection(prefs, state)
-                SmoothingSection(prefs, state)
+                SmoothingSection(prefs, state, onDelayClick)
                 if (remote == null) RemoteSection(onRemoteHostClick, onRemoteTvsClick)
                 GeneralSection(prefs, state)
             }
@@ -254,66 +261,6 @@ fun SettingsScreen(
         )
     }
 
-    if (state.showScanDialog) {
-        DeviceScanDialog(
-            onDismiss = { state.showScanDialog = false },
-            onDeviceSelected = { device ->
-                val oldConnectionType = state.connectionType
-
-                when (device.type) {
-                    com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.WLED -> {
-                        val newConnectionType = "wled"
-                        prefs.putString(R.string.pref_key_connection_type, newConnectionType)
-                        state.connectionType = newConnectionType
-
-                        val protocol = when (device.protocol) {
-                            "ddp" -> "ddp"
-                            "udp_raw" -> "udp_raw"
-                            else -> "ddp"
-                        }
-                        state.wledProtocol = protocol
-                        prefs.putString(R.string.pref_key_wled_protocol, protocol)
-
-                        AnalyticsHelper.logProtocolChanged(
-                            context,
-                            oldConnectionType,
-                            newConnectionType
-                        )
-                        AnalyticsHelper.updateProtocolProperty(context, newConnectionType)
-                    }
-
-                    com.vasmarfas.UniversalAmbientLight.common.network.DeviceDetector.DeviceType.HYPERION -> {
-                        val newConnectionType = "hyperion"
-                        prefs.putString(R.string.pref_key_connection_type, newConnectionType)
-                        state.connectionType = newConnectionType
-
-                        AnalyticsHelper.logProtocolChanged(
-                            context,
-                            oldConnectionType,
-                            newConnectionType
-                        )
-                        AnalyticsHelper.updateProtocolProperty(context, newConnectionType)
-                    }
-
-                    else -> {}
-                }
-
-                prefs.putString(R.string.pref_key_host, device.host)
-                prefs.putString(R.string.pref_key_port, device.port.toString())
-
-                state.currentHost = device.host
-                state.currentPort = device.port.toString()
-
-                AnalyticsHelper.logHostChanged(context, device.host)
-                AnalyticsHelper.logPortChanged(context, device.port)
-                AnalyticsHelper.logSettingChanged(
-                    context,
-                    "device_scanned",
-                    "${device.type}:${device.host}:${device.port}"
-                )
-            }
-        )
-    }
     if (state.showAdbPairingDialog) {
         val actions = remember(remote != null) {
             if (remote != null) RemoteAdbActions() else LocalAdbActions(context, prefs)
@@ -325,25 +272,84 @@ fun SettingsScreen(
         )
     }
     if (state.showHaLampsDialog) {
-        HomeAssistantLampsDialog(
+        ZoneLampsDialog(
             prefs = prefs,
-            keyHost = R.string.pref_key_host,
-            keyPort = R.string.pref_key_port,
-            keyToken = R.string.pref_key_ha_token,
+            title = stringResource(R.string.ha_lamps_dialog_title),
+            hint = stringResource(R.string.ha_lamps_hint),
             keyLamps = R.string.pref_key_ha_lamps,
+            fetch = { homeAssistantLights(prefs, R.string.pref_key_host, R.string.pref_key_port, R.string.pref_key_ha_token) },
             onSaved = { state.haLampsSpec = it },
-            onDismiss = { state.showHaLampsDialog = false }
+            onDismiss = { state.showHaLampsDialog = false },
+            identify = { homeAssistantFlash(prefs, R.string.pref_key_host, R.string.pref_key_port, R.string.pref_key_ha_token, it) }
+        )
+    }
+    if (state.showLampsDialog) {
+        OutputLampsDialog(
+            prefs = prefs,
+            type = OutputType.of(state.connectionType),
+            onSaved = { state.lampsSpec = it },
+            onDismiss = { state.showLampsDialog = false }
+        )
+    }
+    if (state.showPairDialog) {
+        val type = OutputType.of(state.connectionType)
+        PairDialog(
+            prefs = prefs,
+            type = type,
+            onPaired = {
+                state.showPairDialog = false
+                state.pairingKey = prefs.getString(
+                    if (type == OutputType.HUE) R.string.pref_key_hue_username else R.string.pref_key_nanoleaf_token
+                ).orEmpty()
+                // Мосту сразу нужны лампы или зона: без них подсветке нечего включать
+                if (type == OutputType.HUE && state.lampsSpec.isBlank() && state.hueArea.isBlank()) {
+                    state.showHueAreaDialog = true
+                }
+            },
+            onDismiss = { state.showPairDialog = false }
+        )
+    }
+    if (state.showHueAreaDialog) {
+        HueAreaDialog(
+            prefs = prefs,
+            onPicked = { area ->
+                state.showHueAreaDialog = false
+                state.hueArea = area.orEmpty()
+                state.hueAreaName = prefs.getString(R.string.pref_key_hue_area_name).orEmpty()
+                if (area == null && state.lampsSpec.isBlank()) state.showLampsDialog = true
+            },
+            onRepair = {
+                state.showHueAreaDialog = false
+                state.showPairDialog = true
+            },
+            onDismiss = { state.showHueAreaDialog = false }
         )
     }
     if (state.showHa2LampsDialog) {
-        HomeAssistantLampsDialog(
+        ZoneLampsDialog(
             prefs = prefs,
-            keyHost = R.string.pref_key_ha2_host,
-            keyPort = R.string.pref_key_ha2_port,
-            keyToken = R.string.pref_key_ha2_token,
+            title = stringResource(R.string.ha_lamps_dialog_title),
+            hint = stringResource(R.string.ha_lamps_hint),
             keyLamps = R.string.pref_key_ha2_lamps,
+            fetch = { homeAssistantLights(prefs, R.string.pref_key_ha2_host, R.string.pref_key_ha2_port, R.string.pref_key_ha2_token) },
             onSaved = { state.ha2LampsSpec = it },
-            onDismiss = { state.showHa2LampsDialog = false }
+            onDismiss = { state.showHa2LampsDialog = false },
+            identify = { homeAssistantFlash(prefs, R.string.pref_key_ha2_host, R.string.pref_key_ha2_port, R.string.pref_key_ha2_token, it) }
         )
     }
 }
+
+private fun homeAssistantLights(prefs: Preferences, keyHost: Int, keyPort: Int, keyToken: Int) =
+    HomeAssistantClient.fetchLights(
+        prefs.getString(keyHost, "")?.trim().orEmpty(),
+        prefs.getInt(keyPort, 8123),
+        prefs.getString(keyToken, "").orEmpty()
+    )
+
+private fun homeAssistantFlash(prefs: Preferences, keyHost: Int, keyPort: Int, keyToken: Int, entityId: String) =
+    HomeAssistantClient.flash(
+        prefs.getString(keyHost, "")?.trim().orEmpty(),
+        prefs.getInt(keyPort, 8123),
+        prefs.getString(keyToken, "").orEmpty(),
+        entityId
+    )

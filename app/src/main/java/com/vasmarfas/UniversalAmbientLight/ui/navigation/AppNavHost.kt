@@ -4,8 +4,10 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,14 +28,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.NavHostController
 import com.vasmarfas.UniversalAmbientLight.common.remote.PairingPayload
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.calibration.CalibrationScreen
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
+import com.vasmarfas.UniversalAmbientLight.ui.delay.DelayScreen
+import com.vasmarfas.UniversalAmbientLight.ui.devices.DevicePickerScreen
+import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeSource
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeTarget
-import com.vasmarfas.UniversalAmbientLight.ui.home.EffectMode
+import com.vasmarfas.UniversalAmbientLight.ui.home.setupIssue
 import com.vasmarfas.UniversalAmbientLight.ui.home.HelpDialog
 import com.vasmarfas.UniversalAmbientLight.ui.home.HomeStatus
 import com.vasmarfas.UniversalAmbientLight.ui.home.LowRatingDialog
@@ -50,6 +57,7 @@ import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteBanner
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteHostScreen
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteTvsScreen
+import com.vasmarfas.UniversalAmbientLight.ui.remote.TvRemoteScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
 @Composable
 fun AppNavHost(
@@ -57,9 +65,9 @@ fun AppNavHost(
     startDestination: String = Screen.Home.route,
     isRunning: Boolean,
     onToggleClick: () -> Unit,
-    onEffectsClick: () -> Unit,
-    effectMode: EffectMode,
     lastError: String? = null,
+    sleepAt: Long = 0L,
+    onSleepTimer: (Int) -> Unit = {},
     remotePending: Boolean = false,
     pendingPayload: PairingPayload? = null,
     onPayloadConsumed: () -> Unit = {},
@@ -93,6 +101,7 @@ fun AppNavHost(
             }
             var target by remember(prefs) { mutableStateOf(describeTarget(context, prefs)) }
             var source by remember(prefs) { mutableStateOf(describeSource(context, prefs)) }
+            var setupHint by remember(prefs) { mutableStateOf(setupIssue(context, prefs)) }
             val lifecycleOwner = LocalLifecycleOwner.current
             DisposableEffect(lifecycleOwner, prefs) {
                 val observer = LifecycleEventObserver { _, event ->
@@ -101,6 +110,7 @@ fun AppNavHost(
                             prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
                         target = describeTarget(context, prefs)
                         source = describeSource(context, prefs)
+                        setupHint = setupIssue(context, prefs)
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -118,20 +128,43 @@ fun AppNavHost(
                     // Пока ждём запуска, прошлая ошибка ТВ только сбивала бы с толку
                     error = if (remotePending) null else lastError ?: remote.error,
                     target = target,
-                    source = source
+                    source = source,
+                    sleepAt = remote.sleepAt
                 )
             } else {
-                HomeStatus(running = isRunning, error = lastError, target = target, source = source)
+                HomeStatus(
+                    running = isRunning,
+                    error = lastError,
+                    target = target,
+                    source = source,
+                    sleepAt = sleepAt
+                )
             }
-            // На ТВ — пустить телефон, на телефоне — управлять телевизором
-            val remoteEntry = if (isTv && remote == null) {
-                RemoteEntry(stringResource(R.string.remote_host_title), Icons.Default.PhoneAndroid) {
-                    navController.navigate(Screen.RemoteHost.route) { launchSingleTop = true }
-                }
-            } else {
-                RemoteEntry(stringResource(R.string.remote_tvs_title), Icons.Default.SettingsRemote) {
-                    navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
-                }
+            val sleepSupported = remote == null ||
+                    remote.caps?.features?.contains(RemoteProtocol.FEATURE_SLEEP) == true
+            // На ТВ - пустить телефон, на телефоне - управлять телевизором, а уже подключённому
+            // пульту - кнопки ТВ и выбор другого телевизора
+            val remoteEntries = when {
+                remote != null -> listOf(
+                    RemoteEntry(stringResource(R.string.tv_remote_title), Icons.Default.Gamepad) {
+                        navController.navigate(Screen.TvRemote.route) { launchSingleTop = true }
+                    },
+                    RemoteEntry(stringResource(R.string.remote_tvs_switch), Icons.Default.Tv) {
+                        navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
+                    }
+                )
+
+                isTv -> listOf(
+                    RemoteEntry(stringResource(R.string.remote_host_title), Icons.Default.PhoneAndroid) {
+                        navController.navigate(Screen.RemoteHost.route) { launchSingleTop = true }
+                    }
+                )
+
+                else -> listOf(
+                    RemoteEntry(stringResource(R.string.remote_tvs_title), Icons.Default.SettingsRemote) {
+                        navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
+                    }
+                )
             }
 
             MainScreen(
@@ -141,12 +174,18 @@ fun AppNavHost(
                 onSettingsClick = {
                     navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                 },
-                onEffectsClick = onEffectsClick,
-                effectMode = effectMode,
+                onEffectsClick = {
+                    navController.navigate(Screen.Effects.route) { launchSingleTop = true }
+                },
                 captureSource = captureSource,
                 status = status,
                 localPreview = remote == null,
-                remoteEntry = remoteEntry,
+                remoteEntries = remoteEntries,
+                onSleepTimer = if (sleepSupported) onSleepTimer else null,
+                setupHint = setupHint,
+                onSetupClick = {
+                    navController.navigate(Screen.Devices.route) { launchSingleTop = true }
+                },
                 topContent = {
                     if (remote != null) {
                         RemoteBanner(
@@ -298,6 +337,26 @@ fun AppNavHost(
                 },
                 onRemoteTvsClick = {
                     navController.navigate(Screen.RemoteTvs.route) { launchSingleTop = true }
+                },
+                onDelayClick = {
+                    navController.navigate(Screen.Delay.route) { launchSingleTop = true }
+                },
+                onControllerClick = {
+                    navController.navigate(Screen.Devices.route) { launchSingleTop = true }
+                }
+            )
+        }
+        composable(Screen.Devices.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "devices", "DevicePickerScreen")
+            }
+            DevicePickerScreen(
+                onBackClick = { navController.popBackStack() },
+                onLedLayoutClick = {
+                    navController.navigate(Screen.LedLayout.route) {
+                        popUpTo(Screen.Devices.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -326,6 +385,52 @@ fun AppNavHost(
                 AnalyticsHelper.logScreenView(context, "remote_host", "RemoteHostScreen")
             }
             RemoteHostScreen(onBackClick = { navController.popBackStack() })
+        }
+        composable(Screen.Effects.route) {
+            val context = LocalContext.current
+            val remote = LocalRemote.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "effects", "EffectsScreen")
+            }
+            val running = remote?.running ?: isRunning
+            EffectsScreen(
+                running = running,
+                onBackClick = { navController.popBackStack() },
+                onStart = { if (!running) onToggleClick() },
+                onStop = { if (running) onToggleClick() }
+            )
+        }
+        composable(Screen.Delay.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "delay", "DelayScreen")
+            }
+            DelayScreen(
+                onBackClick = { navController.popBackStack() },
+                onCalibrateClick = {
+                    navController.navigate(Screen.Calibration.route) { launchSingleTop = true }
+                }
+            )
+        }
+        composable(Screen.Calibration.route) {
+            val context = LocalContext.current
+            val remote = LocalRemote.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "calibration", "CalibrationScreen")
+            }
+            val running = remote?.running ?: isRunning
+            CalibrationScreen(
+                running = running,
+                onBackClick = { navController.popBackStack() },
+                onStartLighting = { if (!running) onToggleClick() }
+            )
+        }
+        composable(Screen.TvRemote.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "tv_remote", "TvRemoteScreen")
+            }
+            TvRemoteScreen(onBackClick = { navController.popBackStack() })
         }
         composable(Screen.RemoteTvs.route) {
             val context = LocalContext.current

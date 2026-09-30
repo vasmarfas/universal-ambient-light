@@ -53,6 +53,24 @@ internal fun ColumnScope.HomeAssistantSection(
         }
     )
 
+    LampZonesPreference(lampsSpec, onLampsClick)
+    LampBehaviorSection(
+        prefs = prefs,
+        analyticsPrefix = analyticsPrefix,
+        keyUpdateInterval = keyUpdateInterval,
+        keyChangeThreshold = keyChangeThreshold,
+        keyTransition = keyTransition,
+        keyBrightnessMode = keyBrightnessMode,
+        keyBrightness = keyBrightness,
+        keyDarkOff = keyDarkOff,
+        keyDarkThreshold = keyDarkThreshold,
+        keyTurnOffLights = keyTurnOffLights,
+    )
+}
+
+/** Сводка «сколько ламп привязано к зонам», по нажатию открывается диалог ламп. */
+@Composable
+internal fun LampZonesPreference(lampsSpec: String, onClick: () -> Unit) {
     val lampCount = HomeAssistantLamp.parseList(lampsSpec).size
     ClickablePreference(
         title = stringResource(R.string.pref_title_ha_lamps),
@@ -61,8 +79,28 @@ internal fun ColumnScope.HomeAssistantSection(
         } else {
             stringResource(R.string.pref_summary_ha_lamps_count, lampCount)
         },
-        onClick = onLampsClick
+        onClick = onClick
     )
+}
+
+/**
+ * Ритм и поведение ламп: частота обновлений, порог, переход, яркость, тёмные сцены.
+ * Общий для Home Assistant и ламп основного подключения.
+ */
+@Composable
+internal fun ColumnScope.LampBehaviorSection(
+    prefs: Preferences,
+    analyticsPrefix: String,
+    keyUpdateInterval: Int,
+    keyChangeThreshold: Int,
+    keyTransition: Int,
+    keyBrightnessMode: Int,
+    keyBrightness: Int,
+    keyDarkOff: Int,
+    keyDarkThreshold: Int,
+    keyTurnOffLights: Int,
+) {
+    val context = LocalContext.current
 
     ListPreference(
         prefs = prefs,

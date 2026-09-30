@@ -3,48 +3,64 @@
 # Universal Ambient Light
 
 Ambient screen lighting for Android. The app captures the screen (or films the TV with the
-device camera), extracts the edge colors and streams them to an LED controller. Runs on
-Android 8.0 and newer, on both phones and Android TV.
+device camera), extracts the edge colors and streams them to an LED strip, a controller or
+smart lights. Without capture it can also run light effects. Runs on Android 8.0 and newer,
+on both phones and Android TV.
 
 [Читать на русском](README_RU.md) · [Support the project](SUPPORT.md) ·
 [Third-party licenses](THIRD_PARTY_LICENSES.md)
 
 ## Features
 
-- **Three controller families**: Hyperion, WLED and Adalight.
+- **17 kinds of outputs**: WLED, DDP, E1.31 (sACN), Art-Net, tpm2.net, UDP raw, Open Pixel
+  Control, Adalight and other USB boards, Philips Hue, Nanoleaf, WiZ, Yeelight, LIFX, Govee,
+  Zigbee2MQTT, Home Assistant and a Hyperion / HyperHDR server.
+- **Device search**: finds WLED, Hyperion, HyperHDR, Hue bridges, Nanoleaf, Home Assistant,
+  WiZ, Yeelight, LIFX, Govee and Art-Net nodes on the local network in a few seconds.
 - **Phone and Android TV**: separate layouts for touchscreens and D-pad navigation.
 - **Camera capture**: films the TV with the device camera and corrects perspective by four
-  corners — for TVs where screen capture is unavailable.
-- **Network discovery**: scans the local network for LED servers.
+  corners, for TVs where screen capture is unavailable.
+- **Light effects without capture**: solid color, gradient, movie white, rainbow, fire,
+  candle, aurora and more.
+- **Lighting delay per app**, with auto-tuning: a phone camera films the TV and the glow and
+  measures how far the strip is ahead of the picture on the movie that is playing.
 - **Tunable pipeline**: capture quality, frame rate, color smoothing and latency.
 - **Auto-start** after boot, TV sleep and app updates, **auto-reconnect** after a connection drop.
-- **Phone remote**: pair with the TV by QR code, then start, stop and change every lighting setting of the TV from the phone, including during a movie.
+- **Phone remote**: pair with the TV by QR code, then start, stop and change every lighting
+  setting of the TV from the phone. The phone also works as a TV remote with a touchpad
+  mouse and a keyboard.
+- **Sleep timer** that turns the lighting off after 15 minutes to 2 hours.
 - **Average color mode**: sends one dominant color instead of a full strip, for weak devices.
 - **Quick Settings tile** for switching the light on and off.
 
 ## Supported Controllers
 
-### Hyperion
-- Full Hyperion protocol support.
-- Message priority configuration.
-- Compatible with all Hyperion NG versions.
+| Group | Output | Notes |
+|---|---|---|
+| Strip over the network | WLED | DDP or UDP raw, color order, RGBW, brightness limit |
+| | DDP | WLED, ESPixelStick, FPP and other DDP receivers |
+| | E1.31 (sACN) | start universe, LEDs per universe, unicast or multicast |
+| | Art-Net | ArtDmx, start universe, LEDs per universe |
+| | tpm2.net | packets of up to 490 LEDs, port 65506 |
+| | UDP raw | bare RGB in one datagram, up to 490 LEDs |
+| | Open Pixel Control | FadeCandy / fcserver over TCP |
+| Strip over USB | Adalight and USB kits | Ada, LightBerry APA102, AWA (HyperSerial), tpm2, Skydimo, SEDU, KarateLight, AtmoLight, SP616E |
+| Smart lights | Philips Hue | through the bridge, paired with its button; an entertainment area gets a stream up to 25 times per second |
+| | Nanoleaf | Light Panels, Canvas, Shapes, Elements, Lines |
+| | WiZ, Yeelight, LIFX, Govee | local network protocols, no cloud |
+| | Zigbee2MQTT | Zigbee lights through an MQTT broker |
+| | Home Assistant | any light entity, as the main output or next to it |
+| Server | Hyperion / HyperHDR | FlatBuffers, message priority |
 
-### WLED
-- Supports **DDP** (recommended for WLED 0.11+) and **UDP Raw** protocols.
-- configurable color order (RGB, GRB, BRG, etc.).
-- RGBW LED support.
-- Brightness control.
-
-### Adalight
-- Supports **ADA**, **LBAPA** (LightBerry APA102), and **AWA** (Hyperserial) protocols.
-- Configurable Baud Rate.
-- USB OTG connection support.
+Lights and panels get the color of a screen zone (left, top, corners, the whole screen and so
+on) and follow the picture at the rate they can take, not at the frame rate of a strip.
 
 ## Requirements
 
 - Android 8.0 (API 26) or higher.
 - Screen Capture permission (MediaProjection).
-- Local network access (for Hyperion/WLED) or USB Host support (for Adalight).
+- Local network access (for network controllers and lights) or USB Host support (for Adalight
+  and other USB boards).
 
 ## Installation
 
@@ -62,9 +78,17 @@ An experimental build with **external USB camera (UVC) support** is available fo
 ## Configuration
 
 ### 1. Connection
-1. Launch the app and open **Settings**.
-2. Select **Connection Type**: Hyperion, WLED, or Adalight.
-3. Enter the IP/Port (for network controllers) or configure USB settings.
+1. Launch the app and open **Settings**, or press **Set up the controller** on the home screen.
+2. The controller screen lists what it found on the network. Pick a device, or pick its type
+   in the list below and enter the address by hand. **Check every address** scans the whole
+   subnet for WLED and Hyperion that do not announce themselves over mDNS; it takes a minute
+   or two.
+3. A Hue bridge and Nanoleaf panels are paired with a button on the device. Lights (Hue, WiZ,
+   Yeelight, LIFX, Govee, Zigbee2MQTT, Home Assistant) are then assigned to screen zones; **Blink**
+   next to a light shows which one it is. A Hue bridge with an entertainment area can work through
+   the area instead, then the zones are not needed.
+4. For a WLED picked from the search the app reads the LED count set in WLED and says so if the
+   LED layout of the app has a different number.
 
 ### 2. LED Configuration
 - **Per-Side LED Configuration**: You can configure each side separately:
@@ -147,6 +171,32 @@ against a live feed.
 1. Grant **Screen Capture / Casting** permission when prompted.
 2. Toggle the button to start the grabber.
 
+### 6. Effects
+The palette button on the home screen opens the effects. An effect lights the strip without
+screen capture: no permission dialog, and what is on the TV does not matter. Static: solid
+color, gradient, movie white (color temperature, 6500 K is the reference white). Animated:
+rainbow, color cycle, breathing, candle, fire, aurora, ocean, plasma, comet. **Layout test**
+paints the sides in different colors and runs a white dot from the first LED, which makes a
+wrong LED layout obvious.
+
+**Keep on when the TV screen is off** leaves the effect running as a night light while the TV
+box stays awake. Some TVs cut the network in standby, the strip goes dark then anyway.
+
+### 7. Lighting delay
+Players and sources process video differently, so the strip can run ahead of the picture by
+a different amount in every app. Settings → **Lighting delay** holds a delay for all apps and
+a list of apps with their own value; the TV switches to it while that app is on screen. The
+per-app part needs usage access, which is granted together with the autostart permissions
+via ADB.
+
+**Tune with the camera** runs from a phone paired with the TV. The phone films the TV and the
+glow on the wall for about a minute, detects scene changes in both and finds the shift
+between them. The strip goes dark for a few seconds at the start while the phone looks for the
+screen in the frame. It needs a dark room, a dynamic scene and the whole screen with some wall
+around it in the frame. The result comes with an accuracy estimate and is saved for the app
+that is playing or for all apps. A strip that is behind the picture cannot be fixed by a
+delay: lower the smoothing or pick a faster capture method.
+
 ---
 
 ### Controller-Specific Details
@@ -165,9 +215,57 @@ against a live feed.
   The app extracts the white channel itself (the component common to R, G and B is moved to W), so in WLED the strip type must be RGBW and **Calculate white channel from RGB** must be set to `Manual only` or `Dual`. In the automatic modes WLED discards the white value it receives and recomputes it from the already-reduced RGB, which comes out as zero: the white LEDs stay dark and the colors look washed out.
 - [WLED Documentation](https://kno.wled.ge/)
 
+#### E1.31 and Art-Net
+- **Start universe**: the first universe of the strip. A strip longer than **LEDs per
+  universe** continues into the next universes.
+- **LEDs per universe**: 170 fills all 510 channels; set the receiver's value if it differs.
+- E1.31 with an empty address is sent as multicast to `239.255.x.y`.
+
+#### tpm2.net, UDP raw, Open Pixel Control
+- tpm2.net splits the frame into numbered packets, the size is set in LEDs per packet.
+- UDP raw has no header at all, so the whole strip must fit into one datagram (490 LEDs).
+- OPC keeps a TCP connection to port `7890`; channel 0 addresses every channel of the server.
+
+#### Philips Hue
+- Pick the bridge in the device search or enter its address, then press the round button on
+  the bridge and **Pair** within 30 seconds.
+- If the Hue app has entertainment areas, the app offers to use one. The bridge then gets a
+  DTLS stream on port `2100` up to 25 times per second, and every light of the area takes the
+  color of its place set in the Hue app: left to right, and floor, TV level or ceiling. An area
+  holds up to 10 lights. While the stream is on, other scenes and automations of the bridge
+  do not touch these lights.
+- Bridges paired by version 1.x of the app have no streaming key, such a bridge has to be
+  paired again to use an area.
+- Without an area the lights of the bridge are listed in **Lights and zones**; each one gets a
+  screen zone. Colors are converted to the gamut of each light. The bridge takes about ten
+  commands per second for all lights, so the update rate is shared between them.
+
+#### Nanoleaf
+- Hold the power button on the controller for 5 to 7 seconds until its light flashes, then
+  press **Pair** within 30 seconds.
+- Every panel takes the color of the place it occupies on the wall, relative to the others.
+
+#### WiZ, Yeelight, LIFX, Govee
+- The lights are found on the local network, no cloud and no account.
+- Yeelight needs **LAN Control** enabled in the Yeelight app. The app switches every Yeelight
+  to music mode, which lifts the limit of 60 commands per minute.
+- Govee needs **LAN Control** enabled for the device in the Govee Home app. The LAN API sets one
+  color per device, segments of a strip are not addressed separately.
+
+#### Zigbee2MQTT
+- The address and port (`1883` by default) are those of the MQTT broker Zigbee2MQTT works with,
+  for example the Mosquitto add-on of Home Assistant. Login, password and base topic
+  (`zigbee2mqtt` by default) are set in the connection settings.
+- The list of lights comes from the retained `zigbee2mqtt/bridge/devices` message, only devices
+  that expose a light are shown. Colors are published to `zigbee2mqtt/<name>/set`.
+- Zigbee is slow for fast scenes: a few updates per second per light is what the network takes
+  without delays.
+
 #### Adalight (USB)
-- **Baud Rate**: `115200` (default) or match your firmware.
-- **Protocol**: ADA (Standard Arduino), LBAPA (APA102), AWA.
+- **Baud Rate**: `115200` (default) or match your firmware. HyperSerial firmwares usually run
+  at `2000000`.
+- **Protocol**: ADA (Standard Arduino), LBAPA (APA102), AWA (HyperSerial), tpm2, Skydimo,
+  SEDU, KarateLight (8 or 16 channels), AtmoLight (5 channels), SP616E.
 - [Adalight Repository](https://github.com/adafruit/Adalight)
 
 ##### Arduino Sketch for Adalight
@@ -239,6 +337,12 @@ The phone and the TV must be on the same local network. The connection is encryp
 The phone is also handy for setting up ADB on the TV itself: the 6-digit code from Wireless debugging is typed on the phone, and the TV finds the pairing port by itself.
 
 Camera corners are dragged on the TV itself; from the phone only the automatic screen search is available.
+
+**Remote** on the phone's home screen turns it into a TV remote: D-pad, Back, Home, volume and
+playback buttons, a touchpad that moves a cursor on the TV (a tap clicks, two fingers
+scroll), a text field whose input appears on the TV right away, and a list of TV apps to
+launch. Buttons, mouse and text go through ADB on the TV; without ADB only system buttons,
+taps and text through the accessibility service are available (GitHub and RuStore builds).
 
 ## Auto-start
 **Grab on Boot** (on by default) brings the lighting back after the TV boots, wakes from sleep or the app updates, if the lighting was on before. After sleep a system alarm watchdog restarts it, so it also comes back on firmware that unloads apps while the TV sleeps.

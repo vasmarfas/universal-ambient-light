@@ -17,7 +17,11 @@ import com.vasmarfas.UniversalAmbientLight.R
  * Группа сглаживания цвета.
  */
 @Composable
-internal fun ColumnScope.SmoothingSection(prefs: Preferences, state: SettingsScreenState) {
+internal fun ColumnScope.SmoothingSection(
+    prefs: Preferences,
+    state: SettingsScreenState,
+    onDelayClick: () -> Unit,
+) {
     val context = LocalContext.current
     SettingsGroup(title = stringResource(R.string.pref_group_smoothing)) {
         // key: пресет «off» выключает сглаживание записью в prefs, и без пересоздания
@@ -98,5 +102,10 @@ internal fun ColumnScope.SmoothingSection(prefs: Preferences, state: SettingsScr
                 recomposeKey = state.smoothingPreset
             )
         }
+        ClickablePreference(
+            title = stringResource(R.string.delay_title),
+            summary = stringResource(R.string.delay_summary),
+            onClick = onDelayClick
+        )
     }
 }

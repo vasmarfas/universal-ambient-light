@@ -2,6 +2,9 @@
 agp = "9.3.1"
 appUpdateKtx = "2.1.0"
 conscryptAndroid = "2.6.1"
+# DTLS для Hue Entertainment. Версия та же, что у bcprov из libadb-android: разные сборки
+# Bouncy Castle в одном приложении дают конфликт классов
+bouncycastle = "1.81"
 dadb = "2.0.0"
 libadbAndroid = "3.1.1"
 playReview = "2.0.2"
@@ -28,6 +31,7 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 app-update = { module = "com.google.android.play:app-update", version.ref = "appUpdateKtx" }
 app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdateKtx" }
 conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "conscryptAndroid" }
+bctls = { module = "org.bouncycastle:bctls-jdk15to18", version.ref = "bouncycastle" }
 dadb = { module = "dev.mobile:dadb", version.ref = "dadb" }
 libadb-android = { module = "com.github.MuntashirAkon:libadb-android", version.ref = "libadbAndroid" }
 play-review = { module = "com.google.android.play:review", version.ref = "playReview" }

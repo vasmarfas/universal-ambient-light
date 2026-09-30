@@ -37,6 +37,8 @@ class RemoteServer(
         fun handle(client: Client, op: String, request: JSONObject): JSONObject
 
         fun onClientsChanged(clients: List<Client>)
+
+        fun onClientGone(client: Client)
     }
 
     class Client internal constructor(val id: Int, val name: String, val channel: RemoteChannel) {
@@ -158,7 +160,7 @@ class RemoteServer(
             while (!mStopped) {
                 val request = channel.receive()
                 val op = request.optString("op")
-                if (op == RemoteProtocol.OP_PING) {
+                if (op == RemoteProtocol.OP_PING || op == RemoteProtocol.OP_INPUT) {
                     respond(client, request, op)
                 } else {
                     try {
@@ -180,6 +182,7 @@ class RemoteServer(
         } finally {
             channel.close()
             mClients.remove(client)
+            handler.onClientGone(client)
             notifyClientsChanged()
         }
     }
@@ -196,7 +199,12 @@ class RemoteServer(
                 .put("err", RemoteProtocol.ERR_FAILED)
                 .put("msg", e.message ?: e.javaClass.simpleName)
         }
-        response.put("re", request.optInt("id"))
+        val id = request.optInt("id")
+        if (id == 0 && op == RemoteProtocol.OP_INPUT) {
+            if (!response.optBoolean("ok")) Log.w(TAG, "Input without reply failed: ${response.optString("msg")}")
+            return
+        }
+        response.put("re", id)
         try {
             client.channel.send(response)
         } catch (e: IOException) {

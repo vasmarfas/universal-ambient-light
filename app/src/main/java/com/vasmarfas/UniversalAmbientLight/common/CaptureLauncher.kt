@@ -54,17 +54,24 @@ object CaptureLauncher {
             return startService(app, ScreenGrabberService.ACTION_START_CAMERA)
         }
 
-        val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
-            ?: "media_projection"
-        if (method == "accessibility" && AccessibilityCaptureService.getInstance() == null) {
-            return Result(Outcome.FAILED, app.getString(R.string.accessibility_enable_prompt))
-        }
-
         val adalight = "adalight".equals(
             prefs.getString(R.string.pref_key_connection_type, "hyperion"),
             ignoreCase = true
         )
         val needsUsbPermission = adalight && !hasUsbPermission(app)
+        // Эффекту не нужен захват экрана - диалог возможен только ради USB
+        if (source == "effect" && !needsUsbPermission) {
+            return startService(app, ScreenGrabberService.ACTION_START_EFFECT)
+        }
+
+        val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+            ?: "media_projection"
+        if (source != "effect" && method == "accessibility" &&
+            AccessibilityCaptureService.getInstance() == null
+        ) {
+            return Result(Outcome.FAILED, app.getString(R.string.accessibility_enable_prompt))
+        }
+
         if (method != "media_projection" && !needsUsbPermission) {
             return startService(app, ScreenGrabberService.ACTION_START)
         }

@@ -50,14 +50,13 @@ import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.LocalNetworkAccess
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.ReviewHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
-import com.vasmarfas.UniversalAmbientLight.ui.home.EffectMode
-import com.vasmarfas.UniversalAmbientLight.ui.home.next
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.AppNavHost
 import com.vasmarfas.UniversalAmbientLight.ui.navigation.Screen
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
@@ -75,6 +74,7 @@ class MainActivity : ComponentActivity() {
 
     // Последняя ошибка сервиса — на карточке состояния главного экрана до следующего запуска
     private var mLastError by mutableStateOf<String?>(null)
+    private var mSleepAt by mutableStateOf(0L)
     // Отказ телевизора выполнить команду пульта; своя ошибка у ТВ приходит его статусом
     private var mRemoteError by mutableStateOf<String?>(null)
     private var mRemotePending by mutableStateOf(false)
@@ -94,7 +94,6 @@ class MainActivity : ComponentActivity() {
     private var mOverlayRequested = false
     private var mTclWarningShown = false
     private lateinit var appUpdateManager: AppUpdateManager
-    private var currentEffect by mutableStateOf(EffectMode.RAINBOW)
     private var mSessionStartTime: Long? = null
     private var mSessionEverConnected: Boolean = false
     private var mSessionMethod: String? = null
@@ -142,6 +141,7 @@ class MainActivity : ComponentActivity() {
 
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
             mLastError = if (checked) null else error
+            mSleepAt = intent.getLongExtra(ScreenGrabberService.BROADCAST_SLEEP_AT, 0L)
             val tclBlocked =
                 intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
 
@@ -212,10 +212,7 @@ class MainActivity : ComponentActivity() {
         )
         checkForInstance()
 
-        // Разрешение на уведомления для Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestNotificationPermission()
-        }
+        requestStartupPermissions()
 
         maybeRequestBatteryOptimizationExemption()
 
@@ -242,15 +239,11 @@ class MainActivity : ComponentActivity() {
                             onToggleClick = {
                                 if (remoteActive) toggleRemoteCapture() else toggleScreenCapture()
                             },
-                            onEffectsClick = {
-                                currentEffect = currentEffect.next()
-                                AnalyticsHelper.logEffectChanged(
-                                    this@MainActivity,
-                                    currentEffect.name.lowercase()
-                                )
-                            },
-                            effectMode = currentEffect,
                             lastError = if (remoteActive) mRemoteError else mLastError,
+                            sleepAt = mSleepAt,
+                            onSleepTimer = { minutes ->
+                                if (remoteActive) setRemoteSleepTimer(minutes) else setSleepTimer(minutes)
+                            },
                             remotePending = mRemotePending,
                             pendingPayload = mPendingPayload,
                             onPayloadConsumed = { mPendingPayload = null }
@@ -415,11 +408,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    /**
+     * Уведомления (Android 13+) и локальная сеть (Android 17+) одним запросом: второй
+     * запрос, пока открыт первый диалог, система молча отбрасывает.
+     */
+    private fun requestStartupPermissions() {
+        val needed = ArrayList<String>()
+        if (shouldAskNotifications()) needed += Manifest.permission.POST_NOTIFICATIONS
+        // Без сети не работает ничего, кроме USB-ленты, поэтому спрашиваем при каждом запуске;
+        // после двух отказов система сама перестаёт показывать диалог
+        if (!LocalNetworkAccess.isGranted(this)) needed += LocalNetworkAccess.PERMISSION
+        if (needed.isEmpty()) return
+        ActivityCompat.requestPermissions(this, needed.toTypedArray(), REQUEST_STARTUP_PERMISSIONS)
+    }
+
+    private fun shouldAskNotifications(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             == PackageManager.PERMISSION_GRANTED
-        ) return
+        ) return false
 
         // shouldShowRequestPermissionRationale возвращает false и при первом запросе, и после
         // «Больше не спрашивать» — различаем их одноразовой настройкой, чтобы не докучать.
@@ -428,14 +435,10 @@ class MainActivity : ComponentActivity() {
         if (askedBefore && !ActivityCompat.shouldShowRequestPermissionRationale(
                 this, Manifest.permission.POST_NOTIFICATIONS
             )
-        ) return
+        ) return false
 
         prefs.edit { putBoolean(PREF_NOTIF_PERMISSION_ASKED, true) }
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            REQUEST_NOTIFICATION_PERMISSION
-        )
+        return true
     }
 
     private fun beginCaptureSession(source: String, method: String, protocol: String) {
@@ -480,6 +483,8 @@ class MainActivity : ComponentActivity() {
         val action = if (start) RemoteProtocol.CAPTURE_START else RemoteProtocol.CAPTURE_STOP
         Thread({
             val result = runCatching {
+                // Источник могли переключить только что: правка обязана дойти до ТВ раньше запуска
+                if (start) RemoteSession.flushPending()
                 RemoteSession.call(
                     RemoteProtocol.OP_CAPTURE,
                     JSONObject().put("action", action),
@@ -514,6 +519,25 @@ class MainActivity : ComponentActivity() {
         }, "remote-capture").start()
     }
 
+    private fun setSleepTimer(minutes: Int) {
+        if (!ScreenGrabberService.sInstanceRunning) return
+        val intent = Intent(this, ScreenGrabberService::class.java)
+            .setAction(ScreenGrabberService.ACTION_SLEEP_TIMER)
+            .putExtra(ScreenGrabberService.EXTRA_SLEEP_MINUTES, minutes)
+        startService(intent)
+    }
+
+    private fun setRemoteSleepTimer(minutes: Int) {
+        Thread({
+            val result = runCatching {
+                RemoteSession.call(RemoteProtocol.OP_SLEEP, JSONObject().put("minutes", minutes))
+            }
+            result.exceptionOrNull()?.let { error ->
+                runOnUiThread { mRemoteError = error.message }
+            }
+        }, "remote-sleep").start()
+    }
+
     private fun toggleScreenCapture() {
         if (!mRecorderRunning) {
             // Ловим отсутствующие адрес, порт и количество светодиодов здесь, иначе пользователь
@@ -533,6 +557,8 @@ class MainActivity : ComponentActivity() {
 
             if (captureSource == "camera") {
                 requestCameraCapture()
+            } else if (captureSource == "effect") {
+                ensureUsbPermissionForAdalight { startEffects() }
             } else {
                 ensureUsbPermissionForAdalight {
                     requestScreenCapture()
@@ -638,6 +664,18 @@ class MainActivity : ComponentActivity() {
         } else {
             startCameraGrabber()
         }
+    }
+
+    private fun startEffects() {
+        val prefs = Preferences(this)
+        val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        BootActivity.startEffects(this)
+        mRecorderRunning = true
+        beginCaptureSession(
+            source = "effect",
+            method = prefs.getString(R.string.pref_key_effect, "rainbow") ?: "rainbow",
+            protocol = protocol
+        )
     }
 
     private fun startCameraGrabber() {
@@ -752,18 +790,23 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
-            if (grantResults.isNotEmpty()) {
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    AnalyticsHelper.logPermissionGranted(this, "POST_NOTIFICATIONS")
-                } else {
-                    AnalyticsHelper.logPermissionDenied(this, "POST_NOTIFICATIONS")
-                    Toast.makeText(
-                        this,
-                        "Notification permission is needed for the foreground service",
-                        Toast.LENGTH_LONG
-                    ).show()
+        if (requestCode == REQUEST_STARTUP_PERMISSIONS) {
+            for ((index, permission) in permissions.withIndex()) {
+                val granted = grantResults.getOrNull(index) == PackageManager.PERMISSION_GRANTED
+                val name = permission.substringAfterLast('.')
+                if (granted) {
+                    AnalyticsHelper.logPermissionGranted(this, name)
+                    // Пульт пытался подключиться к ТВ, пока сеть была закрыта
+                    if (permission == LocalNetworkAccess.PERMISSION) RemoteSession.reconnectNow()
+                    continue
                 }
+                AnalyticsHelper.logPermissionDenied(this, name)
+                val message = if (permission == LocalNetworkAccess.PERMISSION) {
+                    getString(R.string.error_local_network)
+                } else {
+                    "Notification permission is needed for the foreground service"
+                }
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
         }
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
@@ -832,7 +875,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val REQUEST_MEDIA_PROJECTION = 1
-        private const val REQUEST_NOTIFICATION_PERMISSION = 2
+        private const val REQUEST_STARTUP_PERMISSIONS = 2
         private const val REQUEST_OVERLAY_PERMISSION = 3
         private const val REQUEST_UPDATE_CODE = 4
         private const val REQUEST_CAMERA_PERMISSION = 5

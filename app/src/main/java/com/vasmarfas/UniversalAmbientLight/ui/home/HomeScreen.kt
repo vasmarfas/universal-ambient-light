@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Help
@@ -32,7 +33,9 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -64,37 +68,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraPreviewBackground
+import com.vasmarfas.UniversalAmbientLight.ui.settings.ClickablePreference
+import java.text.DateFormat
+import java.util.Date
 import kotlin.math.sqrt
-
-/**
- * Главный экран: кнопка включения, режимы фоновой анимации и кнопки в углах.
- */
-enum class EffectMode {
-    RAINBOW,
-    SIDE_COLORS,
-    MOVING_BAR,
-    SOLID_WHITE,
-    SOLID_RED,
-    SOLID_GREEN,
-    SOLID_BLUE,
-    BREATHING,
-    VERTICAL_BARS,
-    HORIZONTAL_BARS;
-}
-
-internal fun EffectMode.next(): EffectMode =
-    when (this) {
-        EffectMode.RAINBOW -> EffectMode.SIDE_COLORS
-        EffectMode.SIDE_COLORS -> EffectMode.MOVING_BAR
-        EffectMode.MOVING_BAR -> EffectMode.SOLID_WHITE
-        EffectMode.SOLID_WHITE -> EffectMode.SOLID_RED
-        EffectMode.SOLID_RED -> EffectMode.SOLID_GREEN
-        EffectMode.SOLID_GREEN -> EffectMode.SOLID_BLUE
-        EffectMode.SOLID_BLUE -> EffectMode.BREATHING
-        EffectMode.BREATHING -> EffectMode.VERTICAL_BARS
-        EffectMode.VERTICAL_BARS -> EffectMode.HORIZONTAL_BARS
-        EffectMode.HORIZONTAL_BARS -> EffectMode.RAINBOW
-    }
 
 /**
  * Рамка фокуса для d-pad на ТВ. Отдельно от border с условной шириной: 0.dp — это
@@ -130,6 +107,8 @@ data class HomeStatus(
     val error: String? = null,
     val target: String? = null,
     val source: String? = null,
+    /** Когда подсветка выключится по таймеру сна, мс по часам; 0 - таймера нет. */
+    val sleepAt: Long = 0L,
 )
 
 /** Вход в удалённое управление: на ТВ — показать QR, на телефоне — выбрать телевизор. */
@@ -141,18 +120,22 @@ fun MainScreen(
     onToggleClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onEffectsClick: () -> Unit,
-    effectMode: EffectMode,
     captureSource: String = "screen",
     status: HomeStatus = HomeStatus(running = isRunning),
-    // Эффекты рисуются на экране этого устройства — при управлении телевизором с телефона
-    // они ничего не дают, как и превью камеры телефона
+    // Превью камеры и радуга захвата рисуются на экране этого устройства, при управлении
+    // телевизором с телефона они ничего не показывают
     localPreview: Boolean = true,
-    remoteEntry: RemoteEntry? = null,
+    remoteEntries: List<RemoteEntry> = emptyList(),
     topContent: @Composable () -> Unit = {},
     onHelpClick: () -> Unit = {},
     onSupportClick: () -> Unit = {},
     onReportIssueClick: () -> Unit = {},
     onLeaveReviewClick: () -> Unit = {},
+    // null - таймер сна недоступен (старый ТВ); 0 минут отменяет таймер
+    onSleepTimer: ((minutes: Int) -> Unit)? = null,
+    // Чего не хватает контроллеру; null - всё настроено и кнопка настройки не нужна
+    setupHint: String? = null,
+    onSetupClick: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // В режиме камеры фоном идёт превью камеры с углами
@@ -160,225 +143,45 @@ fun MainScreen(
             CameraPreviewBackground(isCapturing = isRunning)
         }
 
-        // В режиме экрана — анимированный фон, но только когда захват запущен
-        if (isRunning && captureSource != "camera" && localPreview) {
+        // Пока идёт захват экрана, фон переливается радугой: она попадает на ленту и сразу
+        // показывает, что картинка доходит до контроллера
+        if (isRunning && captureSource == "screen" && localPreview) {
             val infiniteTransition = rememberInfiniteTransition(label = "effects")
+            val angle by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(4000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "rotation"
+            )
 
-            when (effectMode) {
-                EffectMode.RAINBOW -> {
-                    val angle by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(4000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "rotation"
-                    )
+            Spacer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        val diagonal =
+                            sqrt(size.width * size.width + size.height * size.height)
 
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val diagonal =
-                                    sqrt(size.width * size.width + size.height * size.height)
-
-                                rotate(angle) {
-                                    drawCircle(
-                                        brush = Brush.sweepGradient(
-                                            colors = listOf(
-                                                Color.Red,
-                                                Color.Magenta,
-                                                Color.Blue,
-                                                Color.Cyan,
-                                                Color.Green,
-                                                Color.Yellow,
-                                                Color.Red
-                                            )
-                                        ),
-                                        radius = diagonal / 2
+                        rotate(angle) {
+                            drawCircle(
+                                brush = Brush.sweepGradient(
+                                    colors = listOf(
+                                        Color.Red,
+                                        Color.Magenta,
+                                        Color.Blue,
+                                        Color.Cyan,
+                                        Color.Green,
+                                        Color.Yellow,
+                                        Color.Red
                                     )
-                                }
-                            }
-                    )
-                }
-
-                EffectMode.SIDE_COLORS -> {
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val thickness = h * 0.12f
-
-                                // Верх — красный
-                                drawRect(
-                                    color = Color.Red,
-                                    size = androidx.compose.ui.geometry.Size(w, thickness)
-                                )
-                                // Низ — синий
-                                drawRect(
-                                    color = Color.Blue,
-                                    topLeft = androidx.compose.ui.geometry.Offset(
-                                        0f,
-                                        h - thickness
-                                    ),
-                                    size = androidx.compose.ui.geometry.Size(w, thickness)
-                                )
-                                // Слева — жёлтый
-                                drawRect(
-                                    color = Color.Yellow,
-                                    topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
-                                    size = androidx.compose.ui.geometry.Size(thickness, h)
-                                )
-                                // Справа — зелёный
-                                drawRect(
-                                    color = Color.Green,
-                                    topLeft = androidx.compose.ui.geometry.Offset(
-                                        w - thickness,
-                                        0f
-                                    ),
-                                    size = androidx.compose.ui.geometry.Size(thickness, h)
-                                )
-                            }
-                    )
-                }
-
-                EffectMode.MOVING_BAR -> {
-                    val offset by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(3000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "movingBar"
-                    )
-
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val barWidth = w * 0.12f
-                                val x = (w + barWidth) * offset - barWidth
-
-                                drawRect(
-                                    brush = Brush.verticalGradient(
-                                        listOf(
-                                            Color.Red,
-                                            Color.Yellow,
-                                            Color.Green,
-                                            Color.Cyan,
-                                            Color.Blue,
-                                            Color.Magenta
-                                        )
-                                    ),
-                                    topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
-                                    size = androidx.compose.ui.geometry.Size(barWidth, h)
-                                )
-                            }
-                    )
-                }
-
-                EffectMode.SOLID_WHITE,
-                EffectMode.SOLID_RED,
-                EffectMode.SOLID_GREEN,
-                EffectMode.SOLID_BLUE,
-                    -> {
-                    val color = when (effectMode) {
-                        EffectMode.SOLID_WHITE -> Color.White
-                        EffectMode.SOLID_RED -> Color.Red
-                        EffectMode.SOLID_GREEN -> Color.Green
-                        EffectMode.SOLID_BLUE -> Color.Blue
-                        else -> Color.White
+                                ),
+                                radius = diagonal / 2
+                            )
+                        }
                     }
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(color)
-                    )
-                }
-
-                EffectMode.BREATHING -> {
-                    val alpha by infiniteTransition.animateFloat(
-                        initialValue = 0.2f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(2000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "breathing"
-                    )
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Cyan.copy(alpha = alpha))
-                    )
-                }
-
-                EffectMode.VERTICAL_BARS -> {
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val colors = listOf(
-                                    Color.Red,
-                                    Color.Yellow,
-                                    Color.Green,
-                                    Color.Cyan,
-                                    Color.Blue,
-                                    Color.Magenta
-                                )
-                                val barWidth = w / colors.size
-                                colors.forEachIndexed { index, c ->
-                                    drawRect(
-                                        color = c,
-                                        topLeft = androidx.compose.ui.geometry.Offset(
-                                            index * barWidth,
-                                            0f
-                                        ),
-                                        size = androidx.compose.ui.geometry.Size(barWidth, h)
-                                    )
-                                }
-                            }
-                    )
-                }
-
-                EffectMode.HORIZONTAL_BARS -> {
-                    Spacer(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawBehind {
-                                val w = size.width
-                                val h = size.height
-                                val colors = listOf(
-                                    Color.Red,
-                                    Color.Yellow,
-                                    Color.Green,
-                                    Color.Cyan,
-                                    Color.Blue,
-                                    Color.Magenta
-                                )
-                                val barHeight = h / colors.size
-                                colors.forEachIndexed { index, c ->
-                                    drawRect(
-                                        color = c,
-                                        topLeft = androidx.compose.ui.geometry.Offset(
-                                            0f,
-                                            index * barHeight
-                                        ),
-                                        size = androidx.compose.ui.geometry.Size(w, barHeight)
-                                    )
-                                }
-                            }
-                    )
-                }
-            }
+            )
         }
 
         // Центральный блок с рядом кнопок управления. Прокрутка — на телефоне в ландшафте
@@ -407,16 +210,12 @@ fun MainScreen(
 
             topContent()
 
-            // Эффекты рисуются на экране устройства и попадают на ленту через захват
-            // экрана — в режиме камеры кнопка ничего не меняет
-            val effectsEnabled = captureSource != "camera"
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 // Кнопка эффектов (слева)
-                if (localPreview) Box(
+                Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(80.dp)
@@ -430,7 +229,6 @@ fun MainScreen(
                 ) {
                     IconButton(
                         onClick = onEffectsClick,
-                        enabled = effectsEnabled,
                         modifier = Modifier
                             .size(72.dp)
                             .onFocusChanged { effectsFocused = it.isFocused }
@@ -439,12 +237,10 @@ fun MainScreen(
                             imageVector = Icons.Default.Palette,
                             contentDescription = stringResource(R.string.home_effects),
                             modifier = Modifier.size(40.dp),
-                            tint = when {
-                                !effectsEnabled ->
-                                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-
-                                isRunning -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onBackground
+                            tint = if (isRunning && captureSource == "effect") {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onBackground
                             }
                         )
                     }
@@ -529,6 +325,62 @@ fun MainScreen(
                     .padding(horizontal = 16.dp)
             )
 
+            if (setupHint != null && !isRunning) {
+                var setupFocused by remember { mutableStateOf(false) }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = setupHint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = onSetupClick,
+                    border = focusableOutline(setupFocused),
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .onFocusChanged { setupFocused = it.isFocused }
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.home_setup_button))
+                }
+            }
+
+            if (onSleepTimer != null && isRunning) {
+                var showSleepDialog by remember { mutableStateOf(false) }
+                var sleepFocused by remember { mutableStateOf(false) }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { showSleepDialog = true },
+                    border = focusableOutline(sleepFocused),
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .onFocusChanged { sleepFocused = it.isFocused }
+                ) {
+                    Icon(Icons.Default.Bedtime, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.sleep_timer))
+                }
+                if (showSleepDialog) {
+                    SleepTimerDialog(
+                        active = status.sleepAt > 0,
+                        onPick = { minutes ->
+                            showSleepDialog = false
+                            onSleepTimer(minutes)
+                        },
+                        onDismiss = { showSleepDialog = false }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Столбец кнопок помощи и поддержки. Ширина ограничена: на ТВ кнопки
@@ -541,7 +393,7 @@ fun MainScreen(
                     .widthIn(max = 420.dp)
                     .padding(horizontal = 16.dp)
             ) {
-                if (remoteEntry != null) {
+                for (remoteEntry in remoteEntries) {
                     var remoteFocused by remember { mutableStateOf(false) }
                     FilledTonalButton(
                         onClick = remoteEntry.onClick,
@@ -681,6 +533,14 @@ private fun StatusCard(status: HomeStatus, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (status.running && status.sleepAt > 0) {
+                val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(status.sleepAt))
+                Text(
+                    text = stringResource(R.string.sleep_timer_until, time),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             if (error != null) {
                 Text(
                     text = error,
@@ -694,3 +554,33 @@ private fun StatusCard(status: HomeStatus, modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+private fun SleepTimerDialog(active: Boolean, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sleep_timer)) },
+        text = {
+            Column {
+                for (minutes in SLEEP_OPTIONS) {
+                    ClickablePreference(
+                        title = stringResource(R.string.sleep_timer_minutes, minutes),
+                        onClick = { onPick(minutes) }
+                    )
+                }
+                if (active) {
+                    ClickablePreference(
+                        title = stringResource(R.string.sleep_timer_cancel),
+                        onClick = { onPick(0) }
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
+}
+
+private val SLEEP_OPTIONS = listOf(15, 30, 45, 60, 90, 120)

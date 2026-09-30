@@ -12,16 +12,7 @@
   <!-- notification button -->
   <string name="notification_exit_button">Выход</string>
   <!-- Network scanner -->
-  <string name="scanner_description">Автоматически найти WLED и Hyperion устройства в сети</string>
   <string name="scanner_retry_button">Повторить</string>
-  <string name="scanner_scan_devices">Сканировать устройства</string>
-  <string name="scanner_scanning">Сканирование сети…</string>
-  <string name="scanner_found_devices">Найденные устройства:</string>
-  <string name="scanner_no_devices_found">Устройства не найдены</string>
-  <string name="scanner_device_wled">WLED</string>
-  <string name="scanner_device_hyperion">Hyperion</string>
-  <string name="scanner_device_unknown">Неизвестно</string>
-  <string name="scanner_device_info">%1$s на %2$s:%3$d</string>
   <string name="scanner_cancel">Отмена</string>
   <!-- Network Scanner result -->
   <!-- Connection settings -->
@@ -84,9 +75,6 @@
   <string name="pref_category_debug">Отладка</string>
   <string name="pref_title_device_info">Информация об устройстве</string>
   <string name="pref_summary_device_info">Показать данные устройства для отладки</string>
-  <string name="scan_scanning">Сканирование: %1$s</string>
-  <string name="scan_hostname">Имя хоста: %1$s</string>
-  <string name="scan_protocol">Протокол: %1$s</string>
   <string name="rating_stars_desc">Звёзд: %1$d</string>
   <string name="usb_service_unavailable">USB-сервис недоступен на этом устройстве</string>
   <string name="usb_no_serial_devices">USB-устройства не найдены. Подключите устройство через USB OTG</string>
@@ -102,10 +90,12 @@
   <string-array name="pref_list_capture_source">
     <item>Экран</item>
     <item>Камера</item>
+    <item>Эффект (без захвата)</item>
   </string-array>
   <string-array name="pref_list_capture_source_values">
     <item>screen</item>
     <item>camera</item>
+    <item>effect</item>
   </string-array>
   <string name="pref_title_camera_setup">Настройка углов камеры</string>
   <string name="pref_summary_camera_setup">Настройте 4 угла для совмещения с экраном ТВ в кадре камеры</string>
@@ -278,19 +268,6 @@
   <string name="notification_channel_label">Уведомления Universal Ambient Light</string>
   <string name="notification_description">Идет захват содержимого экрана</string>
   <string name="pref_title_use_avg_color">Средний цвет экрана</string>
-  <string name="pref_title_connection_type">Тип подключения</string>
-  <string-array name="pref_list_connection_type">
-    <item>Hyperion</item>
-    <item>WLED</item>
-    <item>Adalight</item>
-    <item>Home Assistant</item>
-  </string-array>
-  <string-array name="pref_list_connection_type_values">
-    <item>hyperion</item>
-    <item>wled</item>
-    <item>adalight</item>
-    <item>homeassistant</item>
-  </string-array>
   <string name="pref_title_adalight_baudrate">Скорость Adalight</string>
   <string-array name="pref_list_adalight_baudrate">
     <item>9600</item>
@@ -301,6 +278,9 @@
     <item>230400</item>
     <item>250000</item>
     <item>500000</item>
+    <item>921600</item>
+    <item>1000000</item>
+    <item>2000000</item>
   </string-array>
   <string-array name="pref_list_adalight_baudrate_values" translatable="false">
     <item>9600</item>
@@ -311,6 +291,9 @@
     <item>230400</item>
     <item>250000</item>
     <item>500000</item>
+    <item>921600</item>
+    <item>1000000</item>
+    <item>2000000</item>
   </string-array>
   <string name="pref_title_wled_color_order">Порядок цветов WLED</string>
   <string-array name="pref_list_wled_color_order">
@@ -452,11 +435,23 @@
     <item>ADA (Стандарт)</item>
     <item>LBAPA (LightBerry APA102)</item>
     <item>AWA (Hyperserial)</item>
+    <item>tpm2</item>
+    <item>Skydimo</item>
+    <item>SEDU</item>
+    <item>KarateLight</item>
+    <item>AtmoLight</item>
+    <item>SP616E</item>
   </string-array>
   <string-array name="pref_list_adalight_protocol_values">
     <item>ada</item>
     <item>lbapa</item>
     <item>awa</item>
+    <item>tpm2</item>
+    <item>skydimo</item>
+    <item>sedu</item>
+    <item>karate</item>
+    <item>atmo</item>
+    <item>sp616e</item>
   </string-array>
 
   <!-- App Specific Strings -->
@@ -481,7 +476,7 @@
   <string name="rating_dialog_report_issue">Сообщить о проблеме</string>
   <string name="rating_dialog_cancel">Отмена</string>
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
-  <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
+  <string name="accessibility_service_description">Позволяет Universal Ambient Light снимать экран для подсветки и нажимать кнопки ТВ по командам сопряжённого телефона.</string>
   <string name="accessibility_disclosure_title">Требуется разрешение специальных возможностей</string>
   <string name="accessibility_disclosure_message">Это приложение использует API специальных возможностей (AccessibilityService API) для захвата содержимого экрана. Это необходимо для анализа цветов на экране и синхронизации фоновой подсветки (Ambilight) в реальном времени.\n\nДанные экрана обрабатываются локально на вашем устройстве, никуда не сохраняются и не передаются третьим лицам.\n\nЕсли вы не согласны, вы не сможете использовать этот режим захвата.</string>
   <string name="accessibility_disclosure_button_deny">Отказать</string>
@@ -499,7 +494,7 @@
   <string name="autostart_permissions_ok">Выданы: подсветка возвращается сама, без диалогов</string>
   <string name="autostart_permissions_missing">Не выданы: после сна ТВ может попросить подтвердить запись экрана. Откройте, чтобы выдать через ADB</string>
   <string name="adb_grant_title">Разрешения для автозапуска</string>
-  <string name="adb_grant_description">Через ADB один раз разрешает запись экрана без диалога подтверждения, окна поверх других приложений и работу в фоне без ограничений. Без них Android 10+ не может сам вернуть подсветку после сна или перезагрузки ТВ.</string>
+  <string name="adb_grant_description">Через ADB один раз разрешает запись экрана без диалога подтверждения, окна поверх других приложений и работу в фоне без ограничений. Без них Android 10+ не может сам вернуть подсветку после сна или перезагрузки ТВ. Заодно выдаётся доступ к статистике использования: с ним подсветка знает, какое приложение на экране, и берёт задержку этого приложения.</string>
   <string name="adb_grant_btn">Выдать через ADB</string>
   <string name="adb_grant_success">Готово: запись экрана без подтверждения, окна поверх других приложений и работа в фоне разрешены.</string>
   <string name="adb_grant_partial">Не применилось: %1$s. Прошивка может этого не поддерживать.</string>
@@ -566,4 +561,279 @@
   <string name="remote_notification_title">Управление с телефона включено</string>
   <string name="remote_notification_waiting">Ждём подключения телефона</string>
   <string name="remote_notification_connected">Подключены: %1$s</string>
+
+  <!-- Effects without screen capture -->
+  <string name="effects_title">Эффекты</string>
+  <string name="effects_intro">Эффекты зажигают ленту сами, без захвата экрана: разрешение на запись не нужно, и неважно, что сейчас на ТВ.</string>
+  <string name="effects_group_static">Статичные</string>
+  <string name="effects_group_dynamic">Динамичные</string>
+  <string name="effects_group_setup">Для настройки</string>
+  <string name="effects_parameters">Настройки: %1$s</string>
+  <string name="effects_now_off">Подсветка выключена. Выберите эффект, и он сразу включится.</string>
+  <string name="effects_now_effect">Сейчас горит: %1$s</string>
+  <string name="effects_now_screen">Сейчас подсветка повторяет картинку. Выбор эффекта переключит её.</string>
+  <string name="effects_turn_off">Выключить</string>
+  <string name="effects_back_to_screen">Вернуть захват экрана</string>
+  <string name="effects_color">Цвет</string>
+  <string name="effects_color2">Второй цвет</string>
+  <string name="effects_hue">Оттенок</string>
+  <string name="effects_saturation">Насыщенность</string>
+  <string name="effects_speed">Скорость</string>
+  <string name="effects_brightness">Яркость</string>
+  <string name="effects_temperature">Цветовая температура</string>
+  <string name="effects_standby">Не гасить при выключенном экране</string>
+  <string name="effects_standby_summary">Лента светит ночником, пока приставка не уснула. Часть телевизоров в режиме ожидания отключает сеть, тогда лента всё равно погаснет.</string>
+  <string name="unit_kelvin">%1$d К</string>
+  <string name="effect_solid">Один цвет</string>
+  <string name="effect_gradient">Градиент</string>
+  <string name="effect_white">Белый для кино</string>
+  <string name="effect_white_hint">Эталонный белый для просмотра кино 6500 К, чем меньше, тем теплее.</string>
+  <string name="effect_rainbow">Радуга</string>
+  <string name="effect_color_cycle">Смена цвета</string>
+  <string name="effect_breathing">Дыхание</string>
+  <string name="effect_candle">Свеча</string>
+  <string name="effect_fire">Огонь</string>
+  <string name="effect_aurora">Северное сияние</string>
+  <string name="effect_ocean">Океан</string>
+  <string name="effect_plasma">Плазма</string>
+  <string name="effect_comet">Комета</string>
+  <string name="effect_layout_test">Проверка раскладки</string>
+  <string name="effect_layout_test_hint">Верх красный, правая сторона зелёная, низ синий, левая жёлтая. Белая точка бежит от первого светодиода в сторону нумерации. Если цвета или путь точки не совпадают с лентой, поправьте раскладку.</string>
+  <string name="home_source_effect">Эффект: %1$s</string>
+  <string name="remote_error_update_tv">На ТВ стоит старая версия приложения, в ней этого ещё нет. Обновите приложение на ТВ.</string>
+
+  <!-- Remote: buttons, mouse, text and apps of the TV -->
+  <string name="tv_remote_title">Пульт</string>
+  <string name="tv_remote_tab_keys">Кнопки</string>
+  <string name="tv_remote_tab_mouse">Мышь</string>
+  <string name="tv_remote_tab_text">Текст</string>
+  <string name="tv_remote_tab_apps">Приложения</string>
+  <string name="tv_remote_adb_missing">Кнопки, мышь и текст работают через ADB на ТВ, а он сейчас недоступен: %1$s</string>
+  <string name="tv_remote_adb_missing_accessibility">Без ADB работают только системные кнопки, касания и текст через службу доступности.</string>
+  <string name="tv_remote_adb_setup">Настроить ADB</string>
+  <string name="tv_remote_no_cursor">ТВ не разрешает окна поверх других приложений, поэтому курсора не видно. Выдайте разрешения для автозапуска через ADB.</string>
+  <string name="tv_remote_power">Питание</string>
+  <string name="tv_remote_input">Источник сигнала</string>
+  <string name="tv_remote_settings">Настройки ТВ</string>
+  <string name="tv_remote_back">Назад</string>
+  <string name="tv_remote_home">Домой</string>
+  <string name="tv_remote_menu">Меню</string>
+  <string name="tv_remote_ok">OK</string>
+  <string name="tv_remote_up">Вверх</string>
+  <string name="tv_remote_down">Вниз</string>
+  <string name="tv_remote_left">Влево</string>
+  <string name="tv_remote_right">Вправо</string>
+  <string name="tv_remote_volume_up">Громче</string>
+  <string name="tv_remote_volume_down">Тише</string>
+  <string name="tv_remote_mute">Без звука</string>
+  <string name="tv_remote_play_pause">Пуск или пауза</string>
+  <string name="tv_remote_rewind">Назад по видео</string>
+  <string name="tv_remote_forward">Вперёд по видео</string>
+  <string name="tv_remote_previous">Предыдущее</string>
+  <string name="tv_remote_next">Следующее</string>
+  <string name="tv_remote_touchpad_hint">Ведите пальцем, чтобы двигать курсор. Касание нажимает, удержание делает долгое нажатие. Двумя пальцами листайте, касание двумя пальцами работает как «Назад».</string>
+  <string name="tv_remote_click">Нажать</string>
+  <string name="tv_remote_text_label">Текст для ТВ</string>
+  <string name="tv_remote_text_hint">Выберите поле ввода на ТВ, например поиск, и печатайте здесь. Текст сразу появляется на экране.</string>
+  <string name="tv_remote_enter">Ввод</string>
+  <string name="tv_remote_backspace">Стереть</string>
+  <string name="tv_remote_clear">Очистить</string>
+  <string name="tv_remote_apps_loading">Загружаю приложения ТВ…</string>
+  <string name="tv_remote_apps_empty">На ТВ не нашлось приложений</string>
+  <string name="remote_tvs_switch">Другие телевизоры</string>
+  <string name="remote_input_needs_adb">Для этого нужен ADB на ТВ (%1$s). Он настраивается на экране «Пульт».</string>
+  <string name="remote_app_not_found">Приложение не установлено на ТВ</string>
+
+  <!-- Lighting delay and auto-tuning with the phone camera -->
+  <string name="calibration_title">Автоподбор задержки</string>
+  <string name="calibration_needs_remote">Автоподбор снимает ТВ камерой телефона, поэтому запускается с телефона, сопряжённого с ТВ.</string>
+  <string name="calibration_needs_screen">Включите на ТВ подсветку по экрану и запустите фильм: задержка меряется на нём.</string>
+  <string name="calibration_turn_on">Включить подсветку</string>
+  <string name="calibration_intro">Телефон снимает ТВ и свечение на стене и сравнивает, когда меняются картинка и лента. Задержка меряется на том, что идёт сейчас, поэтому для каждого приложения и источника она получается своя.</string>
+  <string name="calibration_steps">1. Включите фильм или ролик, где часто меняются сцены.\n2. Выключите свет в комнате.\n3. Встаньте так, чтобы в кадр попал весь экран ТВ и стена вокруг, и держите телефон неподвижно около минуты.</string>
+  <string name="calibration_start">Начать</string>
+  <string name="calibration_searching">Лента на несколько секунд гаснет, пока телефон ищет экран ТВ. Держите телефон неподвижно.</string>
+  <string name="calibration_measuring">Идёт замер. Смен сцен: %1$d, секунд: %2$d. Держите телефон неподвижно.</string>
+  <string name="calibration_glow_invisible">Камера почти не видит свечения ленты. Выключите свет и проверьте, что стена вокруг ТВ попадает в кадр.</string>
+  <string name="calibration_result_ahead">Лента опережает картинку на %1$d мс</string>
+  <string name="calibration_result_behind">Лента отстаёт от картинки на %1$d мс</string>
+  <string name="calibration_result_in_sync">Лента и картинка идут вровень</string>
+  <string name="calibration_result_details">Смен сцен: %1$d, точность около ±%2$d мс, совпадение %3$d%%.</string>
+  <string name="calibration_unreliable">Результат ненадёжный: мало смен сцен или телефон сдвинулся. Лучше повторить на более динамичной сцене.</string>
+  <string name="calibration_behind_hint">Отстающую ленту задержкой не исправить. Уменьшите сглаживание или выберите более быстрый способ захвата.</string>
+  <string name="calibration_current">Сейчас стоит %1$d мс, предлагается %2$d мс.</string>
+  <string name="calibration_save_app">Сохранить для «%1$s»</string>
+  <string name="calibration_save_all">Сохранить для всех приложений</string>
+  <string name="calibration_no_usage_access">ТВ не сообщает, какое приложение на экране, поэтому задержка сохраняется для всех. Для задержки по приложениям нужен доступ к статистике использования, он выдаётся вместе с разрешениями для автозапуска через ADB.</string>
+  <string name="calibration_saved">Сохранено: %1$d мс. ТВ применяет её сразу.</string>
+  <string name="calibration_repeat">Измерить ещё раз</string>
+  <string name="calibration_error_no_screen">Экран ТВ в кадре не нашёлся. Наведите камеру так, чтобы экран был виден целиком, и попробуйте ещё раз.</string>
+  <string name="calibration_error_too_dark">В кадре слишком темно. На ТВ должно идти что-то достаточно яркое.</string>
+  <string name="calibration_error_too_close">ТВ занимает почти весь кадр, для стены не осталось места. Отойдите чуть дальше.</string>
+  <string name="calibration_error_static">Слишком мало смен сцен для замера. Включите что-то динамичнее и попробуйте снова.</string>
+  <string name="calibration_error_not_running">Сначала включите подсветку на ТВ.</string>
+  <string name="calibration_error_not_screen">Автоподбор работает с захватом экрана, а сейчас на ТВ эффект или камера.</string>
+  <string name="delay_title">Задержка подсветки</string>
+  <string name="delay_summary">Задержка по приложениям и автоподбор камерой телефона</string>
+  <string name="delay_intro">Если лента опережает картинку, её придерживают задержкой. Плееры и источники обрабатывают видео по-разному, поэтому у приложения может быть своя задержка: ТВ переключается на неё, пока это приложение на экране.</string>
+  <string name="delay_global">Задержка для всех приложений</string>
+  <string name="delay_calibration_title">Автоподбор</string>
+  <string name="delay_calibration_summary">Камера телефона снимает ТВ и свечение и находит задержку на идущем фильме.</string>
+  <string name="delay_calibration_open">Подобрать камерой</string>
+  <string name="delay_calibration_on_phone">Автоподбор запускается с телефона: откройте на нём «Пульт для ТВ», подключитесь к этому ТВ и зайдите в «Настройки», «Задержка подсветки».</string>
+  <string name="delay_apps_title">Задержка по приложениям</string>
+  <string name="delay_no_usage_access">ТВ не сообщает, какое приложение на экране. Выдайте доступ к статистике использования через ADB, иначе везде действует общая задержка.</string>
+  <string name="delay_apps_empty">Пока ни у одного приложения нет своей задержки.</string>
+  <string name="delay_apps_remove">Удалить</string>
+  <string name="delay_apps_add">Добавить приложение</string>
+
+  <!-- Sleep timer -->
+  <string name="sleep_timer">Таймер сна</string>
+  <string name="sleep_timer_minutes">Через %1$d мин</string>
+  <string name="sleep_timer_cancel">Отключить таймер</string>
+  <string name="sleep_timer_until">Выключится в %1$s</string>
+
+  <!-- More controllers and smart lights -->
+  <string name="error_hue_not_paired">Мост Hue не подключён. Откройте «Настройки», «Подключение» и подключите мост кнопкой на нём.</string>
+  <string name="error_nanoleaf_not_paired">Nanoleaf не подключены. Откройте «Настройки», «Подключение» и подключите панели.</string>
+  <string name="error_no_lamps">Ни одна лампа не привязана к зоне экрана. Откройте «Настройки», «Подключение», «Лампы и зоны».</string>
+
+  <!-- Controller picker -->
+  <string name="devices_title">Контроллер</string>
+  <string name="devices_found">Найдено в сети</string>
+  <string name="devices_searching">Ищем устройства в сети…</string>
+  <string name="devices_nothing_found">Никто не ответил. Проверьте, что контроллер в той же сети, или выберите тип ниже и введите адрес вручную.</string>
+  <string name="devices_search_again">Искать снова</string>
+  <string name="devices_sweep">Проверить все адреса</string>
+  <string name="devices_sweep_summary">Для WLED и Hyperion без mDNS. Займёт минуту-две.</string>
+  <string name="devices_sweep_progress">Проверяем адреса: %1$d%%</string>
+  <string name="devices_manual">Выбрать по типу</string>
+  <string name="devices_current">Сейчас</string>
+  <string name="devices_lamps_count">Ламп: %1$d</string>
+  <string name="devices_remote_note">Поиск идёт с телефона, поэтому телевизор должен быть в той же сети.</string>
+  <string name="devices_group_strip">Адресная лента по сети</string>
+  <string name="devices_group_usb">Лента по USB</string>
+  <string name="devices_group_lamps">Умные лампы и панели</string>
+  <string name="devices_group_server">Сервер подсветки</string>
+
+  <!-- Output types -->
+  <string name="output_wled">WLED</string>
+  <string name="output_wled_summary">ESP8266 или ESP32 с прошивкой WLED</string>
+  <string name="output_ddp">DDP</string>
+  <string name="output_ddp_summary">WLED, ESPixelStick, FPP и другие приёмники DDP</string>
+  <string name="output_e131">E1.31 (sACN)</string>
+  <string name="output_e131_summary">ESPixelStick, Falcon, FPP, DMX-узлы</string>
+  <string name="output_artnet">Art-Net</string>
+  <string name="output_artnet_summary">DMX-узлы и пиксельные контроллеры</string>
+  <string name="output_tpm2net">tpm2.net</string>
+  <string name="output_tpm2net_summary">Приёмники, совместимые с Jinx!</string>
+  <string name="output_udpraw">UDP raw</string>
+  <string name="output_udpraw_summary">RGB без заголовка одним пакетом, до 490 светодиодов</string>
+  <string name="output_opc">Open Pixel Control</string>
+  <string name="output_opc_summary">FadeCandy и fcserver</string>
+  <string name="output_adalight">Adalight и USB-комплекты</string>
+  <string name="output_adalight_summary">Arduino, ESP, Skydimo и другие платы по USB-кабелю</string>
+  <string name="output_hue">Philips Hue</string>
+  <string name="output_hue_summary">Лампы через мост Hue</string>
+  <string name="output_nanoleaf">Nanoleaf</string>
+  <string name="output_nanoleaf_summary">Shapes, Canvas, Elements, Lines, Light Panels</string>
+  <string name="output_wiz">WiZ</string>
+  <string name="output_wiz_summary">Лампы WiZ Connected, в том числе Philips WiZ</string>
+  <string name="output_yeelight">Yeelight</string>
+  <string name="output_yeelight_summary">Нужно включить LAN Control в приложении Yeelight</string>
+  <string name="output_lifx">LIFX</string>
+  <string name="output_lifx_summary">Лампы LIFX в локальной сети</string>
+  <string name="output_govee">Govee</string>
+  <string name="output_govee_summary">Нужно включить LAN Control в приложении Govee Home</string>
+  <string name="output_homeassistant">Home Assistant</string>
+  <string name="output_homeassistant_summary">Любые лампы, подключённые к Home Assistant</string>
+  <string name="output_hyperion">Hyperion / HyperHDR</string>
+  <string name="output_hyperion_summary">Картинка уходит на сервер Hyperion или HyperHDR, светом управляет он</string>
+
+  <!-- Controller settings -->
+  <string name="controller_change">Сменить</string>
+  <string name="controller_no_address">адрес не задан</string>
+  <string name="pref_title_color_order">Порядок цветов</string>
+  <string name="pref_title_dmx_universe">Первая вселенная</string>
+  <string name="pref_summary_dmx_universe">%1$d, длинная лента продолжается в следующих вселенных</string>
+  <string name="pref_title_dmx_leds_per_universe">Светодиодов во вселенной</string>
+  <string name="pref_summary_dmx_leds_per_universe">%1$d (170 занимают все 510 каналов вселенной)</string>
+  <string name="pref_title_tpm2_leds_per_packet">Светодиодов в пакете</string>
+  <string name="pref_title_opc_channel">Канал OPC</string>
+  <string name="pref_summary_opc_channel">%1$d (0 означает все каналы сервера)</string>
+  <string name="pref_summary_e131_multicast">Пусто: мультикаст на 239.255.x.y</string>
+  <string name="home_target_multicast">мультикаст</string>
+  <string name="pref_title_hue_pairing">Подключение к мосту</string>
+  <string name="pref_title_nanoleaf_pairing">Подключение к панелям</string>
+  <string name="pref_summary_paired">Подключено</string>
+  <string name="pref_summary_not_paired">Не подключено, нажмите, чтобы подключить</string>
+
+  <!-- Pairing -->
+  <string name="action_pair">Подключить</string>
+  <string name="pair_in_progress">Подключаемся…</string>
+  <string name="pair_failed">Не удалось подключиться: %1$s</string>
+  <string name="hue_pair_title">Подключение моста Hue</string>
+  <string name="hue_pair_text">Нажмите круглую кнопку на мосту и в течение 30 секунд нажмите «Подключить».</string>
+  <string name="hue_pair_button_not_pressed">Мост ответил, что кнопку не нажимали. Нажмите её и попробуйте ещё раз.</string>
+  <string name="nanoleaf_pair_title">Подключение Nanoleaf</string>
+  <string name="nanoleaf_pair_text">Удерживайте кнопку питания на контроллере 5-7 секунд, пока индикатор не замигает, и в течение 30 секунд нажмите «Подключить».</string>
+  <string name="nanoleaf_pair_rejected">Nanoleaf отказал: кнопку не удерживали или прошло больше 30 секунд.</string>
+  <string name="pair_need_host">Сначала укажите адрес</string>
+
+  <!-- Lights of other systems -->
+  <string name="lamps_dialog_title">Лампы %1$s</string>
+  <string name="lamps_hint_network">Лампы ищутся в локальной сети. Включите их и проверьте, что они в той же сети Wi-Fi.</string>
+  <string name="lamps_hint_hue">Сначала подключите мост, затем выберите зону для каждой лампы.</string>
+  <string name="lamps_error">Не удалось получить список ламп: %1$s</string>
+  <string name="lamps_lamp_missing">Сейчас не найдена в сети</string>
+  <string name="lamps_identify">Мигнуть</string>
+
+  <!-- Home: controller setup hint -->
+  <string name="home_setup_button">Настроить контроллер</string>
+  <string name="home_setup_no_host">Не задан адрес контроллера</string>
+  <string name="home_setup_no_lamps">Лампы не привязаны к зонам экрана</string>
+  <string name="home_setup_not_paired">%1$s ещё не подключён</string>
+  <string name="home_setup_no_token">Не задан токен Home Assistant</string>
+
+  <!-- Connection errors of LED controllers and lights -->
+  <string name="error_device_unreachable">Не удалось связаться с контроллером. Проверьте адрес, питание и что он в той же сети.</string>
+  <string name="error_device_connection_lost">Связь с контроллером потеряна, захват остановлен.</string>
+  <string name="error_lamps_unreachable">Не удалось связаться с лампами. Проверьте, что они включены и в той же сети.</string>
+  <string name="error_lamps_connection_lost">Связь с лампами потеряна, захват остановлен.</string>
+
+  <!-- WLED LED count check -->
+  <string name="devices_led_mismatch_title">Число светодиодов не совпадает</string>
+  <string name="devices_led_mismatch_text">Светодиодов в WLED: %1$d, в раскладке приложения: %2$d. Когда числа разные, часть ленты не горит или цвета попадают не туда.</string>
+  <string name="devices_led_mismatch_layout">Настроить раскладку</string>
+  <string name="devices_led_mismatch_later">Не сейчас</string>
+
+  <!-- Local network access (Android 17) -->
+  <string name="error_local_network">Нет доступа к локальной сети. Разрешите приложению «Устройства поблизости» в системных настройках.</string>
+
+  <!-- Hue entertainment area -->
+  <string name="pref_title_hue_area">Зона развлечений</string>
+  <string name="pref_summary_hue_area_none">Не используется, лампы получают цвет по одной</string>
+  <string name="hue_area_none">Лампы по одной</string>
+  <string name="hue_area_none_summary">Несколько обновлений в секунду, зоны выбираются здесь</string>
+  <string name="hue_area_summary">Поток до 25 раз в секунду, места ламп из приложения Hue</string>
+  <string name="hue_area_hint">Зоны создаются в приложении Hue, раздел «Зоны развлечений». Их лампам мост передаёт цвет потоком, каждая берёт цвет своего места вокруг экрана.</string>
+  <string name="hue_area_empty">На мосту пока нет зон развлечений.</string>
+  <string name="hue_area_no_key">Мост подключала прежняя версия приложения, без ключа потока. Чтобы работать через зону, подключите его заново.</string>
+  <string name="hue_area_repair">Подключить заново</string>
+  <string name="hue_area_error">Не удалось получить зоны: %1$s</string>
+  <string name="pref_summary_hue_area_lamps">Лампы и их места задаёт зона в приложении Hue</string>
+  <string name="error_hue_no_clientkey">Мост Hue нужно подключить заново: для зоны развлечений нужен ключ потока. Откройте Настройки, Подключение.</string>
+  <string name="home_setup_hue_repair">Мост Hue нужно подключить заново</string>
+  <string name="hue_area_loading">Спрашиваю мост…</string>
+
+  <!-- Zigbee2MQTT -->
+  <string name="output_z2m">Zigbee2MQTT</string>
+  <string name="output_z2m_summary">Лампы Zigbee через брокер MQTT</string>
+  <string name="pref_title_mqtt_username">Пользователь MQTT</string>
+  <string name="pref_summary_mqtt_no_login">Без входа</string>
+  <string name="pref_title_mqtt_password">Пароль MQTT</string>
+  <string name="pref_summary_mqtt_password_empty">Не задан</string>
+  <string name="pref_summary_mqtt_password_set">Сохранён</string>
+  <string name="pref_title_z2m_base_topic">Базовая тема Zigbee2MQTT</string>
+  <string name="lamps_hint_z2m">Список ламп приходит от брокера, его там держит сам Zigbee2MQTT. Проверьте адрес брокера, вход и базовую тему.</string>
 </resources>

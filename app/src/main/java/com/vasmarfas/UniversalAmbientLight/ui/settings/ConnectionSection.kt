@@ -1,77 +1,76 @@
 package com.vasmarfas.UniversalAmbientLight.ui.settings
 
-import android.content.Context
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
-import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.ui.components.focusHighlight
+import com.vasmarfas.UniversalAmbientLight.ui.devices.icon
+import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
 
 /**
- * Группа «Подключение»: тип контроллера, адрес, порт и зависящие от протокола настройки.
+ * Группа «Подключение»: выбранный контроллер (сменить - на экране выбора) и настройки,
+ * которые нужны именно ему.
  */
 @Composable
-internal fun ColumnScope.ConnectionSection(prefs: Preferences, state: SettingsScreenState) {
+internal fun ColumnScope.ConnectionSection(
+    prefs: Preferences,
+    state: SettingsScreenState,
+    onControllerClick: () -> Unit,
+) {
     val context = LocalContext.current
+    val resources = LocalResources.current
+    val type = OutputType.of(state.connectionType)
     SettingsGroup(title = stringResource(R.string.pref_group_connection)) {
 
-        key(state.connectionType) {
-            ListPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_connection_type,
-                title = stringResource(R.string.pref_title_connection_type),
-                entriesRes = R.array.pref_list_connection_type,
-                entryValuesRes = R.array.pref_list_connection_type_values,
-                recomposeKey = state.connectionType,
-                onValueChange = { newType ->
-                    val oldType = state.connectionType
-                    state.connectionType = newType
-                    AnalyticsHelper.logProtocolChanged(context, oldType, newType)
-                    AnalyticsHelper.logSettingChanged(context, "connection_type", newType)
-                    AnalyticsHelper.updateProtocolProperty(context, newType)
-                    val defaultPort = when (newType) {
-                        "hyperion" -> "19400"
-                        "wled" -> if (state.wledProtocol == "ddp") "4048" else "19446"
-                        "homeassistant" -> "8123"
-                        else -> null
-                    }
-                    if (defaultPort != null) {
-                        prefs.putString(R.string.pref_key_port, defaultPort)
-                        state.currentPort = defaultPort
-                    }
-                }
-            )
+        val address = when {
+            !type.needsHost && type != OutputType.E131 -> null
+            state.currentHost.isBlank() -> stringResource(R.string.controller_no_address)
+            type.defaultPort > 0 -> "${state.currentHost}:${state.currentPort}"
+            else -> state.currentHost
         }
+        ControllerCard(type, address, onControllerClick)
 
-        val isWled = state.connectionType == "wled"
-        val isHyperion = state.connectionType == "hyperion"
-        val isAdalight = state.connectionType == "adalight"
-        val isHomeAssistant = state.connectionType == "homeassistant"
-        val isNetwork = isHyperion || isWled || isHomeAssistant
-
-        if (isHyperion || isWled) {
-            ClickablePreference(
-                title = stringResource(R.string.scanner_scan_devices),
-                summary = stringResource(R.string.scanner_description),
-                onClick = { state.showScanDialog = true }
-            )
-        }
-
-        if (isNetwork) {
-
+        if (type.needsHost || type == OutputType.E131) {
+            val multicastSummary = stringResource(R.string.pref_summary_e131_multicast)
+            val noAddressSummary = stringResource(R.string.controller_no_address)
             key(state.connectionType) {
                 EditTextPreference(
                     prefs = prefs,
                     keyRes = R.string.pref_key_host,
                     title = stringResource(R.string.pref_title_host),
-                    summaryProvider = { it },
+                    summaryProvider = {
+                        when {
+                            it.isNotBlank() -> it
+                            type == OutputType.E131 -> multicastSummary
+                            else -> noAddressSummary
+                        }
+                    },
                     recomposeKey = state.currentHost,
                     onValueChange = { newHost ->
                         state.currentHost = newHost
@@ -80,32 +79,30 @@ internal fun ColumnScope.ConnectionSection(prefs: Preferences, state: SettingsSc
                     }
                 )
             }
+        }
 
-            // Для WLED выбор протокола показываем между адресом и портом
-            if (isWled) {
-                key(state.wledProtocol) {
-                    ListPreference(
-                        prefs = prefs,
-                        keyRes = R.string.pref_key_wled_protocol,
-                        title = stringResource(R.string.pref_title_wled_protocol),
-                        entriesRes = R.array.pref_list_wled_protocol,
-                        entryValuesRes = R.array.pref_list_wled_protocol_values,
-                        onValueChange = { newProtocol ->
-                            state.wledProtocol = newProtocol
-                            AnalyticsHelper.logSettingChanged(
-                                context,
-                                "wled_protocol",
-                                newProtocol
-                            )
-                            // При смене протокола WLED порт подставляем сами
-                            val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
-                            prefs.putString(R.string.pref_key_port, defaultPort)
-                            state.currentPort = defaultPort
-                        }
-                    )
-                }
+        // Для WLED выбор протокола показываем между адресом и портом
+        if (type == OutputType.WLED) {
+            key(state.wledProtocol) {
+                ListPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_wled_protocol,
+                    title = stringResource(R.string.pref_title_wled_protocol),
+                    entriesRes = R.array.pref_list_wled_protocol,
+                    entryValuesRes = R.array.pref_list_wled_protocol_values,
+                    onValueChange = { newProtocol ->
+                        state.wledProtocol = newProtocol
+                        AnalyticsHelper.logSettingChanged(context, "wled_protocol", newProtocol)
+                        // При смене протокола WLED порт подставляем сами
+                        val defaultPort = if (newProtocol == "ddp") "4048" else "19446"
+                        prefs.putString(R.string.pref_key_port, defaultPort)
+                        state.currentPort = defaultPort
+                    }
+                )
             }
+        }
 
+        if (type.defaultPort > 0) {
             // key заставляет пересобрать поле при смене типа подключения или протокола WLED
             key("${state.connectionType}_${state.wledProtocol}") {
                 EditTextPreference(
@@ -117,63 +114,147 @@ internal fun ColumnScope.ConnectionSection(prefs: Preferences, state: SettingsSc
                     recomposeKey = state.currentPort,
                     onValueChange = { newPort ->
                         state.currentPort = newPort
-                        val portInt = newPort.toIntOrNull() ?: 0
-                        AnalyticsHelper.logPortChanged(context, portInt)
+                        AnalyticsHelper.logPortChanged(context, newPort.toIntOrNull() ?: 0)
                         AnalyticsHelper.logSettingChanged(context, "port", newPort)
                     }
                 )
             }
-            if (isHyperion) {
+        }
+
+        when (type) {
+            OutputType.WLED, OutputType.DDP -> WledSettings(prefs, state)
+            OutputType.E131, OutputType.ARTNET -> {
                 EditTextPreference(
                     prefs = prefs,
-                    keyRes = R.string.pref_key_priority,
-                    title = stringResource(R.string.pref_title_priority),
-                    summaryProvider = { it },
+                    keyRes = R.string.pref_key_dmx_universe,
+                    title = stringResource(R.string.pref_title_dmx_universe),
+                    summaryProvider = {
+                        resources.getString(R.string.pref_summary_dmx_universe, it.toIntOrNull() ?: 1)
+                    },
                     keyboardType = KeyboardType.Number,
-                    onValueChange = { newPriority ->
-                        val priorityInt = newPriority.toIntOrNull() ?: 100
-                        AnalyticsHelper.logPriorityChanged(context, priorityInt)
-                        AnalyticsHelper.logSettingChanged(context, "priority", newPriority)
-                    }
+                    onValueChange = { AnalyticsHelper.logSettingChanged(context, "dmx_universe", it) }
                 )
-                CheckBoxPreference(
+                SliderPreference(
                     prefs = prefs,
-                    keyRes = R.string.pref_key_reconnect,
-                    title = stringResource(R.string.pref_title_reconnect),
-                    onValueChange = { enabled ->
-                        state.reconnectEnabled = enabled
-                        AnalyticsHelper.logAutoReconnectEnabled(context, enabled)
-                        AnalyticsHelper.logSettingChanged(
-                            context,
-                            "reconnect",
-                            enabled.toString()
-                        )
-                        AnalyticsHelper.updateAutoReconnectProperty(context, enabled)
+                    keyRes = R.string.pref_key_dmx_leds_per_universe,
+                    title = stringResource(R.string.pref_title_dmx_leds_per_universe),
+                    range = 1..170,
+                    summaryProvider = { resources.getString(R.string.pref_summary_dmx_leds_per_universe, it) },
+                    onValueChange = {
+                        AnalyticsHelper.logSettingChanged(context, "dmx_leds_per_universe", it.toString())
                     }
                 )
-                if (state.reconnectEnabled) {
-                    val secondsUnit = stringResource(R.string.unit_seconds)
-                    SliderPreference(
+                ColorOrderPreference(prefs)
+            }
+
+            OutputType.TPM2NET -> {
+                SliderPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_dmx_leds_per_universe,
+                    title = stringResource(R.string.pref_title_tpm2_leds_per_packet),
+                    range = 1..490,
+                    onValueChange = {
+                        AnalyticsHelper.logSettingChanged(context, "tpm2_leds_per_packet", it.toString())
+                    }
+                )
+                ColorOrderPreference(prefs)
+            }
+
+            OutputType.UDP_RAW -> ColorOrderPreference(prefs)
+            OutputType.OPC -> {
+                SliderPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_opc_channel,
+                    title = stringResource(R.string.pref_title_opc_channel),
+                    range = 0..255,
+                    summaryProvider = { resources.getString(R.string.pref_summary_opc_channel, it) },
+                    onValueChange = { AnalyticsHelper.logSettingChanged(context, "opc_channel", it.toString()) }
+                )
+                ColorOrderPreference(prefs)
+            }
+
+            OutputType.ADALIGHT -> {
+                ListPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_adalight_baudrate,
+                    title = stringResource(R.string.pref_title_adalight_baudrate),
+                    entriesRes = R.array.pref_list_adalight_baudrate,
+                    entryValuesRes = R.array.pref_list_adalight_baudrate_values,
+                    onValueChange = { newBaudrate ->
+                        AnalyticsHelper.logBaudrateChanged(context, newBaudrate.toIntOrNull() ?: 115200)
+                        AnalyticsHelper.logSettingChanged(context, "adalight_baudrate", newBaudrate)
+                    }
+                )
+                ListPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_adalight_protocol,
+                    title = stringResource(R.string.pref_title_adalight_protocol),
+                    entriesRes = R.array.pref_list_adalight_protocol,
+                    entryValuesRes = R.array.pref_list_adalight_protocol_values,
+                    onValueChange = { newProtocol ->
+                        AnalyticsHelper.logAdalightProtocolChanged(context, newProtocol)
+                        AnalyticsHelper.logSettingChanged(context, "adalight_protocol", newProtocol)
+                    }
+                )
+            }
+
+            OutputType.HUE -> {
+                PairingPreference(
+                    title = stringResource(R.string.pref_title_hue_pairing),
+                    paired = state.pairingKey.isNotBlank(),
+                    onClick = { state.showPairDialog = true }
+                )
+                if (state.pairingKey.isNotBlank()) {
+                    ClickablePreference(
+                        title = stringResource(R.string.pref_title_hue_area),
+                        summary = if (state.hueArea.isBlank()) {
+                            stringResource(R.string.pref_summary_hue_area_none)
+                        } else {
+                            state.hueAreaName.ifBlank { state.hueArea }
+                        },
+                        onClick = { state.showHueAreaDialog = true }
+                    )
+                }
+                if (state.hueArea.isBlank()) {
+                    LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                    MainLampBehavior(prefs)
+                } else {
+                    Text(
+                        text = stringResource(R.string.pref_summary_hue_area_lamps),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    CheckBoxPreference(
                         prefs = prefs,
-                        keyRes = R.string.pref_key_reconnect_delay,
-                        title = stringResource(R.string.pref_title_reconnect_delay),
-                        range = 1..60,
-                        summaryProvider = { "$it $secondsUnit" },
-                        onValueChange = { delay ->
-                            AnalyticsHelper.logReconnectDelayChanged(context, delay)
-                            AnalyticsHelper.logSettingChanged(
-                                context,
-                                "reconnect_delay",
-                                delay.toString()
-                            )
+                        keyRes = R.string.pref_key_ha_turn_off_lights,
+                        title = stringResource(R.string.pref_title_ha_turn_off_lights),
+                        summary = stringResource(R.string.pref_summary_ha_turn_off_lights),
+                        onValueChange = {
+                            AnalyticsHelper.logSettingChanged(context, "lamps_turn_off_lights", it.toString())
                         }
                     )
                 }
             }
-        }
 
-        if (isHomeAssistant) {
-            HomeAssistantSection(
+            OutputType.NANOLEAF -> PairingPreference(
+                title = stringResource(R.string.pref_title_nanoleaf_pairing),
+                paired = state.pairingKey.isNotBlank(),
+                onClick = { state.showPairDialog = true }
+            )
+
+            OutputType.WIZ, OutputType.YEELIGHT, OutputType.LIFX, OutputType.GOVEE -> {
+                LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                MainLampBehavior(prefs)
+            }
+
+            OutputType.ZIGBEE2MQTT -> {
+                MqttSettings(prefs)
+                LampZonesPreference(state.lampsSpec) { state.showLampsDialog = true }
+                MainLampBehavior(prefs)
+            }
+
+            OutputType.HOME_ASSISTANT -> HomeAssistantSection(
                 prefs = prefs,
                 analyticsPrefix = "ha",
                 keyToken = R.string.pref_key_ha_token,
@@ -188,95 +269,209 @@ internal fun ColumnScope.ConnectionSection(prefs: Preferences, state: SettingsSc
                 keyDarkThreshold = R.string.pref_key_ha_dark_threshold,
                 keyTurnOffLights = R.string.pref_key_ha_turn_off_lights,
             )
-        }
 
-        if (isAdalight) {
-            ListPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_adalight_baudrate,
-                title = stringResource(R.string.pref_title_adalight_baudrate),
-                entriesRes = R.array.pref_list_adalight_baudrate,
-                entryValuesRes = R.array.pref_list_adalight_baudrate_values,
-                onValueChange = { newBaudrate ->
-                    val baudrateInt = newBaudrate.toIntOrNull() ?: 115200
-                    AnalyticsHelper.logBaudrateChanged(context, baudrateInt)
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "adalight_baudrate",
-                        newBaudrate
-                    )
-                }
-            )
-            ListPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_adalight_protocol,
-                title = stringResource(R.string.pref_title_adalight_protocol),
-                entriesRes = R.array.pref_list_adalight_protocol,
-                entryValuesRes = R.array.pref_list_adalight_protocol_values,
-                onValueChange = { newProtocol ->
-                    AnalyticsHelper.logAdalightProtocolChanged(context, newProtocol)
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "adalight_protocol",
-                        newProtocol
-                    )
-                }
-            )
+            OutputType.HYPERION -> HyperionSettings(prefs, state)
         }
+    }
+}
 
-        if (isWled) {
-            ListPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_wled_color_order,
-                title = stringResource(R.string.pref_title_wled_color_order),
-                entriesRes = R.array.pref_list_wled_color_order,
-                entryValuesRes = R.array.pref_list_wled_color_order_values,
-                onValueChange = { newColorOrder ->
-                    AnalyticsHelper.logColorOrderChanged(context, newColorOrder)
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "wled_color_order",
-                        newColorOrder
-                    )
-                }
-            )
-            CheckBoxPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_wled_rgbw,
-                title = stringResource(R.string.pref_title_wled_rgbw),
-                summary = if (state.currentPort == "19446") {
-                    stringResource(R.string.pref_summary_wled_rgbw_raw)
-                } else {
-                    stringResource(R.string.pref_summary_wled_rgbw_white_mode)
-                },
-                onValueChange = { enabled ->
-                    AnalyticsHelper.logRgbwChanged(context, enabled)
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "wled_rgbw",
-                        enabled.toString()
-                    )
-                }
-            )
-            val brightnessMaxSummary = stringResource(R.string.pref_summary_wled_brightness_max)
-            SliderPreference(
-                prefs = prefs,
-                keyRes = R.string.pref_key_wled_brightness,
-                title = stringResource(R.string.pref_title_wled_brightness),
-                range = 0..255,
-                // 255 — не «максимальная яркость», а «не трогать цвета вовсе», это стоит
-                // проговорить: иначе значение по умолчанию выглядит как обычный максимум
-                summaryProvider = { value ->
-                    if (value == 255) brightnessMaxSummary else value.toString()
-                },
-                onValueChange = { newBrightness ->
-                    AnalyticsHelper.logSettingChanged(
-                        context,
-                        "wled_brightness",
-                        newBrightness.toString()
-                    )
-                }
-            )
+@Composable
+private fun ColumnScope.WledSettings(prefs: Preferences, state: SettingsScreenState) {
+    val context = LocalContext.current
+    ListPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_wled_color_order,
+        title = stringResource(R.string.pref_title_wled_color_order),
+        entriesRes = R.array.pref_list_wled_color_order,
+        entryValuesRes = R.array.pref_list_wled_color_order_values,
+        onValueChange = { newColorOrder ->
+            AnalyticsHelper.logColorOrderChanged(context, newColorOrder)
+            AnalyticsHelper.logSettingChanged(context, "wled_color_order", newColorOrder)
         }
+    )
+    CheckBoxPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_wled_rgbw,
+        title = stringResource(R.string.pref_title_wled_rgbw),
+        summary = if (state.currentPort == "19446") {
+            stringResource(R.string.pref_summary_wled_rgbw_raw)
+        } else {
+            stringResource(R.string.pref_summary_wled_rgbw_white_mode)
+        },
+        onValueChange = { enabled ->
+            AnalyticsHelper.logRgbwChanged(context, enabled)
+            AnalyticsHelper.logSettingChanged(context, "wled_rgbw", enabled.toString())
+        }
+    )
+    val brightnessMaxSummary = stringResource(R.string.pref_summary_wled_brightness_max)
+    SliderPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_wled_brightness,
+        title = stringResource(R.string.pref_title_wled_brightness),
+        range = 0..255,
+        // 255 - не «максимальная яркость», а «не трогать цвета вовсе», это стоит
+        // проговорить: иначе значение по умолчанию выглядит как обычный максимум
+        summaryProvider = { value ->
+            if (value == 255) brightnessMaxSummary else value.toString()
+        },
+        onValueChange = { newBrightness ->
+            AnalyticsHelper.logSettingChanged(context, "wled_brightness", newBrightness.toString())
+        }
+    )
+}
+
+@Composable
+private fun ColumnScope.HyperionSettings(prefs: Preferences, state: SettingsScreenState) {
+    val context = LocalContext.current
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_priority,
+        title = stringResource(R.string.pref_title_priority),
+        summaryProvider = { it },
+        keyboardType = KeyboardType.Number,
+        onValueChange = { newPriority ->
+            AnalyticsHelper.logPriorityChanged(context, newPriority.toIntOrNull() ?: 100)
+            AnalyticsHelper.logSettingChanged(context, "priority", newPriority)
+        }
+    )
+    CheckBoxPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_reconnect,
+        title = stringResource(R.string.pref_title_reconnect),
+        onValueChange = { enabled ->
+            state.reconnectEnabled = enabled
+            AnalyticsHelper.logAutoReconnectEnabled(context, enabled)
+            AnalyticsHelper.logSettingChanged(context, "reconnect", enabled.toString())
+            AnalyticsHelper.updateAutoReconnectProperty(context, enabled)
+        }
+    )
+    if (state.reconnectEnabled) {
+        val secondsUnit = stringResource(R.string.unit_seconds)
+        SliderPreference(
+            prefs = prefs,
+            keyRes = R.string.pref_key_reconnect_delay,
+            title = stringResource(R.string.pref_title_reconnect_delay),
+            range = 1..60,
+            summaryProvider = { "$it $secondsUnit" },
+            onValueChange = { delay ->
+                AnalyticsHelper.logReconnectDelayChanged(context, delay)
+                AnalyticsHelper.logSettingChanged(context, "reconnect_delay", delay.toString())
+            }
+        )
+    }
+}
+
+/** Вход на брокер и тема, под которой Zigbee2MQTT держит свои устройства. */
+@Composable
+private fun MqttSettings(prefs: Preferences) {
+    val context = LocalContext.current
+    val noLoginSummary = stringResource(R.string.pref_summary_mqtt_no_login)
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_mqtt_username,
+        title = stringResource(R.string.pref_title_mqtt_username),
+        summaryProvider = { it.ifBlank { noLoginSummary } },
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "mqtt_username", if (it.isBlank()) "none" else "set") }
+    )
+    val passwordEmptySummary = stringResource(R.string.pref_summary_mqtt_password_empty)
+    val passwordSetSummary = stringResource(R.string.pref_summary_mqtt_password_set)
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_mqtt_password,
+        title = stringResource(R.string.pref_title_mqtt_password),
+        summaryProvider = { if (it.isBlank()) passwordEmptySummary else passwordSetSummary },
+        keyboardType = KeyboardType.Password,
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "mqtt_password", "set") }
+    )
+    EditTextPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_z2m_base_topic,
+        title = stringResource(R.string.pref_title_z2m_base_topic),
+        summaryProvider = { it.ifBlank { Zigbee2MqttClient.DEFAULT_BASE_TOPIC } },
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "z2m_base_topic", it) }
+    )
+}
+
+/** Порядок цветов для лент по E1.31, Art-Net и прочим: ключ общий с WLED. */
+@Composable
+private fun ColorOrderPreference(prefs: Preferences) {
+    val context = LocalContext.current
+    ListPreference(
+        prefs = prefs,
+        keyRes = R.string.pref_key_wled_color_order,
+        title = stringResource(R.string.pref_title_color_order),
+        entriesRes = R.array.pref_list_wled_color_order,
+        entryValuesRes = R.array.pref_list_wled_color_order_values,
+        onValueChange = { AnalyticsHelper.logSettingChanged(context, "color_order", it) }
+    )
+}
+
+@Composable
+private fun PairingPreference(title: String, paired: Boolean, onClick: () -> Unit) {
+    ClickablePreference(
+        title = title,
+        summary = stringResource(if (paired) R.string.pref_summary_paired else R.string.pref_summary_not_paired),
+        onClick = onClick
+    )
+}
+
+/** Лампы основного подключения живут на тех же настройках ритма, что и Home Assistant. */
+@Composable
+private fun ColumnScope.MainLampBehavior(prefs: Preferences) {
+    LampBehaviorSection(
+        prefs = prefs,
+        analyticsPrefix = "lamps",
+        keyUpdateInterval = R.string.pref_key_ha_update_interval,
+        keyChangeThreshold = R.string.pref_key_ha_change_threshold,
+        keyTransition = R.string.pref_key_ha_transition,
+        keyBrightnessMode = R.string.pref_key_ha_brightness_mode,
+        keyBrightness = R.string.pref_key_ha_brightness,
+        keyDarkOff = R.string.pref_key_ha_dark_off,
+        keyDarkThreshold = R.string.pref_key_ha_dark_threshold,
+        keyTurnOffLights = R.string.pref_key_ha_turn_off_lights,
+    )
+}
+
+/** Текущий контроллер крупно, с иконкой: с него начинается настройка подключения. */
+@Composable
+private fun ControllerCard(type: OutputType, address: String?, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .focusHighlight(interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClickLabel = stringResource(R.string.controller_change),
+                onClick = onClick
+            )
+            .padding(horizontal = 8.dp, vertical = 16.dp)
+    ) {
+        Icon(
+            imageVector = type.group.icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = stringResource(type.titleRes()), style = MaterialTheme.typography.titleMedium)
+            if (address != null) {
+                Text(
+                    text = address,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = stringResource(R.string.controller_change),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }

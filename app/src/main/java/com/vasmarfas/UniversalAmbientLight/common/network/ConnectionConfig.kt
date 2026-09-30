@@ -38,4 +38,16 @@ data class ConnectionConfig(
     val haDarkOffEnabled: Boolean = true,
     val haDarkThreshold: Int = 10,
     val haTurnOffLights: Boolean = true,
+    val dmxUniverse: Int = 1,
+    val dmxLedsPerUniverse: Int = 170,
+    val opcChannel: Int = 0,
+    /** Лампы основного подключения с зонами - тем же форматом, что и у Home Assistant. */
+    val lamps: String = "",
+    val hueUsername: String = "",
+    val nanoleafToken: String = "",
+    val hueClientKey: String = "",
+    val hueArea: String = "",
+    val mqttUsername: String = "",
+    val mqttPassword: String = "",
+    val z2mBaseTopic: String = Zigbee2MqttClient.DEFAULT_BASE_TOPIC,
 )

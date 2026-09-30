@@ -1,5 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.ui.settings
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
@@ -28,43 +29,57 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
-import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
+import com.vasmarfas.UniversalAmbientLight.common.network.GoveeClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantZone
+import com.vasmarfas.UniversalAmbientLight.common.network.HueClient
+import com.vasmarfas.UniversalAmbientLight.common.network.LifxClient
+import com.vasmarfas.UniversalAmbientLight.common.network.MqttLink
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.network.WizClient
+import com.vasmarfas.UniversalAmbientLight.common.network.YeelightClient
+import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
+
+private const val TAG = "ZoneLampsDialog"
 
 /**
- * Выбор ламп Home Assistant и их зон. Список тянется из HA по хосту и токену из настроек;
- * каждой лампе назначается зона экрана либо «не использовать». Сохранение пишет привязку
- * одной строкой в настройки — её разберёт клиент при следующем запуске захвата.
- *
- * Ключи настроек передаются параметрами — тот же диалог обслуживает и основное, и
- * дополнительное подключение Home Assistant.
+ * Выбор ламп и их зон. Список ламп отдаёт [fetch]: Home Assistant, мост или поиск в сети.
+ * Каждой лампе назначается зона экрана либо «не использовать». Сохранение пишет привязку
+ * одной строкой в [keyLamps] - её разберёт клиент при следующем запуске вывода.
  */
 @Composable
-internal fun HomeAssistantLampsDialog(
+internal fun ZoneLampsDialog(
     prefs: Preferences,
-    keyHost: Int,
-    keyPort: Int,
-    keyToken: Int,
+    title: String,
+    hint: String,
     keyLamps: Int,
+    fetch: suspend () -> List<Pair<String, String>>,
     onSaved: (String) -> Unit,
     onDismiss: () -> Unit,
+    errorRes: Int = R.string.ha_lamps_error,
+    missingRes: Int = R.string.ha_lamps_lamp_missing,
+    identify: ((String) -> Unit)? = null,
 ) {
+    val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var lights by remember { mutableStateOf(listOf<Pair<String, String>>()) }
-    // Текущая привязка: entity_id → зона; null — лампа не используется
+    // Текущая привязка: entity_id -> зона; null - лампа не используется
     val mapping = remember { mutableStateMapOf<String, HomeAssistantZone?>() }
-    // Лампы, которые есть в сохранённой привязке, но HA сейчас их не отдал — например,
+    // Лампы, которые есть в сохранённой привязке, но HA сейчас их не отдал - например,
     // залипший тестовый стенд или устройство, отвалившееся от сети
     val missingIds = remember { mutableStateOf(setOf<String>()) }
     var zonePickerFor by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -73,15 +88,10 @@ internal fun HomeAssistantLampsDialog(
     LaunchedEffect(loadAttempt) {
         loading = true
         error = null
-        val host = prefs.getString(keyHost, "")?.trim() ?: ""
-        val port = prefs.getInt(keyPort, 8123)
-        val token = prefs.getString(keyToken, "") ?: ""
         val saved = HomeAssistantLamp.parseList(prefs.getString(keyLamps, ""))
 
         try {
-            val fetched = withContext(Dispatchers.IO) {
-                HomeAssistantClient.fetchLights(host, port, token)
-            }
+            val fetched = withContext(Dispatchers.IO) { fetch() }
             // Сохранённые лампы, которых HA больше не отдал, остаются в списке: пропавшая
             // из сети лампа не должна молча вылетать из привязки
             val known = fetched.map { it.first }.toSet()
@@ -93,8 +103,8 @@ internal fun HomeAssistantLampsDialog(
             for (lamp in saved) mapping[lamp.entityId] = lamp.zone
             loading = false
         } catch (e: Exception) {
-            // Сюда попадает всё от неверного токена до недоступной сети — текст уходит
-            // пользователю в диалог, повторить можно кнопкой
+            // Сюда попадает всё от неверного ключа доступа до недоступной сети - текст
+            // уходит пользователю в диалог, повторить можно кнопкой
             error = e.message ?: e.javaClass.simpleName
             loading = false
         }
@@ -102,7 +112,7 @@ internal fun HomeAssistantLampsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ha_lamps_dialog_title)) },
+        title = { Text(title) },
         text = {
             when {
                 loading -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -118,12 +128,12 @@ internal fun HomeAssistantLampsDialog(
                     modifier = Modifier.verticalScroll(rememberScrollState())
                 ) {
                     Text(
-                        text = stringResource(R.string.ha_lamps_error, error ?: ""),
+                        text = stringResource(errorRes, error ?: ""),
                         color = MaterialTheme.colorScheme.error
                     )
                     Spacer(modifier = Modifier.size(8.dp))
                     Text(
-                        text = stringResource(R.string.ha_lamps_hint),
+                        text = hint,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -140,8 +150,20 @@ internal fun HomeAssistantLampsDialog(
                             entityId = entityId,
                             name = name,
                             zone = mapping[entityId],
-                            isMissing = entityId in missingIds.value,
-                            onClick = { zonePickerFor = entityId to name }
+                            missingText = if (entityId in missingIds.value) stringResource(missingRes) else null,
+                            onClick = { zonePickerFor = entityId to name },
+                            onIdentify = identify?.let { blink ->
+                                {
+                                    scope.launch(Dispatchers.IO) {
+                                        try {
+                                            blink(entityId)
+                                        } catch (e: IOException) {
+                                            // Лампа не ответила на вспышку, зону ей выбрать это не мешает
+                                            Log.w(TAG, "Identify $entityId failed: ${e.message}")
+                                        }
+                                    }
+                                }
+                            }
                         )
                     }
                 }
@@ -189,42 +211,50 @@ private fun LampRow(
     entityId: String,
     name: String,
     zone: HomeAssistantZone?,
-    isMissing: Boolean,
+    missingText: String?,
     onClick: () -> Unit,
+    onIdentify: (() -> Unit)?,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-                onClick = onClick
-            )
-            .padding(horizontal = 4.dp, vertical = 10.dp)
-    ) {
-        Text(text = name, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            text = entityId,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (isMissing) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = LocalIndication.current,
+                    onClick = onClick
+                )
+                .padding(horizontal = 4.dp, vertical = 10.dp)
+        ) {
+            Text(text = name, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = stringResource(R.string.ha_lamps_lamp_missing),
+                text = entityId,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (missingText != null) {
+                Text(
+                    text = missingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            Text(
+                text = zoneLabel(zone),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (zone == null) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
             )
         }
-        Text(
-            text = zoneLabel(zone),
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (zone == null) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.primary
+        if (onIdentify != null) {
+            TextButton(onClick = onIdentify) {
+                Text(stringResource(R.string.lamps_identify))
             }
-        )
+        }
     }
 }
 
@@ -295,3 +325,89 @@ private fun zoneLabel(zone: HomeAssistantZone?): String = stringResource(
         HomeAssistantZone.BOTTOM_RIGHT -> R.string.ha_zone_bottom_right
     }
 )
+
+/**
+ * Лампы основного подключения. [found] - лампы, которые уже нашёл поиск устройств: тогда
+ * сеть заново не опрашивается.
+ */
+@Composable
+internal fun OutputLampsDialog(
+    prefs: Preferences,
+    type: OutputType,
+    found: List<Pair<String, String>> = emptyList(),
+    onSaved: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val keyLamps = type.lampsKey ?: return
+    val hint = when (type) {
+        OutputType.HUE -> stringResource(R.string.lamps_hint_hue)
+        OutputType.YEELIGHT ->
+            stringResource(R.string.lamps_hint_network) + " " + stringResource(R.string.output_yeelight_summary)
+
+        OutputType.GOVEE ->
+            stringResource(R.string.lamps_hint_network) + " " + stringResource(R.string.output_govee_summary)
+
+        OutputType.ZIGBEE2MQTT -> stringResource(R.string.lamps_hint_z2m)
+
+        else -> stringResource(R.string.lamps_hint_network)
+    }
+    ZoneLampsDialog(
+        prefs = prefs,
+        title = stringResource(R.string.lamps_dialog_title, stringResource(type.titleRes())),
+        hint = hint,
+        keyLamps = keyLamps,
+        fetch = {
+            found.ifEmpty {
+                when (type) {
+                    OutputType.HUE -> HueClient.lights(
+                        prefs.getString(R.string.pref_key_host)?.trim().orEmpty(),
+                        prefs.getString(R.string.pref_key_hue_username).orEmpty()
+                    )
+
+                    OutputType.WIZ -> WizClient.discover()
+                    OutputType.YEELIGHT -> YeelightClient.discover()
+                    OutputType.LIFX -> LifxClient.discover()
+                    OutputType.GOVEE -> GoveeClient.discover()
+                    OutputType.ZIGBEE2MQTT -> MqttAccess(prefs).run {
+                        Zigbee2MqttClient.lights(host, port, username, password, baseTopic)
+                    }
+
+                    else -> emptyList()
+                }
+            }
+        },
+        onSaved = onSaved,
+        onDismiss = onDismiss,
+        errorRes = R.string.lamps_error,
+        missingRes = R.string.lamps_lamp_missing,
+        identify = { id ->
+            when (type) {
+                OutputType.HUE -> HueClient.flash(
+                    prefs.getString(R.string.pref_key_host)?.trim().orEmpty(),
+                    prefs.getString(R.string.pref_key_hue_username).orEmpty(),
+                    id
+                )
+
+                OutputType.WIZ -> WizClient.flash(id)
+                OutputType.YEELIGHT -> YeelightClient.flash(id)
+                OutputType.LIFX -> LifxClient.flash(id)
+                OutputType.GOVEE -> GoveeClient.flash(id)
+                OutputType.ZIGBEE2MQTT -> MqttAccess(prefs).run {
+                    Zigbee2MqttClient.flash(host, port, username, password, baseTopic, id)
+                }
+
+                else -> Unit
+            }
+        }
+    )
+}
+
+/** Брокер из настроек: адрес и порт общие с остальными контроллерами. */
+private class MqttAccess(prefs: Preferences) {
+    val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
+    val port = prefs.getInt(R.string.pref_key_port, MqttLink.DEFAULT_PORT)
+    val username = prefs.getString(R.string.pref_key_mqtt_username).orEmpty()
+    val password = prefs.getString(R.string.pref_key_mqtt_password).orEmpty()
+    val baseTopic = prefs.getString(R.string.pref_key_z2m_base_topic)?.trim()?.ifEmpty { null }
+        ?: Zigbee2MqttClient.DEFAULT_BASE_TOPIC
+}

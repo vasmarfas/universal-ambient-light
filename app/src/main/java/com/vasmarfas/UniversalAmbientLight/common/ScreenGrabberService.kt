@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
@@ -22,16 +23,25 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.core.app.ServiceCompat
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.ConnectionConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
+import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
+import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
+import com.vasmarfas.UniversalAmbientLight.common.util.LocalNetworkAccess
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import java.util.Objects
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 /**
  * Отдаёт кадры сразу двум приёмникам — основному подключению и дополнительному выводу на
@@ -85,7 +95,7 @@ class ScreenGrabberService : Service() {
     // Одновременно работает ровно один способ захвата: его выбирают startScreenRecord,
     // startAlternativeRecord и startCameraCapture по настройкам и доступности на прошивке.
     private var mActiveBackend: CaptureBackend? = null
-    private var mCaptureSource: String = "screen" // "screen" or "camera"
+    private var mCaptureSource: String = "screen" // "screen", "camera" или "effect"
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
     private var mConnectionType = "hyperion"
@@ -113,6 +123,27 @@ class ScreenGrabberService : Service() {
     private var mPendingSessionRestart = false
     private val mApplySettings = Runnable { applyPendingSettings() }
 
+    // Задержка по приложениям: раз в несколько секунд смотрим, что на экране. Статистика
+    // использования - вызов в системный сервис, с главного потока его уводим
+    private var mAppWatch: ScheduledExecutorService? = null
+    private var mForegroundPackage: String? = null
+
+    // Автоподбор задержки с телефона: вывод без сглаживания и задержки, а на короткое время
+    // лента гаснет, чтобы камера телефона увидела, сколько света даёт сам экран
+    private var mCalibrating = false
+
+    @Volatile
+    private var mDarkUntil = 0L
+    private var mDarkFrame: ByteArray? = null
+    private val mEndCalibration = Runnable { setCalibrating(false) }
+
+    // Таймер сна: подсветка выключается сама, как будто её выключили кнопкой
+    private val mSleep = Runnable {
+        Log.i(TAG, "Sleep timer elapsed, turning the lighting off")
+        sSleepAt = 0L
+        CaptureLauncher.stop(this)
+    }
+
     /**
      * Выход одного энкодера. После отцепления (перезапуск захвата с новыми настройками)
      * старый энкодер больше ничего не шлёт: его прощальные чёрные кадры и disconnect
@@ -123,7 +154,17 @@ class ScreenGrabberService : Service() {
         var attached = true
 
         override fun sendFrame(data: ByteArray, width: Int, height: Int) {
-            if (attached) mOutput?.sendFrame(data, width, height)
+            if (!attached) return
+            if (SystemClock.uptimeMillis() < mDarkUntil) {
+                var dark = mDarkFrame
+                if (dark == null || dark.size != data.size) {
+                    dark = ByteArray(data.size)
+                    mDarkFrame = dark
+                }
+                mOutput?.sendFrame(dark, width, height)
+                return
+            }
+            mOutput?.sendFrame(data, width, height)
         }
 
         override fun clear() {
@@ -153,7 +194,7 @@ class ScreenGrabberService : Service() {
 
         /** Гасим вывод, только если экран действительно погашен и keepalive выключен. */
         private fun maybeStandbyPauseOnConnect() {
-            if (mCaptureSource == "camera") return
+            if (mCaptureSource == "camera" || effectStaysOn()) return
             if (Preferences(this@ScreenGrabberService).getBoolean(R.string.pref_key_standby_keepalive)) return
             val standby = mStandby ?: return
             if (!standby.isScreenOff()) return
@@ -166,6 +207,8 @@ class ScreenGrabberService : Service() {
             if (!mHasConnected) {
                 mStartError = connectionErrorText(
                     R.string.error_adalight_unreachable,
+                    R.string.error_lamps_unreachable,
+                    R.string.error_device_unreachable,
                     R.string.error_server_unreachable
                 )
                 haltStartup()
@@ -174,19 +217,30 @@ class ScreenGrabberService : Service() {
             } else {
                 mStartError = connectionErrorText(
                     R.string.error_adalight_connection_lost,
+                    R.string.error_lamps_connection_lost,
+                    R.string.error_device_connection_lost,
                     R.string.error_connection_lost
                 )
                 stopSelf()
             }
         }
 
-        /** У Adalight своя формулировка ошибки: там нет ни адреса, ни сервера. */
+        /** Сервер, контроллер, лампы и Adalight на USB ломаются по-разному, и текст у каждого свой. */
         private fun connectionErrorText(
             @StringRes adalight: Int,
-            @StringRes network: Int,
+            @StringRes lamps: Int,
+            @StringRes device: Int,
+            @StringRes server: Int,
         ): String {
-            val isAdalight = "adalight".equals(mConnectionType, ignoreCase = true)
-            return resources.getString(if (isAdalight) adalight else network)
+            val type = OutputType.of(mConnectionType)
+            return resources.getString(
+                when {
+                    type == OutputType.ADALIGHT -> adalight
+                    type == OutputType.HYPERION || type == OutputType.HOME_ASSISTANT -> server
+                    type.isLamps -> lamps
+                    else -> device
+                }
+            )
         }
 
         override fun onReceiveStatus(isCapturing: Boolean) {
@@ -256,7 +310,8 @@ class ScreenGrabberService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (DEBUG) Log.v(TAG, "ACTION_SCREEN_OFF intent received")
                     // Камера снимает внешний телевизор, сон экрана устройства ей безразличен — работаем как работали.
-                    val isCamera = mCaptureSource == "camera"
+                    // Так же живёт эффект, который попросили не гасить: ТВ выключен, лента светит ночником
+                    val isCamera = mCaptureSource == "camera" || effectStaysOn()
                     val standbyKeepalive =
                         Preferences(context).getBoolean(R.string.pref_key_standby_keepalive)
                     if (standbyKeepalive || isCamera) {
@@ -267,7 +322,12 @@ class ScreenGrabberService : Service() {
                     }
                     // Камера снимает внешний телевизор, её кадры не зависят от экрана
                     // устройства — гасим ленту только для экранных способов захвата.
-                    if (mActiveBackend !is CameraEncoder) mActiveBackend?.clearLights()
+                    // Эффект рисует кадры сам и зажёг бы ленту снова - его останавливаем
+                    when (val backend = mActiveBackend) {
+                        is CameraEncoder -> {}
+                        is EffectEncoder -> if (!isCamera) backend.pause()
+                        else -> backend?.clearLights()
+                    }
                     if (!standbyKeepalive && !isCamera) {
                         // Keepalive в простое выключен: даём чёрным кадрам уйти и молчим до SCREEN_ON
                         mStandby?.schedulePause()
@@ -352,7 +412,7 @@ class ScreenGrabberService : Service() {
         val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
         val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
         val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 50)
-        val outputDelayMs = prefs.getInt(R.string.pref_key_output_delay, 0).toLong()
+        val outputDelayMs = effectiveOutputDelay(prefs)
         val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 60)
 
         val haToken = prefs.getString(R.string.pref_key_ha_token, "") ?: ""
@@ -439,9 +499,22 @@ class ScreenGrabberService : Service() {
             haBrightnessMax = haBrightnessMax,
             haDarkOffEnabled = haDarkOffEnabled,
             haDarkThreshold = haDarkThreshold,
-            haTurnOffLights = haTurnOffLights
+            haTurnOffLights = haTurnOffLights,
+            dmxUniverse = prefs.getInt(R.string.pref_key_dmx_universe),
+            dmxLedsPerUniverse = prefs.getInt(R.string.pref_key_dmx_leds_per_universe),
+            opcChannel = prefs.getInt(R.string.pref_key_opc_channel),
+            lamps = OutputType.of(mConnectionType).lampsKey?.let { prefs.getString(it, "") }.orEmpty(),
+            hueUsername = prefs.getString(R.string.pref_key_hue_username, "").orEmpty(),
+            nanoleafToken = prefs.getString(R.string.pref_key_nanoleaf_token, "").orEmpty(),
+            hueClientKey = prefs.getString(R.string.pref_key_hue_clientkey, "").orEmpty(),
+            hueArea = prefs.getString(R.string.pref_key_hue_area, "").orEmpty(),
+            mqttUsername = prefs.getString(R.string.pref_key_mqtt_username, "").orEmpty(),
+            mqttPassword = prefs.getString(R.string.pref_key_mqtt_password, "").orEmpty(),
+            z2mBaseTopic = prefs.getString(R.string.pref_key_z2m_base_topic, null)?.trim()
+                ?.ifEmpty { null } ?: Zigbee2MqttClient.DEFAULT_BASE_TOPIC
         )
         val thread = HyperionThread(mReceiver, baseContext, config)
+        if (mCalibrating) thread.setCalibrating(true)
         mHyperionThread = thread
         thread.start()
 
@@ -472,9 +545,72 @@ class ScreenGrabberService : Service() {
             Log.w(TAG, "Additional Home Assistant output enabled but not fully configured, skipping")
         }
         mOutput = DualHyperionThreadListener(thread.receiver, mSecondaryHyperionThread?.receiver)
+        if (mCaptureSource == "screen") startAppWatch()
 
         mStartError = null
         return true
+    }
+
+    private fun setSleepTimer(minutes: Int) {
+        val handler = mHandler ?: return
+        handler.removeCallbacks(mSleep)
+        if (minutes > 0 && mHyperionThread != null) {
+            val delayMs = minutes * 60_000L
+            sSleepAt = System.currentTimeMillis() + delayMs
+            handler.postDelayed(mSleep, delayMs)
+        } else {
+            sSleepAt = 0L
+        }
+        notifyActivity()
+    }
+
+    private fun effectiveOutputDelay(prefs: Preferences): Long =
+        DelayProfiles.effectiveDelay(prefs, mForegroundPackage).toLong()
+
+    /**
+     * Замер задержки: сглаживание и задержка вывода снимаются на ходу, без переподключения.
+     * Если телефон пропал посреди замера, режим снимется сам через [MAX_CALIBRATION_MS].
+     */
+    private fun setCalibrating(calibrating: Boolean) {
+        mHandler?.removeCallbacks(mEndCalibration)
+        mCalibrating = calibrating
+        if (!calibrating) mDarkUntil = 0L
+        mHyperionThread?.setCalibrating(calibrating)
+        mSecondaryHyperionThread?.setCalibrating(calibrating)
+        if (calibrating) mHandler?.postDelayed(mEndCalibration, MAX_CALIBRATION_MS)
+        Log.i(TAG, if (calibrating) "Delay calibration started" else "Delay calibration finished")
+    }
+
+    private fun applyOutputDelay() {
+        val delay = effectiveOutputDelay(Preferences(this))
+        mHyperionThread?.setOutputDelay(delay)
+        mSecondaryHyperionThread?.setOutputDelay(delay)
+    }
+
+    /** Следить за приложением на экране есть смысл, только когда заданы задержки по приложениям. */
+    private fun startAppWatch() {
+        if (mAppWatch != null) return
+        val profiles = Preferences(this).getString(R.string.pref_key_delay_profiles, "")
+        if (DelayProfiles.parse(profiles).isEmpty()) return
+        val foreground = ForegroundApp(this)
+        mAppWatch = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "app-watch") }.also {
+            it.scheduleWithFixedDelay({
+                val pkg = foreground.current()
+                mHandler?.post { onForegroundApp(pkg) }
+            }, 0, APP_WATCH_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    private fun stopAppWatch() {
+        mAppWatch?.shutdownNow()
+        mAppWatch = null
+        mForegroundPackage = null
+    }
+
+    private fun onForegroundApp(pkg: String?) {
+        if (mAppWatch == null || pkg == mForegroundPackage) return
+        mForegroundPackage = pkg
+        applyOutputDelay()
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
@@ -502,6 +638,10 @@ class ScreenGrabberService : Service() {
                 if (source == "screen" && method != "media_projection" && !adalight) {
                     Log.i(TAG, "Restarted by the system after the process died, resuming capture")
                     return onStartCommand(Intent(this, javaClass).setAction(ACTION_START), flags, startId)
+                }
+                if (source == "effect" && !adalight) {
+                    Log.i(TAG, "Restarted by the system after the process died, resuming the effect")
+                    return onStartCommand(Intent(this, javaClass).setAction(ACTION_START_EFFECT), flags, startId)
                 }
                 // Остальным путям нужен диалог (согласие на запись экрана, разрешения на USB и
                 // камеру) — их поднимает CaptureLauncher, когда этот экземпляр уже остановлен
@@ -577,6 +717,37 @@ class ScreenGrabberService : Service() {
                     }
                 }
 
+                ACTION_START_EFFECT -> if (mHyperionThread == null) {
+                    mCaptureSource = "effect"
+                    val foregroundStarted =
+                        tryStartForegroundCompat(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+
+                    if (prepared()) {
+                        if (!foregroundStarted && mTclBlocked) {
+                            mStandby?.acquireWakeLock()
+                        }
+                        startEffect()
+                        registerEventReceiver()
+                    } else {
+                        haltStartup()
+                    }
+                }
+
+                ACTION_SLEEP_TIMER -> {
+                    setSleepTimer(intent.getIntExtra(EXTRA_SLEEP_MINUTES, 0))
+                    if (mHyperionThread == null) stopSelf()
+                }
+
+                ACTION_CALIBRATION -> {
+                    when (intent.getStringExtra(EXTRA_CALIBRATION)) {
+                        CALIBRATION_BEGIN -> setCalibrating(true)
+                        CALIBRATION_END -> setCalibrating(false)
+                        CALIBRATION_DARK -> mDarkUntil =
+                            SystemClock.uptimeMillis() + intent.getLongExtra(EXTRA_DARK_MS, 0L).coerceIn(0L, MAX_DARK_MS)
+                    }
+                    if (mHyperionThread == null) stopSelf()
+                }
+
                 ACTION_DETECT_FRAME -> {
                     // Кнопка автоподстройки: перезапускаем поиск экрана прямо в идущей
                     // сессии камеры.
@@ -641,6 +812,10 @@ class ScreenGrabberService : Service() {
 
         unregisterColorPrefsListener()
         mHandler?.removeCallbacks(mApplySettings)
+        mHandler?.removeCallbacks(mEndCalibration)
+        mHandler?.removeCallbacks(mSleep)
+        sSleepAt = 0L
+        stopAppWatch()
         mActiveOptions = null
 
         mStandby?.releaseAll()
@@ -849,6 +1024,18 @@ class ScreenGrabberService : Service() {
     }
 
 
+    private fun startEffect() {
+        val prefs = Preferences(this)
+        val encoder = EffectEncoder(newGate(), buildAppOptions(prefs), EffectConfig.from(prefs))
+        mActiveBackend = encoder
+        encoder.sendStatus()
+    }
+
+    /** Эффект просили не гасить вместе с экраном ТВ. */
+    private fun effectStaysOn(): Boolean =
+        mCaptureSource == "effect" &&
+                Preferences(this).getBoolean(R.string.pref_key_effect_standby)
+
     private fun notifyTclBlocked() {
         val intent = Intent(BROADCAST_FILTER)
         intent.putExtra(BROADCAST_TAG, false)
@@ -885,8 +1072,11 @@ class ScreenGrabberService : Service() {
      * каждый неудачный старт оставлял бы два неубиваемых потока, а клиент Adalight —
      * занятый USB-порт до конца процесса. disconnect() блокирует (awaitTermination,
      * закрытие порта), поэтому уводится с вызывающего потока.
+     *
+     * С [fadeOut] перед отключением уходят несколько чёрных кадров: подсветку выключили,
+     * а не перезапускают.
      */
-    private fun shutDownHyperionThread() {
+    private fun shutDownHyperionThread(fadeOut: Boolean = false) {
         val thread = mHyperionThread
         val secondary = mSecondaryHyperionThread
         mHyperionThread = null
@@ -896,6 +1086,13 @@ class ScreenGrabberService : Service() {
         thread?.interrupt()
         secondary?.interrupt()
         Thread({
+            if (fadeOut) {
+                repeat(FADE_OUT_FRAMES) {
+                    SystemClock.sleep(FADE_OUT_STEP_MS)
+                    thread?.receiver?.clear()
+                    secondary?.receiver?.clear()
+                }
+            }
             try {
                 thread?.receiver?.disconnect()
             } catch (e: Exception) {
@@ -1243,25 +1440,21 @@ class ScreenGrabberService : Service() {
     private fun stopAllCapture() {
         if (DEBUG) Log.v(TAG, "Stopping all capture")
         mReconnectEnabled = false
+        stopAppWatch()
         mNotificationManager?.cancel(NOTIFICATION_ID)
 
         val backend = mActiveBackend
         if (backend != null) {
             if (DEBUG) Log.v(TAG, "Stopping ${backend.javaClass.simpleName}")
+            // Прощальные кадры и disconnect энкодер шлёт из своего потока уже после этой
+            // функции, когда выход обнулён. Поэтому он отцепляется, а вывод гасится и
+            // закрывается здесь: иначе keepalive клиента держал бы ленту зажжённой
+            mGate?.attached = false
+            mGate = null
             backend.stopRecording()
             mActiveBackend = null
-            // Клиент и executors закроет цепочка stopRecording → listener.disconnect(),
-            // она уже дошла и до дополнительного вывода через DualHyperionThreadListener
-            mHyperionThread?.interrupt()
-            mHyperionThread = null
-            mSecondaryHyperionThread?.interrupt()
-            mSecondaryHyperionThread = null
-            mOutput = null
-            mGate = null
-        } else {
-            // Энкодера нет — закрывать соединение некому, кроме нас
-            shutDownHyperionThread()
         }
+        shutDownHyperionThread(fadeOut = true)
 
         releaseResource()
     }
@@ -1282,6 +1475,7 @@ class ScreenGrabberService : Service() {
         val intent = Intent(BROADCAST_FILTER)
         intent.putExtra(BROADCAST_TAG, isCommunicating)
         intent.putExtra(BROADCAST_ERROR, mStartError)
+        intent.putExtra(BROADCAST_SLEEP_AT, sSleepAt)
         if (DEBUG) {
             Log.v(
                 TAG, "Broadcasting status: communicating=" + isCommunicating +
@@ -1371,6 +1565,9 @@ class ScreenGrabberService : Service() {
             getString(R.string.pref_key_capture_source),
             getString(R.string.pref_key_capture_method)
         )
+        val effectKeys = EFFECT_KEYS.map { getString(it) }.toSet()
+        val keyOutputDelay = getString(R.string.pref_key_output_delay)
+        val keyDelayProfiles = getString(R.string.pref_key_delay_profiles)
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == null) return@OnSharedPreferenceChangeListener
@@ -1378,6 +1575,16 @@ class ScreenGrabberService : Service() {
                 if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
                 if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
                 if (key in cameraIdleKeys) mActiveOptions?.refreshCameraIdleSettings(prefs)
+                if (key == keyDelayProfiles && mCaptureSource == "screen" && mHyperionThread != null) {
+                    // Первая задержка по приложению включает слежение за экраном, удаление
+                    // последней - выключает
+                    val profiles = prefs.getString(R.string.pref_key_delay_profiles, "")
+                    if (DelayProfiles.parse(profiles).isEmpty()) stopAppWatch() else startAppWatch()
+                }
+                if (key == keyOutputDelay || key == keyDelayProfiles) applyOutputDelay()
+                if (key in effectKeys) {
+                    (mActiveBackend as? EffectEncoder)?.setConfig(EffectConfig.from(prefs))
+                }
                 // Остальное вступало в силу только после ручного перезапуска подсветки; с
                 // телефона правят посреди фильма, и ждать перезапуска там некому
                 val output = key in outputKeys
@@ -1474,6 +1681,10 @@ class ScreenGrabberService : Service() {
         Log.i(TAG, "Capture settings changed, recreating ${backend.javaClass.simpleName}")
 
         when (backend) {
+            // Эффект не зависит ни от частоты, ни от качества захвата, а раскладку ленты
+            // разбор кадра перечитывает сам
+            is EffectEncoder -> return
+
             is ScreenEncoder -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     // Android 14+ не отдаёт вторую проекцию по тому же согласию — новые
@@ -1529,15 +1740,25 @@ class ScreenGrabberService : Service() {
         const val BROADCAST_TAG = "SERVICE_STATUS"
         const val BROADCAST_FILTER = "SERVICE_FILTER"
         const val BROADCAST_TCL_BLOCKED = "TCL_BLOCKED"
+        const val BROADCAST_SLEEP_AT = "SLEEP_AT"
         private const val DEBUG = false
         private const val TAG = "ScreenGrabberService"
 
         private const val BASE = "com.vasmarfas.UniversalAmbientLight.service."
         const val ACTION_START = BASE + "ACTION_START"
         const val ACTION_START_CAMERA = BASE + "ACTION_START_CAMERA"
+        const val ACTION_START_EFFECT = BASE + "ACTION_START_EFFECT"
         const val ACTION_STOP = BASE + "ACTION_STOP"
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_DETECT_FRAME = BASE + "ACTION_DETECT_FRAME"
+        const val ACTION_SLEEP_TIMER = BASE + "ACTION_SLEEP_TIMER"
+        const val EXTRA_SLEEP_MINUTES = BASE + "EXTRA_SLEEP_MINUTES"
+        const val ACTION_CALIBRATION = BASE + "ACTION_CALIBRATION"
+        const val EXTRA_CALIBRATION = BASE + "EXTRA_CALIBRATION"
+        const val EXTRA_DARK_MS = BASE + "EXTRA_DARK_MS"
+        const val CALIBRATION_BEGIN = "begin"
+        const val CALIBRATION_END = "end"
+        const val CALIBRATION_DARK = "dark"
         const val ACTION_EXIT = BASE + "ACTION_EXIT"
         const val GET_STATUS = BASE + "ACTION_STATUS"
         const val EXTRA_RESULT_CODE = BASE + "EXTRA_RESULT_CODE"
@@ -1546,6 +1767,11 @@ class ScreenGrabberService : Service() {
         private const val NOTIFICATION_EXIT_INTENT_ID = 2
         private const val APPLY_SETTINGS_DELAY_MS = 1200L
         private const val SESSION_RESTART_DELAY_MS = 700L
+        private const val FADE_OUT_FRAMES = 3
+        private const val FADE_OUT_STEP_MS = 100L
+        private const val APP_WATCH_INTERVAL_MS = 3000L
+        private const val MAX_CALIBRATION_MS = 3 * 60 * 1000L
+        private const val MAX_DARK_MS = 6000L
 
         /** Настройки вывода: меняются пересозданием HyperionThread под тем же энкодером. */
         private val OUTPUT_KEYS = intArrayOf(
@@ -1564,7 +1790,6 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_smoothing_enabled,
             R.string.pref_key_smoothing_preset,
             R.string.pref_key_settling_time,
-            R.string.pref_key_output_delay,
             R.string.pref_key_update_frequency,
             R.string.pref_key_ha_token,
             R.string.pref_key_ha_lamps,
@@ -1589,6 +1814,34 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_ha2_dark_off,
             R.string.pref_key_ha2_dark_threshold,
             R.string.pref_key_ha2_turn_off_lights,
+            R.string.pref_key_dmx_universe,
+            R.string.pref_key_dmx_leds_per_universe,
+            R.string.pref_key_opc_channel,
+            R.string.pref_key_hue_username,
+            R.string.pref_key_hue_lamps,
+            R.string.pref_key_wiz_lamps,
+            R.string.pref_key_yeelight_lamps,
+            R.string.pref_key_lifx_lamps,
+            R.string.pref_key_govee_lamps,
+            R.string.pref_key_z2m_lamps,
+            R.string.pref_key_hue_clientkey,
+            R.string.pref_key_hue_area,
+            R.string.pref_key_mqtt_username,
+            R.string.pref_key_mqtt_password,
+            R.string.pref_key_z2m_base_topic,
+            R.string.pref_key_nanoleaf_token,
+        )
+
+        /** Параметры эффекта: применяются на ходу, без перезапуска. */
+        private val EFFECT_KEYS = intArrayOf(
+            R.string.pref_key_effect,
+            R.string.pref_key_effect_color,
+            R.string.pref_key_effect_color2,
+            R.string.pref_key_effect_speed,
+            R.string.pref_key_effect_brightness,
+            R.string.pref_key_effect_temperature,
+            R.string.pref_key_led_start_corner,
+            R.string.pref_key_led_direction,
         )
 
         /** Настройки, которые энкодер берёт при создании. */
@@ -1620,9 +1873,14 @@ class ScreenGrabberService : Service() {
             val prefs = Preferences(context)
             val connectionType =
                 prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+            val type = OutputType.of(connectionType)
 
-            // Для Adalight адрес и порт не нужны
-            if (!"adalight".equals(connectionType, ignoreCase = true)) {
+            if (type != OutputType.ADALIGHT && !LocalNetworkAccess.isGranted(context)) {
+                return SettingsError("local_network", context.getString(R.string.error_local_network))
+            }
+
+            // Адрес не нужен USB, лампам со своими адресами и E1.31 (без него - мультикаст)
+            if (type.needsHost) {
                 val host = prefs.getString(R.string.pref_key_host, null)?.trim()
                 if (host.isNullOrEmpty() || host == "0.0.0.0") {
                     return SettingsError(
@@ -1631,20 +1889,40 @@ class ScreenGrabberService : Service() {
                     )
                 }
                 val port = prefs.getInt(R.string.pref_key_port, -1)
-                if (port == -1) {
+                // Мосту Hue порт не задаётся, в настройках его поля нет
+                if (type.defaultPort > 0 && port == -1) {
                     return SettingsError(
                         "empty_port",
                         context.getString(R.string.error_empty_port)
                     )
                 }
                 // Порт должен попадать в диапазон 1-65535
-                if (port < 1 || port > 65535) {
+                if (type.defaultPort > 0 && (port < 1 || port > 65535)) {
                     return SettingsError(
                         "invalid_port",
                         context.getString(R.string.error_invalid_port, port),
                         "port: $port"
                     )
                 }
+            }
+
+            if (type == OutputType.HUE && prefs.getString(R.string.pref_key_hue_username, "").isNullOrBlank()) {
+                return SettingsError("hue_not_paired", context.getString(R.string.error_hue_not_paired))
+            }
+            if (type == OutputType.NANOLEAF &&
+                prefs.getString(R.string.pref_key_nanoleaf_token, "").isNullOrBlank()
+            ) {
+                return SettingsError("nanoleaf_not_paired", context.getString(R.string.error_nanoleaf_not_paired))
+            }
+            val hueArea = type == OutputType.HUE && !prefs.getString(R.string.pref_key_hue_area, "").isNullOrBlank()
+            if (hueArea && prefs.getString(R.string.pref_key_hue_clientkey, "").isNullOrBlank()) {
+                return SettingsError("hue_no_clientkey", context.getString(R.string.error_hue_no_clientkey))
+            }
+            val lampsKey = type.lampsKey
+            if (lampsKey != null && type != OutputType.HOME_ASSISTANT && !hueArea &&
+                HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).isEmpty()
+            ) {
+                return SettingsError("no_lamps", context.getString(R.string.error_no_lamps))
             }
 
             if ("homeassistant".equals(connectionType, ignoreCase = true)) {
@@ -1694,6 +1972,12 @@ class ScreenGrabberService : Service() {
             intent.setPackage(context.packageName)
             context.sendBroadcast(intent)
         }
+
+        /** Когда сработает таймер сна, мс по часам устройства; 0 - таймера нет. */
+        @Volatile
+        @JvmStatic
+        var sSleepAt: Long = 0L
+            private set
 
         /** True, пока экземпляр сервиса жив (onCreate→onDestroy). */
         @Volatile

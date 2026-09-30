@@ -12,16 +12,7 @@
   <!-- notification button -->
   <string name="notification_exit_button">Exit</string>
   <!-- Network scanner -->
-  <string name="scanner_description">Find WLED and Hyperion devices automatically</string>
   <string name="scanner_retry_button">retry</string>
-  <string name="scanner_scan_devices">Scan network</string>
-  <string name="scanner_scanning">Scanning network…</string>
-  <string name="scanner_found_devices">Found devices:</string>
-  <string name="scanner_no_devices_found">No devices found</string>
-  <string name="scanner_device_wled">WLED</string>
-  <string name="scanner_device_hyperion">Hyperion</string>
-  <string name="scanner_device_unknown">Unknown</string>
-  <string name="scanner_device_info">%1$s at %2$s:%3$d</string>
   <string name="scanner_cancel">Cancel</string>
   <!-- Network Scanner result -->
   <!-- Connection settings -->
@@ -84,9 +75,6 @@
   <string name="pref_category_debug">Debug</string>
   <string name="pref_title_device_info">Device Info</string>
   <string name="pref_summary_device_info">Show device information for debugging</string>
-  <string name="scan_scanning">Scanning: %1$s</string>
-  <string name="scan_hostname">Hostname: %1$s</string>
-  <string name="scan_protocol">Protocol: %1$s</string>
   <string name="rating_stars_desc">%1$d stars</string>
   <string name="usb_service_unavailable">USB service is not available on this device</string>
   <string name="usb_no_serial_devices">No USB serial devices found. Connect your device via USB OTG</string>
@@ -102,10 +90,12 @@
   <string-array name="pref_list_capture_source">
     <item>Screen</item>
     <item>Camera</item>
+    <item>Effect (no capture)</item>
   </string-array>
   <string-array name="pref_list_capture_source_values">
     <item>screen</item>
     <item>camera</item>
+    <item>effect</item>
   </string-array>
   <string name="pref_title_camera_setup">Camera Corner Setup</string>
   <string name="pref_summary_camera_setup">Adjust the 4 corners to match your TV screen in the camera view</string>
@@ -276,19 +266,6 @@
   <string name="notification_channel_label">Universal Ambient Light Notifications</string>
   <string name="notification_description">Currently grabbing screen content</string>
   <string name="pref_title_use_avg_color">Send Average Screen Color</string>
-  <string name="pref_title_connection_type">Connection Type</string>
-  <string-array name="pref_list_connection_type">
-    <item>Hyperion</item>
-    <item>WLED</item>
-    <item>Adalight</item>
-    <item>Home Assistant</item>
-  </string-array>
-  <string-array name="pref_list_connection_type_values">
-    <item>hyperion</item>
-    <item>wled</item>
-    <item>adalight</item>
-    <item>homeassistant</item>
-  </string-array>
   <string name="pref_title_adalight_baudrate">Adalight Baud Rate</string>
   <string-array name="pref_list_adalight_baudrate">
     <item>9600</item>
@@ -299,6 +276,9 @@
     <item>230400</item>
     <item>250000</item>
     <item>500000</item>
+    <item>921600</item>
+    <item>1000000</item>
+    <item>2000000</item>
   </string-array>
   <string-array name="pref_list_adalight_baudrate_values" translatable="false">
     <item>9600</item>
@@ -309,6 +289,9 @@
     <item>230400</item>
     <item>250000</item>
     <item>500000</item>
+    <item>921600</item>
+    <item>1000000</item>
+    <item>2000000</item>
   </string-array>
   <string name="pref_title_wled_color_order">WLED Color Order</string>
   <string-array name="pref_list_wled_color_order">
@@ -471,11 +454,23 @@
     <item>ADA (Standard)</item>
     <item>LBAPA (LightBerry APA102)</item>
     <item>AWA (Hyperserial)</item>
+    <item>tpm2</item>
+    <item>Skydimo</item>
+    <item>SEDU</item>
+    <item>KarateLight</item>
+    <item>AtmoLight</item>
+    <item>SP616E</item>
   </string-array>
   <string-array name="pref_list_adalight_protocol_values">
     <item>ada</item>
     <item>lbapa</item>
     <item>awa</item>
+    <item>tpm2</item>
+    <item>skydimo</item>
+    <item>sedu</item>
+    <item>karate</item>
+    <item>atmo</item>
+    <item>sp616e</item>
   </string-array>
 
   <!-- App Specific Strings -->
@@ -500,7 +495,7 @@
   <string name="rating_dialog_report_issue">Report Issue</string>
   <string name="rating_dialog_cancel">Cancel</string>
   <string name="github_issues_url">https://github.com/vasmarfas/universal-ambient-light/issues</string>
-  <string name="accessibility_service_description">Allow Universal Ambient Light to capture screen content for ambient lighting.</string>
+  <string name="accessibility_service_description">Lets Universal Ambient Light capture the screen for the ambient lighting and press TV buttons on commands from a paired phone.</string>
   <string name="accessibility_enable_prompt">Please enable the Accessibility Service for Universal Ambient Light</string>
   <string name="accessibility_disclosure_title">Accessibility Permission Required</string>
   <string name="accessibility_disclosure_message">This app uses the AccessibilityService API to capture screen content. This is required to analyze colors on your screen and sync them with your background lights (Ambilight) in real-time.\n\nThe screen data is processed locally on your device, is never saved, and is never transmitted to any third-party servers.\n\nIf you do not agree, you cannot use this capture mode.</string>
@@ -519,7 +514,7 @@
   <string name="autostart_permissions_ok">Granted: the lighting comes back by itself, without dialogs</string>
   <string name="autostart_permissions_missing">Not granted: after sleep the TV may ask to confirm screen capture. Open to grant them via ADB</string>
   <string name="adb_grant_title">Autostart permissions</string>
-  <string name="adb_grant_description">Uses ADB once to allow screen capture without a confirmation dialog, windows over other apps and unrestricted background work. Without them Android 10+ cannot bring the lighting back by itself after the TV wakes up or reboots.</string>
+  <string name="adb_grant_description">Uses ADB once to allow screen capture without a confirmation dialog, windows over other apps and unrestricted background work. Without them Android 10+ cannot bring the lighting back by itself after the TV wakes up or reboots. Usage access comes along: with it the lighting knows which app is on screen and uses the per-app delay.</string>
   <string name="adb_grant_btn">Grant via ADB</string>
   <string name="adb_grant_success">Done: screen capture without confirmation, windows over other apps and background work are allowed.</string>
   <string name="adb_grant_partial">Not applied: %1$s. This firmware may not support it.</string>
@@ -586,4 +581,279 @@
   <string name="remote_notification_title">Control from a phone is on</string>
   <string name="remote_notification_waiting">Waiting for a phone</string>
   <string name="remote_notification_connected">Connected: %1$s</string>
+
+  <!-- Effects without screen capture -->
+  <string name="effects_title">Effects</string>
+  <string name="effects_intro">Effects light the strip on their own, without screen capture. No screen recording permission is needed, and it does not matter what is on the TV.</string>
+  <string name="effects_group_static">Static</string>
+  <string name="effects_group_dynamic">Animated</string>
+  <string name="effects_group_setup">For setup</string>
+  <string name="effects_parameters">Settings: %1$s</string>
+  <string name="effects_now_off">The lighting is off. Pick an effect and it turns on.</string>
+  <string name="effects_now_effect">Now on: %1$s</string>
+  <string name="effects_now_screen">The lighting follows the screen now. Picking an effect switches it over.</string>
+  <string name="effects_turn_off">Turn off</string>
+  <string name="effects_back_to_screen">Back to the screen</string>
+  <string name="effects_color">Color</string>
+  <string name="effects_color2">Second color</string>
+  <string name="effects_hue">Hue</string>
+  <string name="effects_saturation">Saturation</string>
+  <string name="effects_speed">Speed</string>
+  <string name="effects_brightness">Brightness</string>
+  <string name="effects_temperature">Color temperature</string>
+  <string name="effects_standby">Keep on when the TV screen is off</string>
+  <string name="effects_standby_summary">The strip keeps glowing like a night light while the TV box stays awake. Some TVs cut the network in standby, then it goes dark anyway.</string>
+  <string name="unit_kelvin">%1$d K</string>
+  <string name="effect_solid">Solid color</string>
+  <string name="effect_gradient">Gradient</string>
+  <string name="effect_white">Movie white</string>
+  <string name="effect_white_hint">The reference white for watching movies is 6500 K, lower values are warmer.</string>
+  <string name="effect_rainbow">Rainbow</string>
+  <string name="effect_color_cycle">Color cycle</string>
+  <string name="effect_breathing">Breathing</string>
+  <string name="effect_candle">Candle</string>
+  <string name="effect_fire">Fire</string>
+  <string name="effect_aurora">Aurora</string>
+  <string name="effect_ocean">Ocean</string>
+  <string name="effect_plasma">Plasma</string>
+  <string name="effect_comet">Comet</string>
+  <string name="effect_layout_test">Layout test</string>
+  <string name="effect_layout_test_hint">Top is red, right is green, bottom is blue, left is yellow. The white dot runs from the first LED in the numbering direction. If the colors or the path of the dot do not match the strip, fix the LED layout.</string>
+  <string name="home_source_effect">Effect: %1$s</string>
+  <string name="remote_error_update_tv">The app on the TV is older than this feature. Update it on the TV.</string>
+
+  <!-- Remote: buttons, mouse, text and apps of the TV -->
+  <string name="tv_remote_title">Remote</string>
+  <string name="tv_remote_tab_keys">Buttons</string>
+  <string name="tv_remote_tab_mouse">Mouse</string>
+  <string name="tv_remote_tab_text">Text</string>
+  <string name="tv_remote_tab_apps">Apps</string>
+  <string name="tv_remote_adb_missing">Buttons, mouse and text work through ADB on the TV, and it is not available now: %1$s</string>
+  <string name="tv_remote_adb_missing_accessibility">Without ADB only system buttons, taps and text through the accessibility service work.</string>
+  <string name="tv_remote_adb_setup">Set up ADB</string>
+  <string name="tv_remote_no_cursor">The TV does not allow windows over other apps, so the cursor is not visible. Grant the autostart permissions via ADB.</string>
+  <string name="tv_remote_power">Power</string>
+  <string name="tv_remote_input">Input source</string>
+  <string name="tv_remote_settings">TV settings</string>
+  <string name="tv_remote_back">Back</string>
+  <string name="tv_remote_home">Home</string>
+  <string name="tv_remote_menu">Menu</string>
+  <string name="tv_remote_ok">OK</string>
+  <string name="tv_remote_up">Up</string>
+  <string name="tv_remote_down">Down</string>
+  <string name="tv_remote_left">Left</string>
+  <string name="tv_remote_right">Right</string>
+  <string name="tv_remote_volume_up">Volume up</string>
+  <string name="tv_remote_volume_down">Volume down</string>
+  <string name="tv_remote_mute">Mute</string>
+  <string name="tv_remote_play_pause">Play or pause</string>
+  <string name="tv_remote_rewind">Rewind</string>
+  <string name="tv_remote_forward">Fast forward</string>
+  <string name="tv_remote_previous">Previous</string>
+  <string name="tv_remote_next">Next</string>
+  <string name="tv_remote_touchpad_hint">Slide a finger to move the cursor. A tap clicks, holding makes a long press. Two fingers scroll, a two-finger tap works as Back.</string>
+  <string name="tv_remote_click">Click</string>
+  <string name="tv_remote_text_label">Text for the TV</string>
+  <string name="tv_remote_text_hint">Select a text field on the TV, a search box for example, and type here. The text appears on the TV right away.</string>
+  <string name="tv_remote_enter">Enter</string>
+  <string name="tv_remote_backspace">Delete</string>
+  <string name="tv_remote_clear">Clear</string>
+  <string name="tv_remote_apps_loading">Loading the TV apps…</string>
+  <string name="tv_remote_apps_empty">No apps found on the TV</string>
+  <string name="remote_tvs_switch">Other TVs</string>
+  <string name="remote_input_needs_adb">This needs ADB on the TV (%1$s). It is set up on the Remote screen.</string>
+  <string name="remote_app_not_found">The app is not installed on the TV</string>
+
+  <!-- Lighting delay and auto-tuning with the phone camera -->
+  <string name="calibration_title">Delay auto-tuning</string>
+  <string name="calibration_needs_remote">Auto-tuning films the TV with the phone camera, so it runs from a phone paired with the TV.</string>
+  <string name="calibration_needs_screen">Turn on the lighting in screen capture mode on the TV and play a movie: the delay is measured on it.</string>
+  <string name="calibration_turn_on">Turn on the lighting</string>
+  <string name="calibration_intro">The phone films the TV and the glow on the wall and compares when the picture and the strip change. The delay is measured on what is playing right now, so every app and source gets its own value.</string>
+  <string name="calibration_steps">1. Play a movie or a video with frequent scene changes.\n2. Turn off the lights in the room.\n3. Stand so that the whole TV screen and the wall around it are in the frame, and hold the phone still for about a minute.</string>
+  <string name="calibration_start">Start</string>
+  <string name="calibration_searching">The strip goes dark for a few seconds while the phone looks for the TV screen. Hold the phone still.</string>
+  <string name="calibration_measuring">Measuring. Scene changes: %1$d, seconds: %2$d. Hold the phone still.</string>
+  <string name="calibration_glow_invisible">The camera barely sees the glow of the strip. Turn off the lights and make sure the wall around the TV is in the frame.</string>
+  <string name="calibration_result_ahead">The strip is %1$d ms ahead of the picture</string>
+  <string name="calibration_result_behind">The strip is %1$d ms behind the picture</string>
+  <string name="calibration_result_in_sync">The strip and the picture are in sync</string>
+  <string name="calibration_result_details">Scene changes: %1$d. Accuracy about ±%2$d ms, match %3$d%%.</string>
+  <string name="calibration_unreliable">The result is not reliable: too few scene changes or the phone moved. Better repeat on a more dynamic scene.</string>
+  <string name="calibration_behind_hint">A delay cannot fix a late strip. Lower the smoothing or pick a faster capture method.</string>
+  <string name="calibration_current">Set now: %1$d ms. Suggested: %2$d ms.</string>
+  <string name="calibration_save_app">Save for %1$s</string>
+  <string name="calibration_save_all">Save for all apps</string>
+  <string name="calibration_no_usage_access">The TV does not report which app is on screen, so the delay is saved for all apps. Per-app delay needs usage access, it is granted together with the autostart permissions via ADB.</string>
+  <string name="calibration_saved">Saved: %1$d ms. The TV applies it right away.</string>
+  <string name="calibration_repeat">Measure again</string>
+  <string name="calibration_error_no_screen">The TV screen was not found in the frame. Point the camera so that the whole screen is visible, and try again.</string>
+  <string name="calibration_error_too_dark">The frame is too dark. The TV should be on and playing something bright enough.</string>
+  <string name="calibration_error_too_close">The TV fills almost the whole frame and leaves no room for the wall. Step back a little.</string>
+  <string name="calibration_error_static">Too few scene changes for a measurement. Play something more dynamic and try again.</string>
+  <string name="calibration_error_not_running">Turn on the lighting on the TV first.</string>
+  <string name="calibration_error_not_screen">Auto-tuning works with screen capture, and the TV is showing an effect or using the camera now.</string>
+  <string name="delay_title">Lighting delay</string>
+  <string name="delay_summary">Per-app delay and auto-tuning with the phone camera</string>
+  <string name="delay_intro">If the strip runs ahead of the picture, a delay holds it back. Players and sources process video differently, so an app can have its own delay: the TV switches to it while that app is on screen.</string>
+  <string name="delay_global">Delay for all apps</string>
+  <string name="delay_calibration_title">Auto-tuning</string>
+  <string name="delay_calibration_summary">The phone camera films the TV and the glow and finds the delay on the movie that is playing.</string>
+  <string name="delay_calibration_open">Tune with the camera</string>
+  <string name="delay_calibration_on_phone">Auto-tuning runs from a phone: open TV remote on it, connect to this TV and go to Settings, Lighting delay.</string>
+  <string name="delay_apps_title">Per-app delay</string>
+  <string name="delay_no_usage_access">The TV does not report which app is on screen. Grant usage access via ADB, otherwise the delay for all apps is used everywhere.</string>
+  <string name="delay_apps_empty">No apps with their own delay yet.</string>
+  <string name="delay_apps_remove">Remove</string>
+  <string name="delay_apps_add">Add an app</string>
+
+  <!-- Sleep timer -->
+  <string name="sleep_timer">Sleep timer</string>
+  <string name="sleep_timer_minutes">In %1$d min</string>
+  <string name="sleep_timer_cancel">Turn the timer off</string>
+  <string name="sleep_timer_until">Turns off at %1$s</string>
+
+  <!-- More controllers and smart lights -->
+  <string name="error_hue_not_paired">The Hue bridge is not paired. Open Settings, Connection and pair the bridge with its button.</string>
+  <string name="error_nanoleaf_not_paired">Nanoleaf is not paired. Open Settings, Connection and pair the panels.</string>
+  <string name="error_no_lamps">No lights are assigned to screen zones. Open Settings, Connection, Lights and zones.</string>
+
+  <!-- Controller picker -->
+  <string name="devices_title">Controller</string>
+  <string name="devices_found">Found on the network</string>
+  <string name="devices_searching">Looking for devices on the network…</string>
+  <string name="devices_nothing_found">Nothing answered. Check that the controller is on the same network, or pick its type below and enter the address by hand.</string>
+  <string name="devices_search_again">Search again</string>
+  <string name="devices_sweep">Check every address</string>
+  <string name="devices_sweep_summary">For WLED and Hyperion without mDNS. Takes a minute or two.</string>
+  <string name="devices_sweep_progress">Checking addresses: %1$d%%</string>
+  <string name="devices_manual">Choose by type</string>
+  <string name="devices_current">Current</string>
+  <string name="devices_lamps_count">Lights: %1$d</string>
+  <string name="devices_remote_note">The search runs from this phone, so the TV has to be on the same network.</string>
+  <string name="devices_group_strip">Addressable strip over the network</string>
+  <string name="devices_group_usb">Strip over USB</string>
+  <string name="devices_group_lamps">Smart lights and panels</string>
+  <string name="devices_group_server">Ambilight server</string>
+
+  <!-- Output types -->
+  <string name="output_wled">WLED</string>
+  <string name="output_wled_summary">ESP8266 or ESP32 with WLED firmware</string>
+  <string name="output_ddp">DDP</string>
+  <string name="output_ddp_summary">WLED, ESPixelStick, FPP and other DDP receivers</string>
+  <string name="output_e131">E1.31 (sACN)</string>
+  <string name="output_e131_summary">ESPixelStick, Falcon, FPP, DMX nodes</string>
+  <string name="output_artnet">Art-Net</string>
+  <string name="output_artnet_summary">DMX nodes and pixel controllers</string>
+  <string name="output_tpm2net">tpm2.net</string>
+  <string name="output_tpm2net_summary">Receivers compatible with Jinx!</string>
+  <string name="output_udpraw">UDP raw</string>
+  <string name="output_udpraw_summary">Bare RGB in one packet, up to 490 LEDs</string>
+  <string name="output_opc">Open Pixel Control</string>
+  <string name="output_opc_summary">FadeCandy and fcserver</string>
+  <string name="output_adalight">Adalight and USB kits</string>
+  <string name="output_adalight_summary">Arduino, ESP, Skydimo and other boards on a USB cable</string>
+  <string name="output_hue">Philips Hue</string>
+  <string name="output_hue_summary">Lights through the Hue bridge</string>
+  <string name="output_nanoleaf">Nanoleaf</string>
+  <string name="output_nanoleaf_summary">Shapes, Canvas, Elements, Lines, Light Panels</string>
+  <string name="output_wiz">WiZ</string>
+  <string name="output_wiz_summary">WiZ Connected lights, Philips WiZ included</string>
+  <string name="output_yeelight">Yeelight</string>
+  <string name="output_yeelight_summary">Needs LAN Control enabled in the Yeelight app</string>
+  <string name="output_lifx">LIFX</string>
+  <string name="output_lifx_summary">LIFX lights on the local network</string>
+  <string name="output_govee">Govee</string>
+  <string name="output_govee_summary">Needs LAN Control enabled in the Govee Home app</string>
+  <string name="output_homeassistant">Home Assistant</string>
+  <string name="output_homeassistant_summary">Any lights connected to Home Assistant</string>
+  <string name="output_hyperion">Hyperion / HyperHDR</string>
+  <string name="output_hyperion_summary">The picture goes to a Hyperion or HyperHDR server that drives the LEDs</string>
+
+  <!-- Controller settings -->
+  <string name="controller_change">Change</string>
+  <string name="controller_no_address">address not set</string>
+  <string name="pref_title_color_order">Color order</string>
+  <string name="pref_title_dmx_universe">Start universe</string>
+  <string name="pref_summary_dmx_universe">%1$d, a longer strip continues into the next universes</string>
+  <string name="pref_title_dmx_leds_per_universe">LEDs per universe</string>
+  <string name="pref_summary_dmx_leds_per_universe">%1$d (170 fill all 510 channels of a universe)</string>
+  <string name="pref_title_tpm2_leds_per_packet">LEDs per packet</string>
+  <string name="pref_title_opc_channel">OPC channel</string>
+  <string name="pref_summary_opc_channel">%1$d (0 means every channel of the server)</string>
+  <string name="pref_summary_e131_multicast">Empty: multicast to 239.255.x.y</string>
+  <string name="home_target_multicast">multicast</string>
+  <string name="pref_title_hue_pairing">Bridge pairing</string>
+  <string name="pref_title_nanoleaf_pairing">Panel pairing</string>
+  <string name="pref_summary_paired">Paired</string>
+  <string name="pref_summary_not_paired">Not paired, tap to pair</string>
+
+  <!-- Pairing -->
+  <string name="action_pair">Pair</string>
+  <string name="pair_in_progress">Pairing…</string>
+  <string name="pair_failed">Couldn\'t pair: %1$s</string>
+  <string name="hue_pair_title">Pair the Hue bridge</string>
+  <string name="hue_pair_text">Press the round button on top of the bridge, then tap Pair within 30 seconds.</string>
+  <string name="hue_pair_button_not_pressed">The bridge says its button wasn\'t pressed. Press it and try again.</string>
+  <string name="nanoleaf_pair_title">Pair Nanoleaf</string>
+  <string name="nanoleaf_pair_text">Hold the power button on the controller for 5 to 7 seconds until its light starts flashing, then tap Pair within 30 seconds.</string>
+  <string name="nanoleaf_pair_rejected">Nanoleaf refused: the button wasn\'t held or more than 30 seconds have passed.</string>
+  <string name="pair_need_host">Enter the address first</string>
+
+  <!-- Lights of other systems -->
+  <string name="lamps_dialog_title">%1$s lights</string>
+  <string name="lamps_hint_network">Lights are searched on the local network. Turn them on and check that they are on the same Wi-Fi.</string>
+  <string name="lamps_hint_hue">Pair the bridge first, then pick a zone for each light.</string>
+  <string name="lamps_error">Couldn\'t get the list of lights: %1$s</string>
+  <string name="lamps_lamp_missing">Not found on the network right now</string>
+  <string name="lamps_identify">Blink</string>
+
+  <!-- Home: controller setup hint -->
+  <string name="home_setup_button">Set up the controller</string>
+  <string name="home_setup_no_host">The controller address is not set</string>
+  <string name="home_setup_no_lamps">No lights are assigned to screen zones</string>
+  <string name="home_setup_not_paired">%1$s is not paired yet</string>
+  <string name="home_setup_no_token">The Home Assistant token is not set</string>
+
+  <!-- Connection errors of LED controllers and lights -->
+  <string name="error_device_unreachable">Couldn\'t reach the controller. Check its address and power, and that it is on the same network.</string>
+  <string name="error_device_connection_lost">The connection to the controller was lost, capture stopped.</string>
+  <string name="error_lamps_unreachable">Couldn\'t reach the lights. Check that they are powered and on the same network.</string>
+  <string name="error_lamps_connection_lost">The connection to the lights was lost, capture stopped.</string>
+
+  <!-- WLED LED count check -->
+  <string name="devices_led_mismatch_title">The LED count differs</string>
+  <string name="devices_led_mismatch_text">LEDs in WLED: %1$d, in the app layout: %2$d. With different numbers part of the strip stays dark or the colors land in the wrong place.</string>
+  <string name="devices_led_mismatch_layout">Set up the layout</string>
+  <string name="devices_led_mismatch_later">Not now</string>
+
+  <!-- Local network access (Android 17) -->
+  <string name="error_local_network">No access to the local network. Allow Nearby devices for the app in the system settings.</string>
+
+  <!-- Hue entertainment area -->
+  <string name="pref_title_hue_area">Entertainment area</string>
+  <string name="pref_summary_hue_area_none">Not used, lights get colors one by one</string>
+  <string name="hue_area_none">Lights one by one</string>
+  <string name="hue_area_none_summary">A few updates per second, zones are picked here</string>
+  <string name="hue_area_summary">Stream up to 25 times per second, places come from the Hue app</string>
+  <string name="hue_area_hint">Areas are created in the Hue app under Entertainment areas. The bridge streams colors to their lights, each light takes the color of its place around the screen.</string>
+  <string name="hue_area_empty">The bridge has no entertainment areas yet.</string>
+  <string name="hue_area_no_key">The bridge was paired by an older version of the app, without a streaming key. Pair it again to use an area.</string>
+  <string name="hue_area_repair">Pair again</string>
+  <string name="hue_area_error">Couldn\'t get the areas: %1$s</string>
+  <string name="pref_summary_hue_area_lamps">Lights and their places are set by the area in the Hue app</string>
+  <string name="error_hue_no_clientkey">The Hue bridge has to be paired again: the entertainment area needs a streaming key. Open Settings, Connection.</string>
+  <string name="home_setup_hue_repair">The Hue bridge has to be paired again</string>
+  <string name="hue_area_loading">Asking the bridge…</string>
+
+  <!-- Zigbee2MQTT -->
+  <string name="output_z2m">Zigbee2MQTT</string>
+  <string name="output_z2m_summary">Zigbee lights through an MQTT broker</string>
+  <string name="pref_title_mqtt_username">MQTT user</string>
+  <string name="pref_summary_mqtt_no_login">No login</string>
+  <string name="pref_title_mqtt_password">MQTT password</string>
+  <string name="pref_summary_mqtt_password_empty">Not set</string>
+  <string name="pref_summary_mqtt_password_set">Saved</string>
+  <string name="pref_title_z2m_base_topic">Zigbee2MQTT base topic</string>
+  <string name="lamps_hint_z2m">The list comes from the broker, Zigbee2MQTT keeps it there. Check the broker address, login and base topic.</string>
 </resources>

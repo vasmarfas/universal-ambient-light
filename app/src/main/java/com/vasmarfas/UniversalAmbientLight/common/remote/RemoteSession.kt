@@ -52,6 +52,10 @@ object RemoteSession {
         val projectMedia: Boolean,
         /** Окна поверх других приложений — без них Android 10+ не покажет окно из фона. */
         val overlay: Boolean,
+        /** Возможности новее первой версии протокола, см. RemoteProtocol.FEATURE_*. */
+        val features: Set<String> = emptySet(),
+        /** ТВ видит, какое приложение на экране, - работает задержка по приложениям. */
+        val usageAccess: Boolean = false,
     )
 
     data class Snapshot(
@@ -65,6 +69,8 @@ object RemoteSession {
         val problem: String? = null,
         /** Растёт с каждым полным снимком настроек — экранам пора перечитать зеркало. */
         val revision: Int = 0,
+        /** Когда ТВ выключит подсветку по таймеру сна, мс по часам ТВ; 0 - таймера нет. */
+        val sleepAt: Long = 0L,
     )
 
     fun interface Listener {
@@ -82,6 +88,12 @@ object RemoteSession {
     }
     private val mSender: ExecutorService = Executors.newSingleThreadExecutor { r ->
         Thread(r, "remote-send").apply { isDaemon = true }
+    }
+
+    // Ввод идёт своей очередью: кнопки и движения мыши обязаны дойти до ТВ по порядку и не
+    // ждать за пачкой настроек
+    private val mInputSender: ExecutorService = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "remote-input").apply { isDaemon = true }
     }
 
     // Контекст не храним: синглтон живёт дольше любой активити, а нужно ему немногое
@@ -232,6 +244,37 @@ object RemoteSession {
     fun call(op: String, args: JSONObject = JSONObject(), timeoutMs: Long = 15_000L): JSONObject {
         val client = mClient ?: throw IOException(string(R.string.remote_error_offline))
         return client.call(op, args, timeoutMs)
+    }
+
+    /**
+     * Отправляет несохранённые правки зеркала прямо сейчас и ждёт ответа. Нужно перед
+     * командой, которая зависит от только что изменённых настроек: иначе запуск подсветки
+     * обгонял бы отложенную пачку и ТВ стартовал бы со старым источником.
+     */
+    fun flushPending() {
+        val client = mClient ?: return
+        val entries = mainSync {
+            mMain.removeCallbacks(mFlush)
+            collectPending()
+        }
+        if (entries.length() > 0) client.call(RemoteProtocol.OP_SET_PREFS, JSONObject().put("set", entries))
+    }
+
+    /**
+     * Ввод на ТВ. [wait] - ждать ответа и сообщить об отказе в [onError] на главном потоке;
+     * без ожидания уходят движения мыши, их десятки в секунду.
+     */
+    fun input(args: JSONObject, wait: Boolean = true, onError: (String) -> Unit = {}) {
+        mInputSender.execute {
+            val client = mClient
+            try {
+                if (client == null) throw IOException(string(R.string.remote_error_offline))
+                if (wait) client.call(RemoteProtocol.OP_INPUT, args) else client.post(RemoteProtocol.OP_INPUT, args)
+            } catch (e: IOException) {
+                val message = e.message ?: string(R.string.remote_error_offline)
+                mMain.post { onError(message) }
+            }
+        }
     }
 
     fun adb(action: String, extra: JSONObject = JSONObject()): JSONObject =
@@ -391,7 +434,8 @@ object RemoteSession {
         running = status.optBoolean("running"),
         alive = status.optBoolean("alive"),
         error = status.optString("error").takeIf { status.has("error") && !status.isNull("error") },
-        source = status.optString("source").ifEmpty { null }
+        source = status.optString("source").ifEmpty { null },
+        sleepAt = status.optLong("sleepAt")
     )
 
     private fun replaceMirror(entries: JSONArray) {
@@ -454,6 +498,7 @@ object RemoteSession {
     private fun parseCaps(caps: JSONObject?): TvCaps? {
         caps ?: return null
         val methods = caps.optJSONArray("methods") ?: JSONArray()
+        val features = caps.optJSONArray("features") ?: JSONArray()
         return TvCaps(
             sdk = caps.optInt("sdk"),
             appVersion = caps.optString("app"),
@@ -462,7 +507,9 @@ object RemoteSession {
             accessibilityOn = caps.optBoolean("accessibilityOn"),
             methods = (0 until methods.length()).map { methods.optString(it) }.toSet(),
             projectMedia = caps.optBoolean("projectMedia"),
-            overlay = caps.optBoolean("overlay")
+            overlay = caps.optBoolean("overlay"),
+            features = (0 until features.length()).map { features.optString(it) }.toSet(),
+            usageAccess = caps.optBoolean("usageAccess")
         )
     }
 

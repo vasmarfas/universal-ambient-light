@@ -31,7 +31,7 @@ class HomeAssistantClient(
     darkOffEnabled: Boolean,
     darkThreshold: Int,
     private val mTurnOffLights: Boolean,
-) : HyperionClient {
+) : HyperionClient, StreamingClient {
 
     private val mBaseUrl = baseUrl(host, port)
     private val mToken = token.trim()
@@ -90,11 +90,11 @@ class HomeAssistantClient(
 
     override fun isConnected(): Boolean = mConnected
 
-    fun pauseSending() {
+    override fun pauseSending() {
         mPaused = true
     }
 
-    fun resumeSending() {
+    override fun resumeSending() {
         mPaused = false
         // После паузы лампы могли гаситься и переключаться руками — первый кадр уходит заново
         mPolicy.reset()
@@ -267,6 +267,27 @@ class HomeAssistantClient(
         fun baseUrl(host: String, port: Int): String {
             val trimmed = host.trim().trimEnd('/')
             return if (trimmed.contains("://")) trimmed else "http://$trimmed:$port"
+        }
+
+        /** Короткая вспышка лампы средствами самого HA, чтобы найти её в комнате. */
+        @Throws(IOException::class)
+        fun flash(host: String, port: Int, token: String, entityId: String) {
+            val connection =
+                URL(baseUrl(host, port) + "/api/services/light/turn_on").openConnection() as HttpURLConnection
+            try {
+                connection.requestMethod = "POST"
+                connection.connectTimeout = CONNECT_TIMEOUT_MS
+                connection.readTimeout = READ_TIMEOUT_MS
+                connection.setRequestProperty("Authorization", "Bearer ${token.trim()}")
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                val body = JSONObject().put("entity_id", entityId).put("flash", "short").toString()
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                val code = connection.responseCode
+                if (code !in 200..299) throw IOException("HTTP $code")
+            } finally {
+                connection.disconnect()
+            }
         }
 
         /**

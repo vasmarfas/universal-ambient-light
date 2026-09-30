@@ -9,7 +9,10 @@ import io.github.muntashirakon.adb.AdbPairingRequiredException
 import io.github.muntashirakon.adb.AdbStream
 import io.github.muntashirakon.adb.android.AndroidUtils
 import java.io.ByteArrayOutputStream
+import java.io.Closeable
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 
 /**
  * Подключение приложения к собственному ADB устройства: проверка, сопряжение, выдача
@@ -25,6 +28,12 @@ object AdbSetup {
     class Status(val developerOptions: Boolean, val adbEnabled: Boolean, val sdkInt: Int)
 
     class Outcome(val success: Boolean, val message: String)
+
+    /** Долгоживущая команда оболочки: её stdin, объединённые stdout и stderr. */
+    interface Shell : Closeable {
+        val input: InputStream
+        val output: OutputStream
+    }
 
     fun status(context: Context) = Status(
         developerOptions = DevOptionsHelper.isDeveloperOptionsEnabled(context),
@@ -110,6 +119,9 @@ object AdbSetup {
             add("appops set $pkg PROJECT_MEDIA allow")
             add("appops set $pkg SYSTEM_ALERT_WINDOW allow")
             add("appops set $pkg RUN_ANY_IN_BACKGROUND allow")
+            // Статистика использования нужна только задержке по приложениям - в проверку
+            // успеха ниже не входит
+            add("appops set $pkg GET_USAGE_STATS allow")
             add("cmd deviceidle whitelist +$pkg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add("pm grant $pkg android.permission.POST_NOTIFICATIONS")
@@ -145,8 +157,8 @@ object AdbSetup {
         }
     }
 
-    /** Команда оболочки от имени shell через собственный ADB устройства. */
-    private fun shell(context: Context, command: String): String {
+    /** Команда оболочки от имени shell через собственный ADB устройства. Блокирует. */
+    fun shell(context: Context, command: String): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val mgr = AppAdbConnectionManager.getInstance(context)
             if (mgr.isConnected || mgr.autoConnect(context, CONNECT_TIMEOUT_MS)) {
@@ -167,6 +179,43 @@ object AdbSetup {
             ?.toIntOrNull() ?: 5555
         return Dadb.create("127.0.0.1", port, AdbKeyHelper.getKeyPair(context)).use {
             it.shell(command).allOutput
+        }
+    }
+
+    /**
+     * Запускает команду и оставляет её работать: пишут в [Shell.output], читают из
+     * [Shell.input]. Путь подключения тот же, что у [shell]. Бросает
+     * [AdbPairingRequiredException], если ADB ещё не сопряжён.
+     */
+    fun openShell(context: Context, command: String): Shell {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val mgr = AppAdbConnectionManager.getInstance(context)
+            if (mgr.isConnected || mgr.autoConnect(context, CONNECT_TIMEOUT_MS)) {
+                val stream = mgr.openStream("shell:$command")
+                return object : Shell {
+                    override val input: InputStream = stream.openInputStream()
+                    override val output: OutputStream = stream.openOutputStream()
+                    override fun close() = stream.close()
+                }
+            }
+        }
+        val port = Preferences(context).getString(R.string.pref_key_adb_port, "5555")
+            ?.toIntOrNull() ?: 5555
+        val dadb = Dadb.create("127.0.0.1", port, AdbKeyHelper.getKeyPair(context))
+        val stream = try {
+            dadb.open("shell:$command")
+        } catch (e: Exception) {
+            // Соединение с adbd уже поднято, без закрытия оно осталось бы висеть
+            dadb.close()
+            throw e
+        }
+        return object : Shell {
+            override val input: InputStream = stream.source.inputStream()
+            override val output: OutputStream = stream.sink.outputStream()
+            override fun close() {
+                stream.close()
+                dadb.close()
+            }
         }
     }
 

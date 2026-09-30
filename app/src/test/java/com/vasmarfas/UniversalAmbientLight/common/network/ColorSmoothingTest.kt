@@ -66,6 +66,27 @@ class ColorSmoothingTest {
     }
 
     @Test
+    fun `an output delay holds frames back even without smoothing`() {
+        val sender = RecordingSender()
+        val smoothing = ColorSmoothing(sender)
+        smoothing.setEnabled(false)
+        smoothing.setOutputDelay(200)
+        smoothing.setTargetColors(arrayOf(ColorRgb(10, 20, 30)))
+        assertEquals(0, sender.frames)
+    }
+
+    @Test
+    fun `removing the delay passes frames straight through again`() {
+        val sender = RecordingSender()
+        val smoothing = ColorSmoothing(sender)
+        smoothing.setEnabled(false)
+        smoothing.setOutputDelay(200)
+        smoothing.setOutputDelay(0)
+        smoothing.setTargetColors(arrayOf(ColorRgb(10, 20, 30)))
+        assertEquals(1, sender.frames)
+    }
+
+    @Test
     fun `an empty frame is not forwarded`() {
         val sender = RecordingSender()
         val smoothing = ColorSmoothing(sender)
