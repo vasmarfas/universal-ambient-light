@@ -75,6 +75,7 @@ import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.remote.WrongTvException
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.components.focusHighlight
+import com.vasmarfas.UniversalAmbientLight.ui.components.RequestLocalNetworkAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -131,6 +132,11 @@ fun RemoteTvsScreen(
         val payload = pendingPayload ?: return@LaunchedEffect
         onPayloadConsumed()
         pair(payload.hosts, payload.port, payload.code, payload.tvId)
+    }
+
+    val networkError = stringResource(R.string.error_local_network)
+    RequestLocalNetworkAccess { granted ->
+        if (granted) discoveryRound++ else pairError = networkError
     }
 
     LaunchedEffect(discoveryRound) {

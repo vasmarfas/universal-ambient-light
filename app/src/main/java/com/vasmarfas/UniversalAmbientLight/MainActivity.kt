@@ -50,6 +50,7 @@ import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.LocalNetworkAccess
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
@@ -211,10 +212,7 @@ class MainActivity : ComponentActivity() {
         )
         checkForInstance()
 
-        // Разрешение на уведомления для Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestNotificationPermission()
-        }
+        requestStartupPermissions()
 
         maybeRequestBatteryOptimizationExemption()
 
@@ -410,11 +408,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    /**
+     * Уведомления (Android 13+) и локальная сеть (Android 17+) одним запросом: второй
+     * запрос, пока открыт первый диалог, система молча отбрасывает.
+     */
+    private fun requestStartupPermissions() {
+        val needed = ArrayList<String>()
+        if (shouldAskNotifications()) needed += Manifest.permission.POST_NOTIFICATIONS
+        // Без сети не работает ничего, кроме USB-ленты, поэтому спрашиваем при каждом запуске;
+        // после двух отказов система сама перестаёт показывать диалог
+        if (!LocalNetworkAccess.isGranted(this)) needed += LocalNetworkAccess.PERMISSION
+        if (needed.isEmpty()) return
+        ActivityCompat.requestPermissions(this, needed.toTypedArray(), REQUEST_STARTUP_PERMISSIONS)
+    }
+
+    private fun shouldAskNotifications(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             == PackageManager.PERMISSION_GRANTED
-        ) return
+        ) return false
 
         // shouldShowRequestPermissionRationale возвращает false и при первом запросе, и после
         // «Больше не спрашивать» — различаем их одноразовой настройкой, чтобы не докучать.
@@ -423,14 +435,10 @@ class MainActivity : ComponentActivity() {
         if (askedBefore && !ActivityCompat.shouldShowRequestPermissionRationale(
                 this, Manifest.permission.POST_NOTIFICATIONS
             )
-        ) return
+        ) return false
 
         prefs.edit { putBoolean(PREF_NOTIF_PERMISSION_ASKED, true) }
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            REQUEST_NOTIFICATION_PERMISSION
-        )
+        return true
     }
 
     private fun beginCaptureSession(source: String, method: String, protocol: String) {
@@ -782,18 +790,23 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
-            if (grantResults.isNotEmpty()) {
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    AnalyticsHelper.logPermissionGranted(this, "POST_NOTIFICATIONS")
-                } else {
-                    AnalyticsHelper.logPermissionDenied(this, "POST_NOTIFICATIONS")
-                    Toast.makeText(
-                        this,
-                        "Notification permission is needed for the foreground service",
-                        Toast.LENGTH_LONG
-                    ).show()
+        if (requestCode == REQUEST_STARTUP_PERMISSIONS) {
+            for ((index, permission) in permissions.withIndex()) {
+                val granted = grantResults.getOrNull(index) == PackageManager.PERMISSION_GRANTED
+                val name = permission.substringAfterLast('.')
+                if (granted) {
+                    AnalyticsHelper.logPermissionGranted(this, name)
+                    // Пульт пытался подключиться к ТВ, пока сеть была закрыта
+                    if (permission == LocalNetworkAccess.PERMISSION) RemoteSession.reconnectNow()
+                    continue
                 }
+                AnalyticsHelper.logPermissionDenied(this, name)
+                val message = if (permission == LocalNetworkAccess.PERMISSION) {
+                    getString(R.string.error_local_network)
+                } else {
+                    "Notification permission is needed for the foreground service"
+                }
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
         }
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
@@ -862,7 +875,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val REQUEST_MEDIA_PROJECTION = 1
-        private const val REQUEST_NOTIFICATION_PERMISSION = 2
+        private const val REQUEST_STARTUP_PERMISSIONS = 2
         private const val REQUEST_OVERLAY_PERMISSION = 3
         private const val REQUEST_UPDATE_CODE = 4
         private const val REQUEST_CAMERA_PERMISSION = 5

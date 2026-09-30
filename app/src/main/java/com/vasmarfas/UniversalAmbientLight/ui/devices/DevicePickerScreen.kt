@@ -65,6 +65,7 @@ import com.vasmarfas.UniversalAmbientLight.common.network.WLEDClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.ui.components.RequestLocalNetworkAccess
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import com.vasmarfas.UniversalAmbientLight.ui.settings.OutputLampsDialog
@@ -106,6 +107,11 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
     val discovery = remember(round) { LedDiscovery(context) { found.add(it) } }
     var searching by remember(round) { mutableStateOf(true) }
     var sweepProgress by remember(round) { mutableStateOf<Float?>(null) }
+    var networkDenied by remember { mutableStateOf(false) }
+    RequestLocalNetworkAccess { granted ->
+        networkDenied = !granted
+        if (granted) round++
+    }
     DisposableEffect(discovery) {
         discovery.start()
         onDispose { discovery.stop() }
@@ -196,6 +202,16 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
             GroupTitle(stringResource(R.string.devices_found))
             if (remote != null) {
                 Hint(stringResource(R.string.devices_remote_note))
+            }
+            if (networkDenied) {
+                Text(
+                    text = stringResource(R.string.error_local_network),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .widthIn(max = 560.dp)
+                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                )
             }
 
             val devices = found.filter { it.type !in SELF_ADDRESSED_LAMPS }

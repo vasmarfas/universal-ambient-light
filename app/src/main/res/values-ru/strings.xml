@@ -807,6 +807,9 @@
   <string name="devices_led_mismatch_layout">Настроить раскладку</string>
   <string name="devices_led_mismatch_later">Не сейчас</string>
 
+  <!-- Local network access (Android 17) -->
+  <string name="error_local_network">Нет доступа к локальной сети. Разрешите приложению «Устройства поблизости» в системных настройках.</string>
+
   <!-- Hue entertainment area -->
   <string name="pref_title_hue_area">Зона развлечений</string>
   <string name="pref_summary_hue_area_none">Не используется, лампы получают цвет по одной</string>

@@ -35,6 +35,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
 import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
+import com.vasmarfas.UniversalAmbientLight.common.util.LocalNetworkAccess
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.TclBypass
 import java.util.Objects
@@ -1071,8 +1072,11 @@ class ScreenGrabberService : Service() {
      * каждый неудачный старт оставлял бы два неубиваемых потока, а клиент Adalight —
      * занятый USB-порт до конца процесса. disconnect() блокирует (awaitTermination,
      * закрытие порта), поэтому уводится с вызывающего потока.
+     *
+     * С [fadeOut] перед отключением уходят несколько чёрных кадров: подсветку выключили,
+     * а не перезапускают.
      */
-    private fun shutDownHyperionThread() {
+    private fun shutDownHyperionThread(fadeOut: Boolean = false) {
         val thread = mHyperionThread
         val secondary = mSecondaryHyperionThread
         mHyperionThread = null
@@ -1082,6 +1086,13 @@ class ScreenGrabberService : Service() {
         thread?.interrupt()
         secondary?.interrupt()
         Thread({
+            if (fadeOut) {
+                repeat(FADE_OUT_FRAMES) {
+                    SystemClock.sleep(FADE_OUT_STEP_MS)
+                    thread?.receiver?.clear()
+                    secondary?.receiver?.clear()
+                }
+            }
             try {
                 thread?.receiver?.disconnect()
             } catch (e: Exception) {
@@ -1435,20 +1446,15 @@ class ScreenGrabberService : Service() {
         val backend = mActiveBackend
         if (backend != null) {
             if (DEBUG) Log.v(TAG, "Stopping ${backend.javaClass.simpleName}")
+            // Прощальные кадры и disconnect энкодер шлёт из своего потока уже после этой
+            // функции, когда выход обнулён. Поэтому он отцепляется, а вывод гасится и
+            // закрывается здесь: иначе keepalive клиента держал бы ленту зажжённой
+            mGate?.attached = false
+            mGate = null
             backend.stopRecording()
             mActiveBackend = null
-            // Клиент и executors закроет цепочка stopRecording → listener.disconnect(),
-            // она уже дошла и до дополнительного вывода через DualHyperionThreadListener
-            mHyperionThread?.interrupt()
-            mHyperionThread = null
-            mSecondaryHyperionThread?.interrupt()
-            mSecondaryHyperionThread = null
-            mOutput = null
-            mGate = null
-        } else {
-            // Энкодера нет — закрывать соединение некому, кроме нас
-            shutDownHyperionThread()
         }
+        shutDownHyperionThread(fadeOut = true)
 
         releaseResource()
     }
@@ -1761,6 +1767,8 @@ class ScreenGrabberService : Service() {
         private const val NOTIFICATION_EXIT_INTENT_ID = 2
         private const val APPLY_SETTINGS_DELAY_MS = 1200L
         private const val SESSION_RESTART_DELAY_MS = 700L
+        private const val FADE_OUT_FRAMES = 3
+        private const val FADE_OUT_STEP_MS = 100L
         private const val APP_WATCH_INTERVAL_MS = 3000L
         private const val MAX_CALIBRATION_MS = 3 * 60 * 1000L
         private const val MAX_DARK_MS = 6000L
@@ -1866,6 +1874,10 @@ class ScreenGrabberService : Service() {
             val connectionType =
                 prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
             val type = OutputType.of(connectionType)
+
+            if (type != OutputType.ADALIGHT && !LocalNetworkAccess.isGranted(context)) {
+                return SettingsError("local_network", context.getString(R.string.error_local_network))
+            }
 
             // Адрес не нужен USB, лампам со своими адресами и E1.31 (без него - мультикаст)
             if (type.needsHost) {
