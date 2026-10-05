@@ -369,8 +369,8 @@ class ScreenGrabberService : Service() {
         super.onCreate()
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private fun prepared(): Boolean {
+        AnalyticsHelper.syncCrashlyticsContext(baseContext)
         val prefs = Preferences(baseContext)
         mConnectionType =
             prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
@@ -1603,6 +1603,7 @@ class ScreenGrabberService : Service() {
     }
 
     private fun applyPendingSettings() {
+        AnalyticsHelper.syncCrashlyticsContext(this)
         val session = mPendingSessionRestart
         val capture = mPendingCaptureRestart
         val output = mPendingOutputRestart

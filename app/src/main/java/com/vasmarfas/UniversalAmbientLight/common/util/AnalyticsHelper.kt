@@ -95,6 +95,14 @@ object AnalyticsHelper {
             crashlytics.setCustomKey("manufacturer", Build.MANUFACTURER ?: "unknown")
             crashlytics.setCustomKey("framerate", safeGetInt(prefs, R.string.pref_key_framerate))
             crashlytics.setCustomKey(
+                "capture_quality",
+                prefs.getString(R.string.pref_key_capture_quality, "128") ?: "128"
+            )
+            crashlytics.setCustomKey(
+                "border_detection",
+                prefs.getBoolean(R.string.pref_key_border_detection_enabled)
+            )
+            crashlytics.setCustomKey(
                 "use_avg_color",
                 prefs.getBoolean(R.string.pref_key_use_avg_color)
             )

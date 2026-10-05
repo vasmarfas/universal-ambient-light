@@ -66,6 +66,7 @@
   <string name="action_cancel">Cancel</string>
   <string name="action_close">Close</string>
   <string name="action_copy">Copy</string>
+  <string name="action_reset">Reset</string>
   <string name="home_effects">Effects</string>
   <string name="home_toggle_power">Toggle power</string>
   <string name="home_settings">Settings</string>
@@ -230,6 +231,8 @@
   <string name="pref_group_general">General</string>
   <string name="pref_title_boot">Grab on Boot</string>
   <string name="pref_title_language">Language</string>
+  <string name="pref_title_reset_picture">Reset picture settings</string>
+  <string name="pref_summary_reset_picture">Capture rate and quality, color correction, smoothing and black bar cropping go back to their defaults. The connection, LED layout and camera calibration stay as they are</string>
   <string name="pref_key_language">language</string>
   <string-array name="pref_list_language">
     <item>Default</item>

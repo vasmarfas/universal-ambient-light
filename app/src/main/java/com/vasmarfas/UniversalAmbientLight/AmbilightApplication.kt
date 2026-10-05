@@ -103,6 +103,7 @@ class AmbilightApplication : Application() {
     private fun frameworkBugReason(t: Throwable): String? = when {
         isMediaCodecDisplayListenerNpe(t) -> "MediaCodec.onDisplayChanged NPE"
         isReportSizeConfigurationsBug(t) -> "ActivityThread.reportSizeConfigurations race"
+        isStartNotStoppedActivityBug(t) -> "ActivityThread.handleStartActivity race"
         isForegroundServiceTimeout(t) -> "ForegroundServiceDidNotStartInTime (OEM blocked FGS)"
         isDeadSystemException(t) -> "DeadSystemException (system_server died)"
         isProfileVerifierFirmwareBug(t) -> "ProfileVerifier NoSuchMethodError (broken framework.jar)"
@@ -160,6 +161,20 @@ class AmbilightApplication : Application() {
         if (t.message?.contains("reportSizeConfigurations") == true) return true
         return t.stackTrace.any {
             it.className == "android.app.ActivityThread" && it.methodName == "reportSizeConfigurations"
+        }
+    }
+
+    /**
+     * Ещё одна гонка жизненного цикла в ActivityThread: система присылает START активити,
+     * которая на стороне приложения ещё не остановлена, и платформа бросает
+     * `IllegalStateException: Can't start activity that is not stopped`. Пойман на Samsung
+     * с Android 16 вскоре после запуска BootActivity; в стеке только кадры фреймворка.
+     */
+    private fun isStartNotStoppedActivityBug(t: Throwable): Boolean {
+        if (t !is IllegalStateException) return false
+        if (t.message?.contains("Can't start activity that is not stopped") != true) return false
+        return t.stackTrace.any {
+            it.className == "android.app.ActivityThread" && it.methodName == "handleStartActivity"
         }
     }
 

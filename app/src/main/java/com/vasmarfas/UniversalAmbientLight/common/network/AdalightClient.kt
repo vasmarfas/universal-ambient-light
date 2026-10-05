@@ -7,6 +7,8 @@ import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.vasmarfas.UniversalAmbientLight.common.util.LedDataExtractor
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialProberFactory
 import java.io.IOException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 import kotlin.math.max
 
@@ -57,6 +59,18 @@ class AdalightClient(
 
     private val mSmoothing: ColorSmoothing
     private var mLedDataBuffer: Array<ColorRgb>? = null
+
+    private val mKeepAlive = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "AdalightClient-keepalive").apply { isDaemon = true }
+    }
+
+    private val mWriteLock = Any()
+
+    @Volatile
+    private var mLastLeds: Array<ColorRgb>? = null
+
+    @Volatile
+    private var mLastSendMs = 0L
 
     // Сохраняем исходно запрошенную частоту, чтобы auto-throttle никогда не повышал её выше пользовательской
     private val mRequestedUpdateFrequency: Int = updateFrequency
@@ -165,6 +179,12 @@ class AdalightClient(
 
             mConnected = true
             mSmoothing.start()
+            mKeepAlive.scheduleWithFixedDelay({
+                val last = mLastLeds ?: return@scheduleWithFixedDelay
+                if (mPaused || !isConnected()) return@scheduleWithFixedDelay
+                if (System.currentTimeMillis() - mLastSendMs < KEEPALIVE_MS) return@scheduleWithFixedDelay
+                sendLedData(Array(last.size) { last[it].clone() })
+            }, KEEPALIVE_MS, KEEPALIVE_MS / 2, TimeUnit.MILLISECONDS)
             Log.i(
                 TAG, "Successfully connected to Adalight device at " + mBaudRate + " baud (VID=" +
                         device.vendorId + " PID=" + device.productId + ")"
@@ -250,6 +270,7 @@ class AdalightClient(
         // финальный чёрный кадр уходит в порт напрямую, мимо сглаживания. Мы на фоновом
         // потоке гашения, блокирующая запись здесь допустима.
         mSmoothing.stop()
+        mKeepAlive.shutdownNow()
         if (mConnected) {
             val ledCount = LedDataExtractor.getLedCount(mContext)
             sendLedData(Array(ledCount) { ColorRgb(0, 0, 0) })
@@ -333,7 +354,11 @@ class AdalightClient(
         try {
             val packet = createPacket(mProtocol, leds)
             maybeAutoThrottle(packet.size, leds.size)
-            port.write(packet, 1000)
+            mLastLeds = leds
+            mLastSendMs = System.currentTimeMillis()
+            synchronized(mWriteLock) {
+                port.write(packet, 1000)
+            }
 
             // Изредка пишем в лог для диагностики
             if (System.currentTimeMillis() % 2000 < 50) {
@@ -622,6 +647,8 @@ class AdalightClient(
         // Бюджет ожидания хендшейка. Покрывает окно перезагрузки MCU (~1.5–2 c) после подъёма DTR.
         private const val HANDSHAKE_TIMEOUT_MS = 2500L
         private const val HANDSHAKE_READ_TIMEOUT_MS = 250
+
+        private const val KEEPALIVE_MS = 1000L
 
         private const val ATMO_CHANNELS = 5
 

@@ -125,6 +125,14 @@ class BorderProcessorTest {
     }
 
     @Test
+    fun `consecutive cropped frames reuse one buffer`() {
+        val processor = detectedLetterbox()
+        val first = processor.applyKnownBorderCrop(letterbox(), SIZE, SIZE)
+        val second = processor.applyKnownBorderCrop(letterbox(), SIZE, SIZE)
+        assertSame(first.rgb, second.rgb)
+    }
+
+    @Test
     fun `an unknown border leaves the frame buffer as it is`() {
         val processor = BorderProcessor(initialStabilityDetections = 1)
         val frame = letterbox()

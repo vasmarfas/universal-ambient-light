@@ -248,14 +248,13 @@ fun ListPreference(
     val entries = stringArrayResource(entriesRes)
     val entryValues = stringArrayResource(entryValuesRes)
 
-    var value by remember(keyRes, recomposeKey) {
-        mutableStateOf(
-            prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: ""
-        )
-    }
+    fun readValue() =
+        prefs.getString(keyRes) ?: prefs.getDefaultString(keyRes) ?: entryValues.firstOrNull() ?: ""
+
+    var value by remember(keyRes, recomposeKey) { mutableStateOf(readValue()) }
 
     LaunchedEffect(recomposeKey) {
-        recomposeKey?.let { value = prefs.getString(keyRes) ?: entryValues.firstOrNull() ?: "" }
+        recomposeKey?.let { value = readValue() }
     }
     // Сбрасываем состояние диалога при смене recomposeKey — например, при уходе с экрана.
     // rememberSaveable — чтобы открытый диалог переживал поворот экрана.

@@ -56,7 +56,7 @@ class HyperionThread(
     private val mConnected = AtomicBoolean(false)
     private val mStandbyPaused = AtomicBoolean(false)
     private val mClient = AtomicReference<HyperionClient?>()
-    private val mExecutor = Executors.newSingleThreadExecutor()
+    private val mExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "$TAG-send") }
 
     @Volatile
     private var mPendingTask: Future<*>? = null
@@ -68,7 +68,7 @@ class HyperionThread(
     private var mLastSentFrame: FrameData? = null
     private val mSendLock = Any()
     private val mKeepAliveExecutor: ScheduledExecutorService =
-        Executors.newSingleThreadScheduledExecutor()
+        Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "$TAG-keepalive") }
     private val mDelayExecutor: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "$TAG-delay") }
     private val mDelayLine = FrameDelayLine()

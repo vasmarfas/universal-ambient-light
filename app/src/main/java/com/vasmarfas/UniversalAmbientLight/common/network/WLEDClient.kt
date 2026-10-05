@@ -64,7 +64,9 @@ class WLEDClient(
     private var mLedDataBuffer: Array<ColorRgb>? = null
 
     // Поддержание соединения
-    private val mKeepAliveExecutor = Executors.newSingleThreadScheduledExecutor()
+    private val mKeepAliveExecutor = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "WLEDClient-keepalive")
+    }
     private val mResumeExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "WLEDClient-resume").apply { isDaemon = true }
     }

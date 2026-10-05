@@ -66,6 +66,7 @@
   <string name="action_cancel">Отмена</string>
   <string name="action_close">Закрыть</string>
   <string name="action_copy">Копировать</string>
+  <string name="action_reset">Сбросить</string>
   <string name="home_effects">Эффекты</string>
   <string name="home_toggle_power">Включение подсветки</string>
   <string name="home_settings">Настройки</string>
@@ -232,6 +233,8 @@
   <string name="pref_group_general">Общие</string>
   <string name="pref_title_boot">Запуск при загрузке</string>
   <string name="pref_title_language">Язык</string>
+  <string name="pref_title_reset_picture">Сбросить настройки картинки</string>
+  <string name="pref_summary_reset_picture">Частота и качество захвата, цветокоррекция, сглаживание и обрезка чёрных полос вернутся к значениям по умолчанию. Подключение, раскладка ленты и калибровка камеры останутся как есть</string>
   <string name="pref_key_language">language</string>
   <string-array name="pref_list_language">
     <item>По умолчанию</item>

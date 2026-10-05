@@ -109,7 +109,7 @@ fun SettingsScreen(
         // Новый снимок настроек с ТВ пересоздаёт поля — они перечитывают значения. Ключ —
         // ревизия, а не сам prefs: объект пересоздаётся при каждом возврате на экран, и
         // прокрутка теряла бы сохранённое место
-        key(remote?.tv?.id, remote?.revision) {
+        key(remote?.tv?.id, remote?.revision, state.resetRevision) {
             Column(
                 modifier = Modifier
                     .padding(paddingValues)
@@ -256,6 +256,26 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { state.showDebugDialog = false }) {
                     Text(stringResource(R.string.action_close))
+                }
+            }
+        )
+    }
+
+    if (state.showResetPictureDialog) {
+        AlertDialog(
+            onDismissRequest = { state.showResetPictureDialog = false },
+            title = { Text(stringResource(R.string.pref_title_reset_picture)) },
+            text = { Text(stringResource(R.string.pref_summary_reset_picture)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.showResetPictureDialog = false
+                    state.resetPicture(prefs)
+                    AnalyticsHelper.logSettingChanged(context, "picture_settings", "reset")
+                }) { Text(stringResource(R.string.action_reset)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { state.showResetPictureDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )

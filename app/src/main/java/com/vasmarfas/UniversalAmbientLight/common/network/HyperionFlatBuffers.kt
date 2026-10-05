@@ -22,6 +22,8 @@ class HyperionFlatBuffers(
     private val TIMEOUT = 1000
     private var mSocket: Socket? = null
 
+    private val mImageBuilder = FlatBufferBuilder(1024)
+
     init {
         // Порт должен попадать в диапазон 1-65535
         if (port < 1 || port > 65535) {
@@ -119,14 +121,17 @@ class HyperionFlatBuffers(
         priority: Int,
         duration_ms: Int,
     ) {
-        val builder = newBuilder()
-        val dataOffset = RawImage.createDataVector(builder, data)
-        val rawImageOffset = RawImage.createRawImage(builder, dataOffset, width, height)
-        val imageOffset =
-            Image.createImage(builder, ImageType.RawImage, rawImageOffset, duration_ms)
-        val requestOffset = Request.createRequest(builder, Command.Image, imageOffset)
-        Request.finishRequestBuffer(builder, requestOffset)
-        sendRequest(builder.dataBuffer())
+        synchronized(mImageBuilder) {
+            val builder = mImageBuilder
+            builder.clear()
+            val dataOffset = RawImage.createDataVector(builder, data)
+            val rawImageOffset = RawImage.createRawImage(builder, dataOffset, width, height)
+            val imageOffset =
+                Image.createImage(builder, ImageType.RawImage, rawImageOffset, duration_ms)
+            val requestOffset = Request.createRequest(builder, Command.Image, imageOffset)
+            Request.finishRequestBuffer(builder, requestOffset)
+            sendRequest(builder.dataBuffer())
+        }
     }
 
     @Throws(IOException::class)
@@ -142,10 +147,7 @@ class HyperionFlatBuffers(
 
             val output = socket.getOutputStream()
             output.write(header)
-
-            val data = ByteArray(bb.remaining())
-            bb.get(data)
-            output.write(data)
+            output.write(bb.array(), bb.arrayOffset() + bb.position(), size)
             output.flush()
 
             // Ответа не ждём — так задержка минимальна; при необходимости ответы

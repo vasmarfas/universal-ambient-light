@@ -82,6 +82,11 @@ internal fun ColumnScope.GeneralSection(prefs: Preferences, state: SettingsScree
                 (context as? Activity)?.recreate()
             }
         )
+        ClickablePreference(
+            title = stringResource(R.string.pref_title_reset_picture),
+            summary = stringResource(R.string.pref_summary_reset_picture),
+            onClick = { state.showResetPictureDialog = true }
+        )
     }
 
     // Отладка

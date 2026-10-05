@@ -54,3 +54,12 @@
 # бросает NoSuchMethodError там, где framework.jar не соответствует версии Android).
 # Обфускация переименовывала класс, и обход переставал срабатывать именно в release.
 -keepnames class androidx.profileinstaller.**
+
+# Bouncy Castle: SP800SecureRandom перекрывает setSeed() и проверяет в нём своё поле на null,
+# потому что конструктор java.util.Random зовёт setSeed() раньше, чем поле присвоено. R8 видел,
+# что поле всегда получает ненулевое значение, и выбрасывал проверку: DTLS-подключение к Hue
+# Entertainment в release падало с NPE на любом устройстве. Значения закреплённых полей R8 не
+# выводит, поэтому правило на все наследники SecureRandom, а не на один класс.
+-keepclassmembers class * extends java.security.SecureRandom {
+    <fields>;
+}

@@ -84,6 +84,19 @@ class SettingsScreenState(prefs: Preferences) {
     var ha2Enabled by mutableStateOf(prefs.getBoolean(R.string.pref_key_ha2_enabled, false))
     var ha2LampsSpec by mutableStateOf(prefs.getString(R.string.pref_key_ha2_lamps) ?: "")
 
+    var resetRevision by mutableIntStateOf(0)
+
+    fun resetPicture(prefs: Preferences) {
+        prefs.remove(*PICTURE_KEYS)
+        prefs.putBoolean(
+            R.string.pref_key_color_processing_enabled,
+            prefs.getBoolean(R.string.pref_key_color_processing_enabled)
+        )
+        smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset) ?: "off"
+        colorProcessingEnabled = prefs.getBoolean(R.string.pref_key_color_processing_enabled, true)
+        resetRevision++
+    }
+
     var showDebugDialog by mutableStateOf(false)
     var showAdbPairingDialog by mutableStateOf(false)
     var showAccessibilityDisclosure by mutableStateOf(false)
@@ -92,4 +105,33 @@ class SettingsScreenState(prefs: Preferences) {
     var showLampsDialog by mutableStateOf(false)
     var showPairDialog by mutableStateOf(false)
     var showHueAreaDialog by mutableStateOf(false)
+    var showResetPictureDialog by mutableStateOf(false)
+
+    private companion object {
+        val PICTURE_KEYS = intArrayOf(
+            R.string.pref_key_framerate,
+            R.string.pref_key_capture_quality,
+            R.string.pref_key_use_avg_color,
+            R.string.pref_key_color_processing_enabled,
+            R.string.pref_key_color_brightness,
+            R.string.pref_key_color_contrast,
+            R.string.pref_key_color_black_level,
+            R.string.pref_key_color_white_level,
+            R.string.pref_key_color_saturation,
+            R.string.pref_key_color_brightness_r,
+            R.string.pref_key_color_brightness_g,
+            R.string.pref_key_color_brightness_b,
+            R.string.pref_key_color_gamma_r,
+            R.string.pref_key_color_gamma_g,
+            R.string.pref_key_color_gamma_b,
+            R.string.pref_key_smoothing_enabled,
+            R.string.pref_key_smoothing_preset,
+            R.string.pref_key_settling_time,
+            R.string.pref_key_output_delay,
+            R.string.pref_key_update_frequency,
+            R.string.pref_key_border_detection_enabled,
+            R.string.pref_key_border_threshold,
+            R.string.pref_key_border_check_interval,
+        )
+    }
 }

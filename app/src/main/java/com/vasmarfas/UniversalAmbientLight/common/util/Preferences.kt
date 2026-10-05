@@ -87,9 +87,25 @@ class Preferences(
         preferences.edit { putBoolean(key(keyResourceId), value) }
     }
 
+    /**
+     * Умолчание из ресурсов строкой. Списки в настройках хранят строки, а умолчание у них
+     * бывает и строковым, и целым ресурсом (частота кадров, скорость порта).
+     */
+    fun getDefaultString(@StringRes keyResourceId: Int): String? {
+        val stringRes = defaultKey(keyResourceId, "string", warnIfMissing = false)
+        if (stringRes != 0) return resources.getString(stringRes)
+        val integerRes = defaultKey(keyResourceId, "integer", warnIfMissing = false)
+        return if (integerRes != 0) resources.getInteger(integerRes).toString() else null
+    }
+
+    /** Стирает значения одной правкой: дальше действуют умолчания, как на чистой установке. */
+    fun remove(@StringRes vararg keyResourceIds: Int) {
+        preferences.edit { keyResourceIds.forEach { remove(key(it)) } }
+    }
+
     private fun key(keyResourceId: Int) = resources.getString(keyResourceId)
 
-    private fun defaultKey(keyResourceId: Int, type: String): Int {
+    private fun defaultKey(keyResourceId: Int, type: String, warnIfMissing: Boolean = true): Int {
         val cacheKey = (keyResourceId.toLong() shl 8) or typeTag(type).toLong()
         sDefaultKeyCache[cacheKey]?.let { return it }
 
@@ -97,7 +113,7 @@ class Preferences(
             resources.getResourceEntryName(keyResourceId).replace("pref_key_", "pref_default_")
         val pkg = resources.getResourcePackageName(keyResourceId)
         val resolved = resources.getIdentifier(name, type, pkg)
-        if (resolved == 0) {
+        if (resolved == 0 && warnIfMissing) {
             // Ресурса нет — настройка молча получит 0/false. Так уже случалось, когда
             // шринкер вырезал pref_default_* из release-сборки (см. res/raw/keep.xml).
             Log.w(TAG, "No $type default resource for $name, falling back to zero")
@@ -109,6 +125,7 @@ class Preferences(
     private fun typeTag(type: String): Int = when (type) {
         "integer" -> 1
         "bool" -> 2
+        "string" -> 3
         else -> 0
     }
 

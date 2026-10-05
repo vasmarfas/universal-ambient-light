@@ -118,7 +118,7 @@ class BorderProcessor(
         // энкодера успеет записать в mCropBuffer следующий кадр раньше, чем тот дочитает.
         // Без копии исполнитель увидит разорванный кадр, и дальше по цепочке (нарезка
         // пакетов WLED, сглаживание) возможны короткие подвисания.
-        return CropResult(buffer.copyOf(), newW, newH)
+        return CropResult(buffer, newW, newH)
     }
 
     /**
