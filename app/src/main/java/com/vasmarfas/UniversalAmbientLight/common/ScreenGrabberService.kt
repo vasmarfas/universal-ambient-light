@@ -79,7 +79,8 @@ class ScreenGrabberService : Service() {
     private var mStandby: StandbyController? = null
 
     private var mReconnectEnabled = false
-    private var mHasConnected = false
+    @Volatile private var mHasConnected = false
+    @Volatile private var mEverConnected = false
     private var mMediaProjectionManager: MediaProjectionManager? = null
     private var mHyperionThread: HyperionThread? = null
 
@@ -97,6 +98,7 @@ class ScreenGrabberService : Service() {
     private var mCaptureSource: String = "screen" // "screen", "camera" или "effect"
     private var mNotificationManager: NotificationManager? = null
     private var mStartError: String? = null
+    @Volatile private var mStartInProgress = false
     private var mConnectionType = "hyperion"
     private var mProjectionResultCode: Int? = null
     private var mProjectionDataExtras: android.os.Bundle? = null
@@ -183,6 +185,7 @@ class ScreenGrabberService : Service() {
         override fun onConnected() {
             if (DEBUG) Log.d(TAG, "Connected to Hyperion server")
             mHasConnected = true
+            mEverConnected = true
             val prefs = Preferences(baseContext)
             val host = prefs.getString(R.string.pref_key_host, null)
             AnalyticsHelper.logConnectionSuccess(baseContext, mConnectionType, host)
@@ -203,7 +206,13 @@ class ScreenGrabberService : Service() {
         override fun onConnectionError(errorID: Int, error: String?) {
             Log.e(TAG, "Connection error: " + (error ?: "unknown"))
             AnalyticsHelper.logConnectionError(baseContext, mConnectionType, error)
-            if (!mHasConnected) {
+            if (mEverConnected && mReconnectEnabled) {
+                // Во время переподключения захват не останавливаем.
+                mHasConnected = false
+                mStartInProgress = true
+                notifyActivity()
+                Log.i(TAG, "Attempting automatic reconnect...")
+            } else if (!mHasConnected) {
                 mStartError = connectionErrorText(
                     R.string.error_adalight_unreachable,
                     R.string.error_lamps_unreachable,
@@ -211,9 +220,9 @@ class ScreenGrabberService : Service() {
                     R.string.error_server_unreachable
                 )
                 haltStartup()
-            } else if (mReconnectEnabled) {
-                Log.i(TAG, "Attempting automatic reconnect...")
             } else {
+                mHasConnected = false
+                mStartInProgress = false
                 mStartError = connectionErrorText(
                     R.string.error_adalight_connection_lost,
                     R.string.error_lamps_connection_lost,
@@ -654,6 +663,10 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.v(TAG, "Start command action: " + action.toString())
             when (action) {
                 ACTION_START -> if (mHyperionThread == null) {
+                    mStartInProgress = true
+                    mHasConnected = false
+                    mEverConnected = false
+                    notifyActivity()
                     mCaptureSource = "screen"
                     val prefs = Preferences(this)
                     val method =
@@ -696,6 +709,10 @@ class ScreenGrabberService : Service() {
                 }
 
                 ACTION_START_CAMERA -> if (mHyperionThread == null) {
+                    mStartInProgress = true
+                    mHasConnected = false
+                    mEverConnected = false
+                    notifyActivity()
                     mCaptureSource = "camera"
                     if (!tryStartForegroundCamera()) return stopWithoutForeground()
 
@@ -709,6 +726,10 @@ class ScreenGrabberService : Service() {
                 }
 
                 ACTION_START_EFFECT -> if (mHyperionThread == null) {
+                    mStartInProgress = true
+                    mHasConnected = false
+                    mEverConnected = false
+                    notifyActivity()
                     mCaptureSource = "effect"
                     if (!tryStartForegroundCompat(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)) {
                         return stopWithoutForeground()
@@ -751,7 +772,10 @@ class ScreenGrabberService : Service() {
                     }
                 }
 
-                ACTION_STOP -> stopAllCapture()
+                ACTION_STOP -> {
+                    stopAllCapture()
+                    notifyActivity()
+                }
                 ACTION_CLEAR -> {
                     // Один чёрный кадр, но соединение оставляем
                     val backend = mActiveBackend
@@ -1027,6 +1051,7 @@ class ScreenGrabberService : Service() {
     }
 
     private fun haltStartup() {
+        mStartInProgress = false
         // Пробуем выйти в foreground, чтобы показать ошибку, но не падаем, если это запрещено
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1420,6 +1445,9 @@ class ScreenGrabberService : Service() {
     }
 
     private fun stopAllCapture() {
+        mStartInProgress = false
+        mHasConnected = false
+        mEverConnected = false
         if (DEBUG) Log.v(TAG, "Stopping all capture")
         mReconnectEnabled = false
         stopAppWatch()
@@ -1454,8 +1482,13 @@ class ScreenGrabberService : Service() {
         get() = isCapturing && mHasConnected
 
     private fun notifyActivity() {
+        // RUNNING означает готовность источника и основного вывода.
+        val communicating = isCommunicating
+        if (communicating) mStartInProgress = false
+        val starting = mStartError == null && mStartInProgress && !communicating
         val intent = Intent(BROADCAST_FILTER)
-        intent.putExtra(BROADCAST_TAG, isCommunicating)
+        intent.putExtra(BROADCAST_TAG, communicating)
+        intent.putExtra(BROADCAST_STARTING, starting)
         intent.putExtra(BROADCAST_ERROR, mStartError)
         intent.putExtra(BROADCAST_SLEEP_AT, sSleepAt)
         if (DEBUG) {
@@ -1624,6 +1657,9 @@ class ScreenGrabberService : Service() {
         val oldPrimary = mHyperionThread ?: return
         val oldSecondary = mSecondaryHyperionThread
         Log.i(TAG, "Connection settings changed, restarting the output")
+        mStartInProgress = true
+        mHasConnected = false
+        notifyActivity()
         mOutput = null
         mHyperionThread = null
         mSecondaryHyperionThread = null
@@ -1721,6 +1757,7 @@ class ScreenGrabberService : Service() {
     companion object {
         const val BROADCAST_ERROR = "SERVICE_ERROR"
         const val BROADCAST_TAG = "SERVICE_STATUS"
+        const val BROADCAST_STARTING = "SERVICE_STARTING"
         const val BROADCAST_FILTER = "SERVICE_FILTER"
         const val BROADCAST_TCL_BLOCKED = "TCL_BLOCKED"
         const val BROADCAST_SLEEP_AT = "SLEEP_AT"
@@ -1951,6 +1988,7 @@ class ScreenGrabberService : Service() {
         fun notifyNotStarted(context: Context, error: String) {
             val intent = Intent(BROADCAST_FILTER)
             intent.putExtra(BROADCAST_TAG, false)
+            intent.putExtra(BROADCAST_STARTING, false)
             intent.putExtra(BROADCAST_ERROR, error)
             intent.setPackage(context.packageName)
             context.sendBroadcast(intent)
