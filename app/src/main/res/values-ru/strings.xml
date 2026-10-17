@@ -840,4 +840,5 @@
   <string name="pref_summary_mqtt_password_set">Сохранён</string>
   <string name="pref_title_z2m_base_topic">Базовая тема Zigbee2MQTT</string>
   <string name="lamps_hint_z2m">Список ламп приходит от брокера, его там держит сам Zigbee2MQTT. Проверьте адрес брокера, вход и базовую тему.</string>
+    <string name="error_mstar_capture_stopped">Аппаратный захват MStar остановлен: %1$s</string>
 </resources>

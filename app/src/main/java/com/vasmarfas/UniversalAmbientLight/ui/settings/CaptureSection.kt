@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,6 +41,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -74,6 +76,18 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
             // Доступные методы решает устройство, которое снимает экран: в режиме пульта —
             // телевизор (флейвор, MTK, служба доступности), а не телефон
             val remoteCaps = remote?.caps
+            // Проверка аппаратного захвата выполняется в фоне: первый вызов может вернуть false.
+            // Повторно читаем результат до 5 секунд, чтобы пункт MTK/MStar стал доступен
+            // без повторного открытия настроек. В режиме пульта используем возможности ТВ.
+            val mtkAvailable by produceState(initialValue = MtkThalCaptureEncoder.isAvailable(), remoteCaps) {
+                if (remoteCaps == null) {
+                    repeat(20) {
+                        val result = MtkThalCaptureEncoder.isAvailable()
+                        if (result) { value = true; return@produceState }
+                        delay(250)
+                    }
+                }
+            }
             ListPreference(
                 prefs = prefs,
                 keyRes = R.string.pref_key_capture_method,
@@ -81,7 +95,7 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
                 entriesRes = R.array.pref_list_capture_method,
                 entryValuesRes = R.array.pref_list_capture_method_values,
                 recomposeKey = state.captureMethod to state.captureMethodRevision,
-                disabledIndices = remember(remoteCaps) {
+                disabledIndices = remember(remoteCaps, mtkAvailable) {
                     val entryValues =
                         context.resources.getStringArray(R.array.pref_list_capture_method_values)
                     entryValues.indices.filter { index ->
@@ -89,7 +103,7 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
                         if (remoteCaps != null) {
                             value !in remoteCaps.methods
                         } else {
-                            value == "mtk_thal_capture" && !MtkThalCaptureEncoder.isAvailable()
+                            value == "mtk_thal_capture" && !mtkAvailable
                         }
                     }.toSet()
                 },

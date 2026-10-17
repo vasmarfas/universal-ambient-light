@@ -1295,24 +1295,30 @@ class ScreenGrabberService : Service() {
         }
 
         if (method == "mtk_thal_capture") {
-            if (DEBUG) Log.v(TAG, "Creating MTK THAL Capture encoder")
-            val encoder = MtkThalCaptureEncoder(
-                this.applicationContext,
-                newGate(),
-                metrics.widthPixels,
-                metrics.heightPixels,
-                options,
-                onFatalError = { errorMsg ->
-                    // Колбэк приходит из потока энкодера — состояние сервиса и
-                    // startForeground трогаем только с главного
-                    mHandler?.post {
-                        mStartError = errorMsg
-                        haltStartup()
-                    }
+            val gate = newGate()
+            val fatal: (String) -> Unit = { errorMsg ->
+                mHandler?.post {
+                    mStartError = errorMsg
+                    haltStartup()
                 }
-            )
+            }
+            // Наличие libmtal ещё не гарантирует MTVSS_*: при наличии THAL
+            // с DMA-heap выбираем прежний проверенный backend.
+            val useMStar = MStarVssCaptureEncoder.isAvailable() &&
+                !MtkThalCaptureEncoder.hasNativeThalBackend()
+            val encoder: CaptureBackend = if (useMStar) {
+                Log.i(TAG, "Using MStar VSS capture backend")
+                MStarVssCaptureEncoder(applicationContext, gate, options, fatal)
+            } else {
+                Log.i(TAG, "Using MTK THAL capture backend")
+                MtkThalCaptureEncoder(
+                    applicationContext, gate,
+                    metrics.widthPixels, metrics.heightPixels, options, fatal
+                )
+            }
             mActiveBackend = encoder
-            encoder.sendStatus()
+            // VSS подтверждает запуск первым кадром. Прежний THAL — сразу.
+            if (encoder !is MStarVssCaptureEncoder) encoder.sendStatus()
             return
         }
 

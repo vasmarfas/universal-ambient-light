@@ -860,4 +860,5 @@
   <string name="pref_summary_mqtt_password_set">Saved</string>
   <string name="pref_title_z2m_base_topic">Zigbee2MQTT base topic</string>
   <string name="lamps_hint_z2m">The list comes from the broker, Zigbee2MQTT keeps it there. Check the broker address, login and base topic.</string>
+    <string name="error_mstar_capture_stopped">MStar hardware capture stopped: %1$s</string>
 </resources>
