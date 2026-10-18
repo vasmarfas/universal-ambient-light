@@ -5,7 +5,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.vasmarfas.UniversalAmbientLight.BuildConfig
 import com.vasmarfas.UniversalAmbientLight.R
@@ -13,6 +15,7 @@ import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.CaptureLauncher
 import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.input.TvApps
 import com.vasmarfas.UniversalAmbientLight.common.input.TvInput
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbAutoPair
@@ -24,6 +27,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
+import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialPermissionHelper
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -49,6 +53,9 @@ internal class RemoteHostHandler(
     // таймаута сервиса с лентой без сглаживания
     @Volatile
     private var mCalibrationClient: RemoteServer.Client? = null
+    // Держим владельца теста, чтобы потеря связи с телефоном не оставила ленту
+    // в адресных цветах. Доступ к этому полю только из главного потока.
+    private var mLayoutTestClient: RemoteServer.Client? = null
 
     override fun onClientsChanged(clients: List<RemoteServer.Client>) = clientsListener(clients)
 
@@ -56,6 +63,12 @@ internal class RemoteHostHandler(
     // а курсор висеть поверх фильма
     override fun onClientGone(client: RemoteServer.Client) {
         mInput.release()
+        mMainHandler.post {
+            if (mLayoutTestClient === client) {
+                mLayoutTestClient = null
+                dispatchLayoutTest(false)
+            }
+        }
         if (mCalibrationClient === client) {
             mCalibrationClient = null
             sendToService(ScreenGrabberService.ACTION_CALIBRATION) {
@@ -68,6 +81,10 @@ internal class RemoteHostHandler(
     // процесса ввода ждут замка InputInjector: его держит поток пульта, пока подключается к
     // ADB и поднимает app_process, а это до 18 секунд
     fun close() {
+        if (mLayoutTestClient != null) {
+            mLayoutTestClient = null
+            dispatchLayoutTest(false)
+        }
         Thread({ mInput.shutdown() }, "remote-input-shutdown").apply { isDaemon = true }.start()
     }
 
@@ -82,6 +99,7 @@ internal class RemoteHostHandler(
 
             RemoteProtocol.OP_SET_PREFS -> setPrefs(client, request)
             RemoteProtocol.OP_CAPTURE -> capture(request)
+            RemoteProtocol.OP_LAYOUT_TEST -> layoutTest(client, request)
             RemoteProtocol.OP_CLEAR -> {
                 sendToService(ScreenGrabberService.ACTION_CLEAR)
                 JSONObject()
@@ -120,6 +138,116 @@ internal class RemoteHostHandler(
             RemoteProtocol.OP_DEBUG_INFO -> JSONObject().put("text", DebugInfoHelper.getDebugInfo(mContext))
             else -> throw RemoteCommandException(RemoteProtocol.ERR_BAD_REQUEST, "Unknown op: $op")
         }
+
+    /**
+     * Адресный тест с телефона исполняется исключительно на телевизоре. Проверяем
+     * USB-разрешение на стороне ТВ; системный диалог, если нужен, появится там.
+     */
+    private fun layoutTest(client: RemoteServer.Client, request: JSONObject): JSONObject {
+        val outputType = OutputType.of(
+            Preferences(mContext).getString(R.string.pref_key_connection_type)
+        )
+        if (!outputType.supportsLedLayoutTest)
+            throw RemoteCommandException(
+                RemoteProtocol.ERR_FAILED,
+                mContext.getString(R.string.remote_layout_test_unsupported_output)
+            )
+        val enabled = request.optBoolean("enabled")
+        val permissionDone = CountDownLatch(1)
+        var permissionPending = false
+        var permissionGranted = false
+        onMain {
+            if (!enabled) {
+                if (mLayoutTestClient === client) {
+                    mLayoutTestClient = null
+                    dispatchLayoutTest(false)
+                }
+            } else {
+                if (outputType == OutputType.ADALIGHT &&
+                    !UsbSerialPermissionHelper.hasAnySerialDevice(mContext))
+                    throw RemoteCommandException(RemoteProtocol.ERR_FAILED, mContext.getString(R.string.remote_layout_test_no_device))
+                mLayoutTestClient = client
+                if (ScreenGrabberService.sInstanceRunning || outputType != OutputType.ADALIGHT) {
+                    if (!dispatchLayoutTest(true)) {
+                        mLayoutTestClient = null
+                        throw RemoteCommandException(RemoteProtocol.ERR_FAILED, mContext.getString(R.string.remote_layout_test_start_failed))
+                    }
+                } else {
+                    // Не подтверждаем телефону включение, пока не завершился запрос
+                    // разрешения на самом ТВ. Иначе переключатель включался даже при отказе.
+                    permissionPending = true
+                    UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
+                        context = mContext, device = null,
+                        onReady = {
+                            if (mLayoutTestClient === client) {
+                                permissionGranted = dispatchLayoutTest(true)
+                                if (!permissionGranted) mLayoutTestClient = null
+                            }
+                            permissionDone.countDown()
+                        },
+                        onDenied = {
+                            if (mLayoutTestClient === client) mLayoutTestClient = null
+                            permissionDone.countDown()
+                        },
+                        showToast = true, force = true
+                    )
+                }
+            }
+        }
+        if (permissionPending) {
+            if (!permissionDone.await(45, TimeUnit.SECONDS)) {
+                onMain { if (mLayoutTestClient === client) mLayoutTestClient = null }
+                throw RemoteCommandException(RemoteProtocol.ERR_FAILED, mContext.getString(R.string.remote_layout_test_timeout))
+            }
+            if (!permissionGranted)
+                throw RemoteCommandException(RemoteProtocol.ERR_FAILED, mContext.getString(R.string.remote_layout_test_denied))
+        }
+        if (enabled) {
+            // startService подтверждает только доставку команды. Реального соединения
+            // дожидаемся отдельно, иначе UI на телефоне показывает успешный тест при ошибке USB.
+            val deadline = SystemClock.elapsedRealtime() + LAYOUT_TEST_CONNECT_TIMEOUT_MS
+            var serviceSeen = ScreenGrabberService.sInstanceRunning
+            while (!ScreenGrabberService.sLayoutTestConnected &&
+                SystemClock.elapsedRealtime() < deadline) {
+                SystemClock.sleep(100)
+                serviceSeen = serviceSeen || ScreenGrabberService.sInstanceRunning
+                if (serviceSeen && !ScreenGrabberService.sInstanceRunning) break
+            }
+            if (!ScreenGrabberService.sLayoutTestConnected) {
+                onMain {
+                    if (mLayoutTestClient === client) {
+                        mLayoutTestClient = null
+                        dispatchLayoutTest(false)
+                    }
+                }
+                throw RemoteCommandException(
+                    RemoteProtocol.ERR_FAILED,
+                    mContext.getString(R.string.remote_layout_test_start_failed)
+                )
+            }
+        }
+        return JSONObject()
+    }
+
+    private fun dispatchLayoutTest(enabled: Boolean): Boolean {
+        if (!enabled && !ScreenGrabberService.sInstanceRunning) return true
+        val intent = Intent(mContext, ScreenGrabberService::class.java).apply {
+            action = ScreenGrabberService.ACTION_LAYOUT_TEST
+            putExtra(ScreenGrabberService.EXTRA_LAYOUT_TEST_ENABLED, enabled)
+        }
+        try {
+            if (enabled && !ScreenGrabberService.sInstanceRunning) {
+                ContextCompat.startForegroundService(mContext, intent)
+            } else {
+                mContext.startService(intent)
+            }
+            return true
+        } catch (e: Exception) {
+            // Android/OEM могут запретить старт foreground-сервиса разными исключениями.
+            Log.w(TAG, "Remote layout test failed: ${e.message}", e)
+            return false
+        }
+    }
 
     private fun hello(request: JSONObject): JSONObject {
         val proto = request.optInt("proto", -1)
@@ -370,6 +498,7 @@ internal class RemoteHostHandler(
     companion object {
         private const val TAG = "RemoteHostHandler"
         private const val MAIN_TIMEOUT_S = 10L
+        private const val LAYOUT_TEST_CONNECT_TIMEOUT_MS = 8_000L
 
         /** Отметка удалённого ключа в [RemoteServer.Client.sentValues]: null туда не положить. */
         val REMOVED = Any()
@@ -379,6 +508,7 @@ internal class RemoteHostHandler(
             RemoteProtocol.FEATURE_INPUT,
             RemoteProtocol.FEATURE_CALIBRATION,
             RemoteProtocol.FEATURE_SLEEP,
+            RemoteProtocol.FEATURE_LAYOUT_TEST,
         )
     }
 }

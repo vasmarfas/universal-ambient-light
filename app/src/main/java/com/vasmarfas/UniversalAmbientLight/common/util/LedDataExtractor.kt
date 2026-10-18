@@ -407,7 +407,7 @@ object LedDataExtractor {
      * По часовой: верх → правая → низ → левая.
      * Против часовой: в обратную сторону.
      */
-    private fun getEdgeOrder(startCorner: String, direction: String): List<String> {
+    internal fun getEdgeOrder(startCorner: String, direction: String): List<String> {
         return when (startCorner) {
             "top_left" -> {
                 if (direction == "clockwise") {

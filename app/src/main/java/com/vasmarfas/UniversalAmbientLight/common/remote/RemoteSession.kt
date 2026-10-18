@@ -277,6 +277,24 @@ object RemoteSession {
         }
     }
 
+    /**
+     * Адресная проверка выполняется только на телевизоре. Команды отправляются
+     * последовательно, чтобы выключение при уходе со страницы не обгоняло включение.
+     */
+    fun setRemoteLayoutTest(enabled: Boolean, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        mSender.execute {
+            val result = try {
+                if (enabled) flushPending()
+                call(RemoteProtocol.OP_LAYOUT_TEST, JSONObject().put("enabled", enabled),
+                    RemoteClient.LONG_TIMEOUT_MS)
+                Pair(true, null)
+            } catch (e: Exception) {
+                Pair(false, e.message ?: string(R.string.remote_error_offline))
+            }
+            mMain.post { onResult(result.first, result.second) }
+        }
+    }
+
     fun adb(action: String, extra: JSONObject = JSONObject()): JSONObject =
         call(RemoteProtocol.OP_ADB, extra.put("action", action), RemoteClient.LONG_TIMEOUT_MS)
 

@@ -123,9 +123,9 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
-                ConnectionSection(prefs, state, onControllerClick)
+                ConnectionSection(prefs, state, onControllerClick, onLedLayoutClick)
                 HomeAssistantSecondarySection(prefs, state)
-                CaptureSection(prefs, state, onLedLayoutClick, onCameraSetupClick)
+                CaptureSection(prefs, state, onCameraSetupClick)
                 CameraIdleSection(prefs, state)
                 BorderDetectionSection(prefs, state)
                 SmoothingSection(prefs, state, onDelayClick)

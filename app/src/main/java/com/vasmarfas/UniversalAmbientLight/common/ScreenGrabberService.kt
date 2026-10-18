@@ -82,6 +82,8 @@ class ScreenGrabberService : Service() {
     private var mHasConnected = false
     private var mMediaProjectionManager: MediaProjectionManager? = null
     private var mHyperionThread: HyperionThread? = null
+    private var mLayoutTestEnabled = false
+    private var mLayoutTestOutputOnly = false
 
     // Дополнительный вывод на Home Assistant — работает параллельно с основным
     // подключением (например, основной вывод на WLED, а сбоку ещё лампы HA)
@@ -183,6 +185,7 @@ class ScreenGrabberService : Service() {
         override fun onConnected() {
             if (DEBUG) Log.d(TAG, "Connected to Hyperion server")
             mHasConnected = true
+            if (mLayoutTestEnabled) sLayoutTestConnected = true
             val prefs = Preferences(baseContext)
             val host = prefs.getString(R.string.pref_key_host, null)
             AnalyticsHelper.logConnectionSuccess(baseContext, mConnectionType, host)
@@ -201,6 +204,7 @@ class ScreenGrabberService : Service() {
         }
 
         override fun onConnectionError(errorID: Int, error: String?) {
+            if (mLayoutTestEnabled) sLayoutTestConnected = false
             Log.e(TAG, "Connection error: " + (error ?: "unknown"))
             AnalyticsHelper.logConnectionError(baseContext, mConnectionType, error)
             if (!mHasConnected) {
@@ -368,12 +372,14 @@ class ScreenGrabberService : Service() {
         super.onCreate()
     }
 
-    private fun prepared(): Boolean {
+    private fun prepared(outputOnly: Boolean = false): Boolean {
         AnalyticsHelper.syncCrashlyticsContext(baseContext)
         val prefs = Preferences(baseContext)
         mConnectionType =
             prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
 
+        // Для адресного теста видеозахват не нужен, но выбранный контроллер,
+        // локальная сеть и раскладка должны быть настроены так же, как при обычном выводе.
         validateSettings(baseContext)?.let { error ->
             mStartError = error.message
             AnalyticsHelper.logServiceError(baseContext, error.code, error.details)
@@ -456,7 +462,7 @@ class ScreenGrabberService : Service() {
         mMediaProjectionManager =
             getSystemService(MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
-        if (mMediaProjectionManager == null && method == "media_projection") {
+        if (!outputOnly && mMediaProjectionManager == null && method == "media_projection") {
             mStartError = resources.getString(R.string.error_media_projection_denied)
             AnalyticsHelper.logServiceError(baseContext, "media_projection_manager_null", null)
             return false
@@ -468,8 +474,14 @@ class ScreenGrabberService : Service() {
             100
         }
 
-        val finalHost = host ?: "localhost"
-        val finalPort = if (port > 0) port else 19400
+        val outputType = OutputType.of(mConnectionType)
+        // У E1.31 пустой адрес означает мультикаст, а не localhost. Для остальных
+        // адресных протоколов при отсутствии порта используем их собственный дефолт.
+        val finalHost = if (outputType == OutputType.E131) host.orEmpty() else host ?: "localhost"
+        val finalPort = if (port > 0) port else when (outputType) {
+            OutputType.WLED -> if (wledProtocol == "ddp") OutputType.DDP.defaultPort else outputType.defaultPort
+            else -> outputType.defaultPort.takeIf { it > 0 } ?: OutputType.HYPERION.defaultPort
+        }
 
         val config = ConnectionConfig(
             host = finalHost,
@@ -513,13 +525,14 @@ class ScreenGrabberService : Service() {
                 ?.ifEmpty { null } ?: Zigbee2MqttClient.DEFAULT_BASE_TOPIC
         )
         val thread = HyperionThread(mReceiver, baseContext, config)
+        if (mLayoutTestEnabled) thread.setLayoutTestEnabled(true)
         if (mCalibrating) thread.setCalibrating(true)
         mHyperionThread = thread
         thread.start()
 
-        // Дополнительный вывод — необязательная надстройка: недозаполненные настройки просто
-        // пропускают его, не роняя уже работающий основной канал
-        if (ha2Enabled && ha2Token.isNotBlank() && ha2Host.isNotBlank() &&
+        // Дополнительные лампы не участвуют в адресной проверке первичного контроллера:
+        // при самостоятельном тесте не открываем второе подключение без видеозахвата.
+        if (!outputOnly && ha2Enabled && ha2Token.isNotBlank() && ha2Host.isNotBlank() &&
             ha2Port in 1..65535 && HomeAssistantLamp.parseList(ha2Lamps).isNotEmpty()
         ) {
             val secondaryConfig = config.copy(
@@ -540,7 +553,7 @@ class ScreenGrabberService : Service() {
             val secondaryThread = HyperionThread(mSecondaryReceiver, baseContext, secondaryConfig)
             mSecondaryHyperionThread = secondaryThread
             secondaryThread.start()
-        } else if (ha2Enabled) {
+        } else if (!outputOnly && ha2Enabled) {
             Log.w(TAG, "Additional Home Assistant output enabled but not fully configured, skipping")
         }
         mOutput = DualHyperionThreadListener(thread.receiver, mSecondaryHyperionThread?.receiver)
@@ -752,6 +765,50 @@ class ScreenGrabberService : Service() {
                 }
 
                 ACTION_STOP -> stopAllCapture()
+                ACTION_LAYOUT_TEST -> {
+                    val enabled = intent.getBooleanExtra(EXTRA_LAYOUT_TEST_ENABLED, false)
+                    if (enabled) {
+                        if (mHyperionThread == null) {
+                            // При выключенном захвате открываем только адресный вывод.
+                            // Ни MediaProjection, ни VSS, ни новый энкодер не запускаются.
+                            val outputType = Preferences(this).getString(
+                                R.string.pref_key_connection_type, "hyperion"
+                            )
+                            if (!OutputType.of(outputType).supportsLedLayoutTest) {
+                                Log.w(TAG, "LED layout test requires an addressable output")
+                                stopSelf()
+                            } else {
+                                mLayoutTestEnabled = true
+                                sLayoutTestConnected = false
+                                mLayoutTestOutputOnly = true
+                                mCaptureSource = "layout_test"
+                                if (!prepared(outputOnly = true)) {
+                                    mLayoutTestEnabled = false
+                                    mLayoutTestOutputOnly = false
+                                    haltStartup()
+                                }
+                            }
+                        } else {
+                            mLayoutTestEnabled = true
+                            sLayoutTestConnected = mHyperionThread?.isOutputConnected() == true
+                            mHyperionThread?.setLayoutTestEnabled(true)
+                            notifyActivity()
+                        }
+                    } else {
+                        mLayoutTestEnabled = false
+                        sLayoutTestConnected = false
+                        mHyperionThread?.setLayoutTestEnabled(false)
+                        if (mLayoutTestOutputOnly) {
+                            // Тест был единственной причиной работы сервиса:
+                            // гасим ленту и освобождаем соединение при закрытии страницы.
+                            mLayoutTestOutputOnly = false
+                            stopAllCapture()
+                            stopSelf()
+                        } else if (mHyperionThread == null) {
+                            stopSelf()
+                        }
+                    }
+                }
                 ACTION_CLEAR -> {
                     // Один чёрный кадр, но соединение оставляем
                     val backend = mActiveBackend
@@ -1422,6 +1479,9 @@ class ScreenGrabberService : Service() {
     private fun stopAllCapture() {
         if (DEBUG) Log.v(TAG, "Stopping all capture")
         mReconnectEnabled = false
+        sLayoutTestConnected = false
+        mLayoutTestEnabled = false
+        mLayoutTestOutputOnly = false
         stopAppWatch()
         mNotificationManager?.cancel(NOTIFICATION_ID)
 
@@ -1457,6 +1517,7 @@ class ScreenGrabberService : Service() {
         val intent = Intent(BROADCAST_FILTER)
         intent.putExtra(BROADCAST_TAG, isCommunicating)
         intent.putExtra(BROADCAST_ERROR, mStartError)
+        intent.putExtra(BROADCAST_LAYOUT_TEST_CONNECTED, sLayoutTestConnected)
         intent.putExtra(BROADCAST_SLEEP_AT, sSleepAt)
         if (DEBUG) {
             Log.v(
@@ -1543,6 +1604,12 @@ class ScreenGrabberService : Service() {
         )
         val outputKeys = OUTPUT_KEYS.map { getString(it) }.toSet()
         val captureKeys = CAPTURE_KEYS.map { getString(it) }.toSet()
+        val legacyLayoutKeys = setOf(
+            getString(R.string.pref_key_x_led),
+            getString(R.string.pref_key_y_led),
+            getString(R.string.pref_key_led_start_corner),
+            getString(R.string.pref_key_led_direction),
+        )
         val sessionKeys = setOf(
             getString(R.string.pref_key_capture_source),
             getString(R.string.pref_key_capture_method)
@@ -1554,6 +1621,11 @@ class ScreenGrabberService : Service() {
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == null) return@OnSharedPreferenceChangeListener
                 val prefs = Preferences(this)
+                // В Hyperion и протоколах ламп параметры физической ленты скрыты.
+                // Их старые значения не должны пересоздавать захват или эффект.
+                if (key in legacyLayoutKeys &&
+                    !OutputType.of(prefs.getString(R.string.pref_key_connection_type)).supportsLedLayoutTest
+                ) return@OnSharedPreferenceChangeListener
                 if (key in colorKeys) mActiveOptions?.refreshColorSettings(prefs)
                 if (key in borderKeys) mActiveOptions?.refreshBorderSettings(prefs)
                 if (key in cameraIdleKeys) mActiveOptions?.refreshCameraIdleSettings(prefs)
@@ -1643,10 +1715,11 @@ class ScreenGrabberService : Service() {
             }
             mHandler?.post {
                 // Пока закрывался старый вывод, подсветку могли выключить
-                if (mActiveBackend == null || mHyperionThread != null) return@post
+                if ((mActiveBackend == null && !mLayoutTestOutputOnly) ||
+                    mHyperionThread != null) return@post
                 // Новые настройки проверяются как при старте: при ошибке — тот же текст и остановка
                 mHasConnected = false
-                if (!prepared()) haltStartup()
+                if (!prepared(outputOnly = mLayoutTestOutputOnly)) haltStartup()
             }
         }, "hyperion-restart").apply { isDaemon = true }.start()
     }
@@ -1720,6 +1793,10 @@ class ScreenGrabberService : Service() {
 
     companion object {
         const val BROADCAST_ERROR = "SERVICE_ERROR"
+        const val BROADCAST_LAYOUT_TEST_CONNECTED = "LAYOUT_TEST_CONNECTED"
+        @Volatile
+        var sLayoutTestConnected = false
+            private set
         const val BROADCAST_TAG = "SERVICE_STATUS"
         const val BROADCAST_FILTER = "SERVICE_FILTER"
         const val BROADCAST_TCL_BLOCKED = "TCL_BLOCKED"
@@ -1733,6 +1810,8 @@ class ScreenGrabberService : Service() {
         const val ACTION_START_EFFECT = BASE + "ACTION_START_EFFECT"
         const val ACTION_STOP = BASE + "ACTION_STOP"
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
+        const val ACTION_LAYOUT_TEST = BASE + "ACTION_LAYOUT_TEST"
+        const val EXTRA_LAYOUT_TEST_ENABLED = BASE + "EXTRA_LAYOUT_TEST_ENABLED"
         const val ACTION_DETECT_FRAME = BASE + "ACTION_DETECT_FRAME"
         const val ACTION_SLEEP_TIMER = BASE + "ACTION_SLEEP_TIMER"
         const val EXTRA_SLEEP_MINUTES = BASE + "EXTRA_SLEEP_MINUTES"
@@ -1926,18 +2005,19 @@ class ScreenGrabberService : Service() {
                 }
             }
 
-            // Проверяем то же число, что реально уходит контроллеру: раскладку по сторонам
-            // с фолбэком на старые горизонталь/вертикаль. Проверка одних старых ключей
-            // отбрасывала валидную посторонную раскладку, если в них когда-то записали 0.
-            val layout = LedLayout.from(prefs)
-            if (layout.configuredLedCount() <= 0) {
-                return SettingsError(
-                    "invalid_led_counts",
-                    context.getString(R.string.error_invalid_led_counts),
-                    "top: ${layout.topLed}, right: ${layout.rightLed}, " +
-                            "bottom: ${layout.bottomLed}, left: ${layout.leftLed}, " +
-                            "x: ${layout.xLed}, y: ${layout.yLed}"
-                )
+            // Ленты используют адресную раскладку; Hyperion, Nanoleaf и зональные
+            // лампы не должны зависеть от сохранённых параметров физических LED.
+            if (type.supportsLedLayoutTest) {
+                val layout = LedLayout.from(prefs)
+                if (layout.configuredLedCount() <= 0) {
+                    return SettingsError(
+                        "invalid_led_counts",
+                        context.getString(R.string.error_invalid_led_counts),
+                        "top: ${layout.topLed}, right: ${layout.rightLed}, " +
+                                "bottom: ${layout.bottomLed}, left: ${layout.leftLed}, " +
+                                "x: ${layout.xLed}, y: ${layout.yLed}"
+                    )
+                }
             }
 
             return null

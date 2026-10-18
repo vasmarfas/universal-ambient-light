@@ -840,4 +840,10 @@
   <string name="pref_summary_mqtt_password_set">Сохранён</string>
   <string name="pref_title_z2m_base_topic">Базовая тема Zigbee2MQTT</string>
   <string name="lamps_hint_z2m">Список ламп приходит от брокера, его там держит сам Zigbee2MQTT. Проверьте адрес брокера, вход и базовую тему.</string>
+    <string name="remote_layout_test_unsupported_output">На телевизоре должен быть выбран адресный вывод светодиодов</string>
+    <string name="remote_layout_test_no_device">К телевизору не подключено USB-устройство</string>
+    <string name="remote_layout_test_start_failed">Не удалось запустить проверку ленты на телевизоре</string>
+    <string name="remote_layout_test_timeout">Время ожидания USB-разрешения на телевизоре истекло</string>
+    <string name="remote_layout_test_denied">Нет разрешения на USB или не удалось запустить проверку на телевизоре</string>
+    <string name="led_layout_direct_test">Адресная проверка светодиодов</string>
 </resources>

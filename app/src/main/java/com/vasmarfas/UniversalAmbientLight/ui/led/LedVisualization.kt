@@ -47,6 +47,7 @@ fun LedVisualization(
     ledOffset: Int,
     scanDepth: Int,
     modifier: Modifier = Modifier,
+    layoutTestEnabled: Boolean = false,
 ) {
     val (safeTop, safeRight, safeBottom, safeLeft) = remember(
         topLed,
@@ -107,6 +108,35 @@ fun LedVisualization(
                     ),
                     style = Stroke(width = 1.dp.toPx())
                 )
+
+                // Четыре цветовые полоски вокруг схемы показывают адресные цвета
+                // проверочного режима. Геометрию и нумерацию LED не изменяем.
+                if (layoutTestEnabled) {
+                    val thickness = 5.dp.toPx()
+                    val gap = 4.dp.toPx()
+                    val screenWidth = width - screenPadding * 2f
+                    val screenHeight = height - screenPadding * 2f
+                    drawRect(
+                        color = Color.Red.copy(alpha = if (sideTop == "enabled") 1f else 0.3f),
+                        topLeft = Offset(screenPadding, screenPadding - gap - thickness),
+                        size = androidx.compose.ui.geometry.Size(screenWidth, thickness),
+                    )
+                    drawRect(
+                        color = Color.Green.copy(alpha = if (sideRight == "enabled") 1f else 0.3f),
+                        topLeft = Offset(width - screenPadding + gap, screenPadding),
+                        size = androidx.compose.ui.geometry.Size(thickness, screenHeight),
+                    )
+                    drawRect(
+                        color = Color.Blue.copy(alpha = if (sideBottom == "enabled") 1f else 0.3f),
+                        topLeft = Offset(screenPadding, height - screenPadding + gap),
+                        size = androidx.compose.ui.geometry.Size(screenWidth, thickness),
+                    )
+                    drawRect(
+                        color = Color.Yellow.copy(alpha = if (sideLeft == "enabled") 1f else 0.3f),
+                        topLeft = Offset(screenPadding - gap - thickness, screenPadding),
+                        size = androidx.compose.ui.geometry.Size(thickness, screenHeight),
+                    )
+                }
 
                 // Область захвата со своими отступами по каждой стороне — внутренний прямоугольник
                 val marginTop = captureMarginTop.coerceIn(0, 40)

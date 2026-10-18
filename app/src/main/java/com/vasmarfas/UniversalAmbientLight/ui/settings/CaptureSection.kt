@@ -48,7 +48,7 @@ import kotlinx.coroutines.withContext
  * Группа «Захват»: источник и метод захвата, качество, частота кадров и цветокоррекция.
  */
 @Composable
-internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScreenState, onLedLayoutClick: () -> Unit, onCameraSetupClick: () -> Unit) {
+internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScreenState, onCameraSetupClick: () -> Unit) {
     val context = LocalContext.current
     val remote = LocalRemote.current
     val scope = rememberCoroutineScope()
@@ -185,14 +185,6 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
             )
         }
 
-        ClickablePreference(
-            title = stringResource(R.string.pref_title_led_layout),
-            summary = stringResource(R.string.pref_summary_led_layout),
-            onClick = {
-                AnalyticsHelper.logLedLayoutOpened(context)
-                onLedLayoutClick()
-            }
-        )
         ListPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_framerate,

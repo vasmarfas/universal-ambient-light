@@ -42,6 +42,7 @@ internal fun ColumnScope.ConnectionSection(
     prefs: Preferences,
     state: SettingsScreenState,
     onControllerClick: () -> Unit,
+    onLedLayoutClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -55,6 +56,18 @@ internal fun ColumnScope.ConnectionSection(
             else -> state.currentHost
         }
         ControllerCard(type, address, onControllerClick)
+
+        // Раскладка физических LED относится к выбранному контроллеру, а не к захвату.
+        if (type.supportsLedLayoutTest) {
+            ClickablePreference(
+                title = stringResource(R.string.pref_title_led_layout),
+                summary = stringResource(R.string.pref_summary_led_layout),
+                onClick = {
+                    AnalyticsHelper.logLedLayoutOpened(context)
+                    onLedLayoutClick()
+                }
+            )
+        }
 
         if (type.needsHost || type == OutputType.E131) {
             val multicastSummary = stringResource(R.string.pref_summary_e131_multicast)

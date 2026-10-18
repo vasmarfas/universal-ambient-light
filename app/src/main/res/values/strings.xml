@@ -860,4 +860,10 @@
   <string name="pref_summary_mqtt_password_set">Saved</string>
   <string name="pref_title_z2m_base_topic">Zigbee2MQTT base topic</string>
   <string name="lamps_hint_z2m">The list comes from the broker, Zigbee2MQTT keeps it there. Check the broker address, login and base topic.</string>
+    <string name="remote_layout_test_unsupported_output">Select an addressable LED output on the TV</string>
+    <string name="remote_layout_test_no_device">No USB serial device connected to the TV</string>
+    <string name="remote_layout_test_start_failed">Could not start LED layout test on the TV</string>
+    <string name="remote_layout_test_timeout">Timed out waiting for USB permission on the TV</string>
+    <string name="remote_layout_test_denied">USB permission or LED test start denied on the TV</string>
+    <string name="led_layout_direct_test">Show LED layout test</string>
 </resources>

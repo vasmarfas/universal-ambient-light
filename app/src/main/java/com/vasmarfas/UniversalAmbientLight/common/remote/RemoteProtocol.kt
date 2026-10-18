@@ -24,6 +24,7 @@ object RemoteProtocol {
     const val OP_SET_PREFS = "set_prefs"
     const val OP_CAPTURE = "capture"
     const val OP_CLEAR = "clear"
+    const val OP_LAYOUT_TEST = "layout_test"
     const val OP_DETECT_FRAME = "detect_frame"
     const val OP_ADB = "adb"
     const val OP_DEBUG_INFO = "debug_info"
@@ -76,6 +77,7 @@ object RemoteProtocol {
     const val FEATURE_INPUT = "input"
     const val FEATURE_CALIBRATION = "calibration"
     const val FEATURE_SLEEP = "sleep"
+    const val FEATURE_LAYOUT_TEST = "layout_test"
 
     /** Сколько телефонов держит ТВ одновременно; больше — признак ошибки, а не сценарий. */
     const val MAX_CLIENTS = 4

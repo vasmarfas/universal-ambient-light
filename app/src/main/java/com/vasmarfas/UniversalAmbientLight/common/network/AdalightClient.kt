@@ -22,7 +22,7 @@ class AdalightClient(
     settlingTime: Int = 200,
     outputDelayMs: Long = 80L,
     updateFrequency: Int = 25,
-) : HyperionClient, StreamingClient {
+) : HyperionClient, StreamingClient, AddressableLedClient {
 
     enum class ProtocolType {
         ADA,    // Standard Adalight
@@ -60,6 +60,14 @@ class AdalightClient(
     private val mSmoothing: ColorSmoothing
     private var mLedDataBuffer: Array<ColorRgb>? = null
 
+    private val mLayoutTest = LedLayoutTestController(mContext) { leds -> sendLedData(leds) }
+
+    override fun setLayoutTestEnabled(enabled: Boolean) {
+        if (enabled) mSmoothing.stop()
+        mLayoutTest.setEnabled(enabled, mLastLeds?.size ?: 0)
+        if (!enabled && isConnected()) mSmoothing.start()
+    }
+
     private val mKeepAlive = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "AdalightClient-keepalive").apply { isDaemon = true }
     }
@@ -82,7 +90,11 @@ class AdalightClient(
     private var mLastAutoThrottlePacketSize: Int = -1
 
     init {
-        mSmoothing = ColorSmoothing { leds -> sendLedData(leds) }
+        mSmoothing = ColorSmoothing { leds ->
+            synchronized(mLayoutTest) {
+                if (!mLayoutTest.enabled) sendLedData(leds)
+            }
+        }
         // Применить настройки сглаживания из preferences
         // Сначала применяем пресет как базовые значения
         mSmoothing.applyPreset(smoothingPreset)
@@ -180,10 +192,13 @@ class AdalightClient(
             mConnected = true
             mSmoothing.start()
             mKeepAlive.scheduleWithFixedDelay({
-                val last = mLastLeds ?: return@scheduleWithFixedDelay
-                if (mPaused || !isConnected()) return@scheduleWithFixedDelay
-                if (System.currentTimeMillis() - mLastSendMs < KEEPALIVE_MS) return@scheduleWithFixedDelay
-                sendLedData(Array(last.size) { last[it].clone() })
+                synchronized(mLayoutTest) {
+                    mLayoutTest.refresh()
+                    val last = mLastLeds ?: return@scheduleWithFixedDelay
+                    if (mPaused || !isConnected()) return@scheduleWithFixedDelay
+                    if (System.currentTimeMillis() - mLastSendMs < KEEPALIVE_MS) return@scheduleWithFixedDelay
+                    sendLedData(Array(last.size) { last[it].clone() })
+                }
             }, KEEPALIVE_MS, KEEPALIVE_MS / 2, TimeUnit.MILLISECONDS)
             Log.i(
                 TAG, "Successfully connected to Adalight device at " + mBaudRate + " baud (VID=" +
@@ -272,7 +287,7 @@ class AdalightClient(
         mSmoothing.stop()
         mKeepAlive.shutdownNow()
         if (mConnected) {
-            val ledCount = LedDataExtractor.getLedCount(mContext)
+            val ledCount = maxOf(LedDataExtractor.getLedCount(mContext), mLastLeds?.size ?: 0)
             sendLedData(Array(ledCount) { ColorRgb(0, 0, 0) })
         }
         mConnected = false
@@ -286,6 +301,7 @@ class AdalightClient(
 
     @Throws(IOException::class)
     override fun clear(priority: Int) {
+        if (mLayoutTest.enabled) return
         // Отправляем все светодиоды чёрными
         val ledCount = LedDataExtractor.getLedCount(mContext)
         val blackLeds = Array(ledCount) { ColorRgb(0, 0, 0) }
@@ -304,6 +320,7 @@ class AdalightClient(
 
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
+        if (mLayoutTest.enabled) return
         // Число светодиодов берём из настроек
         val ledCount = LedDataExtractor.getLedCount(mContext)
 
@@ -331,6 +348,8 @@ class AdalightClient(
         if (!isConnected()) {
             throw IOException("Not connected to Adalight device")
         }
+
+        if (mLayoutTest.enabled) return
 
         val leds = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
         mLedDataBuffer = leds
