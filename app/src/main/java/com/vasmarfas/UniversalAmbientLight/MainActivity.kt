@@ -70,7 +70,13 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(LocaleHelper.onAttach(newBase))
     }
 
+    // RUNNING ставит только подтверждённый ответ сервиса; STARTING — команда запуска,
+    // ожидание разрешений, подключения вывода или первого кадра любого источника.
     private var mRecorderRunning by mutableStateOf(false)
+    private var mLocalStartPending by mutableStateOf(false)
+    // До отправки команды сервису другие компоненты могут прислать обычный
+    // STOPPED. Такой ответ не должен отменять ожидание разрешений в этом Activity.
+    private var mLocalStartDispatched = false
 
     // Последняя ошибка сервиса — на карточке состояния главного экрана до следующего запуска
     private var mLastError by mutableStateOf<String?>(null)
@@ -136,18 +142,26 @@ class MainActivity : ComponentActivity() {
     private val mMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val checked = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TAG, false)
-            val wasRunning = mRecorderRunning
-            mRecorderRunning = checked
-
+            val starting = intent.getBooleanExtra(ScreenGrabberService.BROADCAST_STARTING, false)
             val error = intent.getStringExtra(ScreenGrabberService.BROADCAST_ERROR)
-            mLastError = if (checked) null else error
+            if (mLocalStartPending && !mLocalStartDispatched &&
+                !checked && !starting && error == null) return
+            val wasRunning = mRecorderRunning
+            val wasStarting = mLocalStartPending
+            mRecorderRunning = checked
+            mLocalStartPending = starting
+
+            // Внешний запуск (плитка, автозапуск, пульт) тоже можно отменить
+            // с главного экрана, даже если команда пришла не из MainActivity.
+            mLocalStartDispatched = checked || starting
+            mLastError = if (checked || starting) null else error
             mSleepAt = intent.getLongExtra(ScreenGrabberService.BROADCAST_SLEEP_AT, 0L)
             val tclBlocked =
                 intent.getBooleanExtra(ScreenGrabberService.BROADCAST_TCL_BLOCKED, false)
 
             if (checked) mSessionEverConnected = true
 
-            if (wasRunning && !checked) {
+            if ((wasRunning || wasStarting) && !checked && !starting) {
                 val reason = when {
                     tclBlocked -> "tcl_blocked"
                     error != null -> "error"
@@ -183,6 +197,12 @@ class MainActivity : ComponentActivity() {
         // которых в байткоде ругается Google Play (даже под API-гейтом).
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Диалог MediaProjection или разрешения камеры переживает пересоздание Activity
+        // (поворот, смерть процесса): без флага его результат отбросится как устаревший
+        savedInstanceState?.let {
+            mLocalStartPending = it.getBoolean(STATE_LOCAL_START_PENDING)
+            mLocalStartDispatched = it.getBoolean(STATE_LOCAL_START_DISPATCHED)
+        }
 
         // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS — то, что с Android 15 (API 35) требуется по
         // умолчанию для выреза дисплея; доступен с Android 11 (API 30), на более старых —
@@ -236,6 +256,7 @@ class MainActivity : ComponentActivity() {
                         AppNavHost(
                             navController = navController,
                             isRunning = mRecorderRunning,
+                            localPending = mLocalStartPending,
                             onToggleClick = {
                                 if (remoteActive) toggleRemoteCapture() else toggleScreenCapture()
                             },
@@ -372,6 +393,12 @@ class MainActivity : ComponentActivity() {
             )
             usbAttachReceiverRegistered = true
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_LOCAL_START_PENDING, mLocalStartPending)
+        outState.putBoolean(STATE_LOCAL_START_DISPATCHED, mLocalStartDispatched)
     }
 
     override fun onDestroy() {
@@ -539,7 +566,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun toggleScreenCapture() {
-        if (!mRecorderRunning) {
+        if (!mRecorderRunning && !mLocalStartPending) {
             // Ловим отсутствующие адрес, порт и количество светодиодов здесь, иначе пользователь
             // пройдёт диалоги наложения и MediaProjection только ради toast от сервиса.
             ScreenGrabberService.validateSettings(this)?.let { error ->
@@ -552,6 +579,8 @@ class MainActivity : ComponentActivity() {
             val prefs = Preferences(this)
             prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
             mLastError = null
+            mLocalStartDispatched = false
+            mLocalStartPending = true
             val captureSource =
                 prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
 
@@ -566,13 +595,18 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
+            // Повторное нажатие во время STARTING отменяет запуск, а не запускает
+            // параллельную попытку. Поздние callback'и разрешений проверят pending.
             stopScreenRecorder()
+            mLocalStartPending = false
+            mLocalStartDispatched = false
             mRecorderRunning = false
             finishCaptureSession("user_stop")
         }
     }
 
     private fun requestScreenCapture() {
+        if (!mLocalStartPending) return
         val prefs = Preferences(this)
         val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
 
@@ -584,6 +618,8 @@ class MainActivity : ComponentActivity() {
                     Toast.LENGTH_LONG
                 ).show()
                 openAccessibilitySettings(this)
+                mLocalStartPending = false
+                prefs.putBoolean(R.string.pref_key_lighting_was_active, false)
                 return
             }
         }
@@ -591,8 +627,8 @@ class MainActivity : ComponentActivity() {
         if (method != "media_projection") {
             Log.d(TAG, "Alternative capture mode ($method) enabled — starting service directly")
             // startScreencapRecorder обрабатывает все альтернативные методы; имя оставлено прежним ради совместимости с BootActivity
+            mLocalStartDispatched = true
             BootActivity.startAlternativeRecorder(this)
-            mRecorderRunning = true
             beginCaptureSession(
                 source = "screen",
                 method = method ?: "unknown",
@@ -627,6 +663,8 @@ class MainActivity : ComponentActivity() {
         val projectionManager = mMediaProjectionManager
         if (projectionManager == null) {
             Log.e(TAG, "MediaProjectionManager is null; cannot request screen capture")
+            mLocalStartPending = false
+            prefs.putBoolean(R.string.pref_key_lighting_was_active, false)
             return
         }
 
@@ -642,6 +680,8 @@ class MainActivity : ComponentActivity() {
                 PermissionHelper.showFullPermissionDialog(this) { requestScreenCapture() }
             }
         } catch (e: Exception) {
+            mLocalStartPending = false
+            prefs.putBoolean(R.string.pref_key_lighting_was_active, false)
             Log.e(TAG, "Failed to request screen capture: " + e.message)
             Toast.makeText(
                 this,
@@ -669,8 +709,8 @@ class MainActivity : ComponentActivity() {
     private fun startEffects() {
         val prefs = Preferences(this)
         val protocol = prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
+        mLocalStartDispatched = true
         BootActivity.startEffects(this)
-        mRecorderRunning = true
         beginCaptureSession(
             source = "effect",
             method = prefs.getString(R.string.pref_key_effect, "rainbow") ?: "rainbow",
@@ -686,12 +726,12 @@ class MainActivity : ComponentActivity() {
 
         val intent = Intent(this, ScreenGrabberService::class.java)
         intent.action = ScreenGrabberService.ACTION_START_CAMERA
+        mLocalStartDispatched = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
             startService(intent)
         }
-        mRecorderRunning = true
         beginCaptureSession("camera", "camera", protocol)
 
         ReviewHelper.onLightingStarted(this)
@@ -707,15 +747,18 @@ class MainActivity : ComponentActivity() {
             prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
 
         if (connectionType != "adalight") {
-            onReady()
+            if (mLocalStartPending) onReady()
             return
         }
 
         UsbSerialPermissionHelper.ensurePermissionForSerialDevice(
             context = this,
             device = null,
-            onReady = onReady,
-            onDenied = null,
+            onReady = { if (mLocalStartPending) onReady() },
+            onDenied = {
+                mLocalStartPending = false
+                Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
+            },
             showToast = true,
             force = true
         )
@@ -733,9 +776,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
+            if (!mLocalStartPending) return
             if (resultCode != RESULT_OK) {
                 mPermissionDeniedCount++
                 mRecorderRunning = false
+                mLocalStartPending = false
                 // Подсветка так и не включилась — автозапуску нечего возвращать
                 Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
                 if (mPermissionDeniedCount >= 2) {
@@ -764,10 +809,12 @@ class MainActivity : ComponentActivity() {
                 AnalyticsHelper.logScreenCaptureStarted(this, protocol)
 
                 startScreenRecorder(resultCode, data)
-                mRecorderRunning = true
                 beginCaptureSession("screen", "media_projection", protocol)
 
                 ReviewHelper.onLightingStarted(this)
+            } else {
+                mLocalStartPending = false
+                Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
             }
         }
         if (requestCode == REQUEST_OVERLAY_PERMISSION) {
@@ -779,7 +826,7 @@ class MainActivity : ComponentActivity() {
             // За полсекунды активити могут закрыть или пересоздать — колбэк на мёртвом
             // экземпляре запустил бы диалог с BadTokenException
             window.decorView.postDelayed({
-                if (!isFinishing && !isDestroyed) requestScreenCapture()
+                if (!isFinishing && !isDestroyed && mLocalStartPending) requestScreenCapture()
             }, 500)
         }
     }
@@ -810,10 +857,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (!mLocalStartPending) return
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 AnalyticsHelper.logPermissionGranted(this, "CAMERA")
                 startCameraGrabber()
             } else {
+                mLocalStartPending = false
+                Preferences(this).putBoolean(R.string.pref_key_lighting_was_active, false)
                 AnalyticsHelper.logPermissionDenied(this, "CAMERA")
                 Toast.makeText(
                     this,
@@ -833,11 +883,12 @@ class MainActivity : ComponentActivity() {
     }
 
     fun startScreenRecorder(resultCode: Int, data: Intent) {
+        mLocalStartDispatched = true
         BootActivity.startScreenRecorder(this, resultCode, data)
     }
 
     fun stopScreenRecorder() {
-        if (mRecorderRunning) {
+        if (mRecorderRunning || (mLocalStartPending && mLocalStartDispatched)) {
             val intent = Intent(this, ScreenGrabberService::class.java)
             intent.action = ScreenGrabberService.ACTION_EXIT
             startService(intent)
@@ -881,6 +932,8 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_CAMERA_PERMISSION = 5
         private const val TAG = "MainActivity"
         private const val PREF_NOTIF_PERMISSION_ASKED = "notif_permission_asked"
+        private const val STATE_LOCAL_START_PENDING = "local_start_pending"
+        private const val STATE_LOCAL_START_DISPATCHED = "local_start_dispatched"
         private const val REMOTE_PENDING_TIMEOUT_MS = 45_000L
     }
 }

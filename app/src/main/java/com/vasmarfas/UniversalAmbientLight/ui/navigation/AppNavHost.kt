@@ -64,6 +64,7 @@ fun AppNavHost(
     navController: NavHostController,
     startDestination: String = Screen.Home.route,
     isRunning: Boolean,
+    localPending: Boolean = false,
     onToggleClick: () -> Unit,
     lastError: String? = null,
     sleepAt: Long = 0L,
@@ -134,6 +135,7 @@ fun AppNavHost(
             } else {
                 HomeStatus(
                     running = isRunning,
+                    pending = localPending,
                     error = lastError,
                     target = target,
                     source = source,
