@@ -197,6 +197,12 @@ class MainActivity : ComponentActivity() {
         // которых в байткоде ругается Google Play (даже под API-гейтом).
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Диалог MediaProjection или разрешения камеры переживает пересоздание Activity
+        // (поворот, смерть процесса): без флага его результат отбросится как устаревший
+        savedInstanceState?.let {
+            mLocalStartPending = it.getBoolean(STATE_LOCAL_START_PENDING)
+            mLocalStartDispatched = it.getBoolean(STATE_LOCAL_START_DISPATCHED)
+        }
 
         // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS — то, что с Android 15 (API 35) требуется по
         // умолчанию для выреза дисплея; доступен с Android 11 (API 30), на более старых —
@@ -387,6 +393,12 @@ class MainActivity : ComponentActivity() {
             )
             usbAttachReceiverRegistered = true
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_LOCAL_START_PENDING, mLocalStartPending)
+        outState.putBoolean(STATE_LOCAL_START_DISPATCHED, mLocalStartDispatched)
     }
 
     override fun onDestroy() {
@@ -920,6 +932,8 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_CAMERA_PERMISSION = 5
         private const val TAG = "MainActivity"
         private const val PREF_NOTIF_PERMISSION_ASKED = "notif_permission_asked"
+        private const val STATE_LOCAL_START_PENDING = "local_start_pending"
+        private const val STATE_LOCAL_START_DISPATCHED = "local_start_dispatched"
         private const val REMOTE_PENDING_TIMEOUT_MS = 45_000L
     }
 }
