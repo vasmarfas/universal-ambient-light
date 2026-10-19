@@ -82,7 +82,7 @@ class ScreenGrabberService : Service() {
     private var mHasConnected = false
     private var mMediaProjectionManager: MediaProjectionManager? = null
     private var mHyperionThread: HyperionThread? = null
-    private var mLayoutTestEnabled = false
+    @Volatile private var mLayoutTestEnabled = false
     private var mLayoutTestOutputOnly = false
 
     // Дополнительный вывод на Home Assistant — работает параллельно с основным
@@ -475,13 +475,17 @@ class ScreenGrabberService : Service() {
         }
 
         val outputType = OutputType.of(mConnectionType)
-        // У E1.31 пустой адрес означает мультикаст, а не localhost. Для остальных
-        // адресных протоколов при отсутствии порта используем их собственный дефолт.
-        val finalHost = if (outputType == OutputType.E131) host.orEmpty() else host ?: "localhost"
-        val finalPort = if (port > 0) port else when (outputType) {
-            OutputType.WLED -> if (wledProtocol == "ddp") OutputType.DDP.defaultPort else outputType.defaultPort
-            else -> outputType.defaultPort.takeIf { it > 0 } ?: OutputType.HYPERION.defaultPort
-        }
+        // Особые умолчания нужны только автономному тесту адресной ленты.
+        // Обычный захват сохраняет прежний контракт адреса и порта.
+        val finalHost = if (outputOnly && outputType == OutputType.E131) host.orEmpty()
+            else host ?: "localhost"
+        val finalPort = if (port > 0) port else if (outputOnly) {
+            when (outputType) {
+                OutputType.WLED -> if (wledProtocol == "ddp") OutputType.DDP.defaultPort
+                    else outputType.defaultPort
+                else -> outputType.defaultPort.takeIf { it > 0 } ?: OutputType.HYPERION.defaultPort
+            }
+        } else 19400
 
         val config = ConnectionConfig(
             host = finalHost,

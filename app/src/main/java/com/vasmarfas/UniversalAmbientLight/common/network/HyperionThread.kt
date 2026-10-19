@@ -197,7 +197,11 @@ class HyperionThread(
             }
             mPendingFrame = null
             mLastSentFrame = null
-            mRestoreFrame = null
+            // Снимок восстанавливаемого кадра пишется также из потока отправки.
+            synchronized(mSendLock) {
+                mRestoreFrame = null
+                mRestoreFrameTimeMs = 0L
+            }
 
             if (!mKeepAliveExecutor.isShutdown) {
                 mKeepAliveExecutor.shutdownNow()
