@@ -72,7 +72,11 @@ class MStarVssCaptureEncoder(
                 val systemProperties = Class.forName("android.os.SystemProperties")
                 val get = systemProperties.getMethod("get", String::class.java)
                 get.invoke(null, property) as? String
-            } catch (_: Exception) { null } ?: return null
+            } catch (_: Exception) {
+                // Скрытый SystemProperties API может отсутствовать на OEM-прошивке.
+                // В этом случае используем разрешение из DisplayManager.
+                null
+            } ?: return null
             val parts = value.trim().lowercase().split("x")
             if (parts.size != 2) return null
             val w = parts[0].trim().toIntOrNull() ?: return null
@@ -172,12 +176,14 @@ class MStarVssCaptureEncoder(
             Thread.currentThread().interrupt()
             Log.w(TAG, "VSS stop interrupted, PID=$pid")
         } catch (e: Exception) {
+            // OEM shell и Magisk su могут завершиться разными исключениями,
+            // проверка PID не должна останавливать поток очистки.
             Log.w(TAG, "VSS PID verification failed, PID=$pid", e)
         }
     }
 
     // Не запускаем вторую очистку из finally: она дожидается первой, прежде чем
-    // освобождать captureLock и разрешать новую аппаратную сессию.
+    // освобождать mCaptureLock и разрешать новую аппаратную сессию.
     private fun stopProcess(proc: java.lang.Process, pidHolder: AtomicInteger?, stop: StopTicket) {
         if (!stop.started.compareAndSet(false, true)) {
             try {
@@ -224,14 +230,16 @@ class MStarVssCaptureEncoder(
             Thread.currentThread().interrupt()
             proc.destroyForcibly()
         } finally {
-            try { proc.outputStream.close() } catch (_: IOException) { }
+            try { proc.outputStream.close() } catch (_: IOException) {
+                // Поток уже мог закрыться после завершения дочернего процесса.
+            }
         }
     }
 
     private fun runCapture(expectedSession: Int) {
         // Один аппаратный VSS-поток на экземпляр приложения, включая завершение
         // старой сессии перед стартом следующей.
-        captureLock.lock()
+        mCaptureLock.lock()
         var ownProcess: java.lang.Process? = null
         var ownPid: AtomicInteger? = null
         var ownStop: StopTicket? = null
@@ -241,8 +249,8 @@ class MStarVssCaptureEncoder(
             val expectedWidth = args[4].toInt()
             val expectedHeight = args[5].toInt()
             val bin = binary()
-            // Запускаем бинарник из каталога, проверенного диагностической утилитой.
-            // Исполнение из закрытого каталога приложения может блокироваться noexec или SELinux.
+            // На Tuvio TO55UFGCV5 (Ventura, Android 11) проверен запуск из /data/local/tmp.
+            // Исполнение из filesDir может быть заблокировано noexec или SELinux.
             // Диагностический /data/local/tmp/mstar_probe не перезаписываем.
             // Сравниваем с установленным через cmp и только при изменении заменяем файл атомарно.
             // Работающий процесс продолжит использовать прежний inode до завершения.
@@ -250,8 +258,8 @@ class MStarVssCaptureEncoder(
             val command = "if ! cmp -s '${bin.absolutePath}' '$target'; then " +
                 "cp '${bin.absolutePath}' '${target}.new' && " +
                 "chmod 700 '${target}.new' && mv -f '${target}.new' '$target' || exit 1; fi; " +
-                // Shell остаётся родителем VSS и выполняет wait() для дочернего процесса.
-                // Без exec magiskd не должен получать осиротевший VSS как прямого ребёнка.
+                // На Tuvio TO55UFGCV5 (Ventura, Android 11, Magisk) сохраняем
+                // shell родителем VSS, чтобы он выполнил wait() при завершении сервера.
                 "LD_LIBRARY_PATH=/vendor/lib:/system/lib '$target' ${args.joinToString(" ")}; " +
                 "result=\$?; exit \$result"
             val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
@@ -273,7 +281,9 @@ class MStarVssCaptureEncoder(
                             }
                         } else if (line.isNotBlank()) Log.w(TAG, "[VSS] $line")
                     }
-                } catch (_: IOException) { }
+                } catch (_: IOException) {
+                    // Закрытие stderr при остановке сервера является штатным завершением чтения.
+                }
             }, "MStar-stderr").apply { isDaemon = true }.start()
             // Регистрация под тем же монитором, что и stopRecording:
             // исключает гонку между проверкой сессии и сохранением процесса.
@@ -323,6 +333,8 @@ class MStarVssCaptureEncoder(
             }
             if (mRunning && mSession == expectedSession) throw EOFException("MStar capture process stopped")
         } catch (e: Exception) {
+            // Граница аппаратного потока: ошибки Java, root shell и OEM-библиотеки
+            // приводят к одной процедуре завершения захвата и освобождения VSS.
             if (mRunning && mSession == expectedSession) {
                 Log.e(TAG, "MStar capture stopped", e)
                 mOnFatalError?.invoke(
@@ -339,7 +351,7 @@ class MStarVssCaptureEncoder(
                 if (mProcess === ownProcess) { mProcess = null; mNativePid = null; mProcessStop = null }
                 mListener.sendStatus(false)
             }
-            captureLock.unlock()
+            mCaptureLock.unlock()
         }
     }
 
@@ -386,9 +398,9 @@ class MStarVssCaptureEncoder(
     override fun setOrientation(orientation: Int) { /* Аппаратное масштабирование уже ориентировано по экрану. */ }
 
     companion object {
-        private const val TAG = "MStarVssCapture"
+        private const val TAG = "MStarVssCaptureEncoder"
         private const val BINARY = "mstar_vss_server"
-        private val captureLock = java.util.concurrent.locks.ReentrantLock(true)
+        private val mCaptureLock = java.util.concurrent.locks.ReentrantLock(true)
 
         /** Быстрая проверка прошивки без вызовов su или ioctl с правами root в UI-потоке. */
         fun isAvailable(): Boolean =

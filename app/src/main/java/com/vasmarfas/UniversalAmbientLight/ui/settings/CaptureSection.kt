@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -33,15 +34,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
-import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.CaptureAvailabilityMonitor
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,17 +76,17 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
             // Доступные методы решает устройство, которое снимает экран: в режиме пульта —
             // телевизор (флейвор, MTK, служба доступности), а не телефон
             val remoteCaps = remote?.caps
-            // Проверка аппаратного захвата выполняется в фоне: первый вызов может вернуть false.
-            // Повторно читаем результат до 5 секунд, чтобы пункт MTK/MStar стал доступен
-            // без повторного открытия настроек. В режиме пульта используем возможности ТВ.
-            val mtkAvailable by produceState(initialValue = MtkThalCaptureEncoder.isAvailable(), remoteCaps) {
-                if (remoteCaps == null) {
-                    repeat(20) {
-                        val result = MtkThalCaptureEncoder.isAvailable()
-                        if (result) { value = true; return@produceState }
-                        delay(250)
-                    }
-                }
+            // Проверку локального устройства ведёт Handler-хелпер, а не Compose-корутина.
+            // В режиме пульта используем только объявленные телевизором возможности.
+            val localCapture = remote == null
+            var mtkAvailable by remember(localCapture) {
+                mutableStateOf(localCapture && CaptureAvailabilityMonitor.isAvailable())
+            }
+            DisposableEffect(localCapture) {
+                val monitor = if (localCapture && !mtkAvailable) {
+                    CaptureAvailabilityMonitor { mtkAvailable = true }.also { it.start() }
+                } else null
+                onDispose { monitor?.stop() }
             }
             ListPreference(
                 prefs = prefs,
