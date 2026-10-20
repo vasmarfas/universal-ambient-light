@@ -24,7 +24,10 @@ data class LedLayout(
     val sideRight: String = "enabled",
     val sideBottom: String = "enabled",
     val sideLeft: String = "enabled",
-    /** Сколько светодиодов вырезано из середины нижней стороны (подставка телевизора). */
+    /**
+     * Сколько светодиодов в середине нижней стороны закрыто саундбаром или подставкой.
+     * Они остаются на ленте и в нумерации, им уходит чёрный цвет.
+     */
     val bottomGap: Int = 0,
     val captureMarginTop: Int = 0,
     val captureMarginRight: Int = 0,

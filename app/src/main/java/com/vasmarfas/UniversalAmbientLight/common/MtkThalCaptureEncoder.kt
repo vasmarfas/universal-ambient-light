@@ -208,9 +208,6 @@ class MtkThalCaptureEncoder(
         private const val BINARY_NAME = "mtk_thal_capture_server"
         private const val DMA_HEAP_PATH = "/dev/dma_heap/mtk_dip_capture_uncached"
         private const val THAL_LIB_PATH = "/vendor/lib/libthal_capture.so"
-
-        fun hasNativeThalBackend(): Boolean =
-            File(THAL_LIB_PATH).isFile && File(DMA_HEAP_PATH).exists()
         private const val STATUS_MAGIC = 0x4D544B53 // "MTKS"
         private const val AVAILABILITY_CHECK_TIMEOUT_SEC = 3L
         private const val CHMOD_TIMEOUT_SEC = 2L
@@ -249,7 +246,7 @@ class MtkThalCaptureEncoder(
                     arrayOf(
                         "su",
                         "-c",
-                        "(test -f /vendor/lib/libmtal.so || (test -f $THAL_LIB_PATH && test -e $DMA_HEAP_PATH)) && echo OK"
+                        "test -f $THAL_LIB_PATH && test -e $DMA_HEAP_PATH && echo OK"
                     )
                 )
                 val completed = process.waitFor(AVAILABILITY_CHECK_TIMEOUT_SEC, TimeUnit.SECONDS)

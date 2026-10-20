@@ -23,15 +23,5 @@ set_target_properties(libmtk_thal_capture_server.so PROPERTIES
 add_executable(libmstar_vss_server.so
     mstar_vss_server.c
 )
-target_compile_options(libmstar_vss_server.so PRIVATE
-    # NDK по умолчанию включает Thumb, где R7 зарезервирован под frame pointer.
-    # Для собственных ARM EABI syscalls нужен ARM-режим (как в проверенной CLI-сборке).
-    -marm -O2 -fPIE -fno-stack-protector -ffreestanding -fno-builtin
-    -fno-unwind-tables -fno-asynchronous-unwind-tables
-)
-target_link_options(libmstar_vss_server.so PRIVATE
-    -nostdlib -Wl,-pie -Wl,-dynamic-linker,/system/bin/linker
-    -Wl,--no-as-needed
-)
-target_link_libraries(libmstar_vss_server.so dl c)
+target_link_libraries(libmstar_vss_server.so dl)
 set_target_properties(libmstar_vss_server.so PROPERTIES PREFIX "" SUFFIX "")

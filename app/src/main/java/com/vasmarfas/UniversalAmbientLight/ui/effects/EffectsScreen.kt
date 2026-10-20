@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
 import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.ui.components.ValueSlider
@@ -196,6 +197,14 @@ fun EffectsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
+                if (OutputType.of(prefs.getString(R.string.pref_key_connection_type)).supportsLedLayoutTest) {
+                    Text(
+                        text = stringResource(R.string.effect_layout_test_strip_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
             }
             if (config.effect.usesColor) {
                 ColorPicker(stringResource(R.string.effects_color), config.color) { rgb ->

@@ -48,8 +48,10 @@ fun calculateLedPositions(
     val scanDepthV = (screenHeight * scanDepth / 100f).coerceAtLeast(2f)
     val scanDepthH = (screenWidth * scanDepth / 100f).coerceAtLeast(2f)
 
+    // Тот же шаг, что у LedDataExtractor: сторона делится на count отрезков, светодиод
+    // рисуется в центре своего, иначе картинка расходилась бы с тем, что реально снимается
     fun step(length: Float, count: Int): Float {
-        return if (count <= 1) 0f else length / (count - 1)
+        return if (count <= 0) 0f else length / count
     }
 
     val stepTop = step(screenWidth, topCount)

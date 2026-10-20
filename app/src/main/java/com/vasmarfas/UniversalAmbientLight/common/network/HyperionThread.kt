@@ -54,6 +54,8 @@ class HyperionThread(
     private val mWledColorOrder: String = config.wledColorOrder
     private val mReconnectEnabled = AtomicBoolean(config.reconnect)
     private val mConnected = AtomicBoolean(false)
+    private val mConnectionLossNotified = AtomicBoolean(false)
+    @Volatile private var mLayoutTestEnabled = false
     private val mStandbyPaused = AtomicBoolean(false)
     private val mClient = AtomicReference<HyperionClient?>()
     private val mExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "$TAG-send") }
@@ -66,6 +68,11 @@ class HyperionThread(
 
     @Volatile
     private var mLastSentFrame: FrameData? = null
+
+    // Сохраняем редкий снимок уже выведенного кадра. Он нужен для восстановления
+    // статичной картинки после теста, в том числе при включённой задержке вывода.
+    private var mRestoreFrame: FrameData? = null
+    private var mRestoreFrameTimeMs = 0L
     private val mSendLock = Any()
     private val mKeepAliveExecutor: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "$TAG-keepalive") }
@@ -99,9 +106,10 @@ class HyperionThread(
 
     private val mListener = object : HyperionThreadListener {
         override fun sendFrame(data: ByteArray, width: Int, height: Int) {
-            if (mStandbyPaused.get()) return
+            if (mStandbyPaused.get() || mLayoutTestEnabled) return
             val client = mClient.get()
             if (client == null || !client.isConnected()) {
+                if (client != null) reportConnectionLost("Primary output disconnected")
                 // Клиент умирает молча: у Adalight после standby ТВ хост переоткрывает USB,
                 // ошибка записи гасит isConnected без исключения наружу, и без этой ветки
                 // лента не оживала бы до ручного перезапуска (issue #41). Приходящие кадры
@@ -162,6 +170,7 @@ class HyperionThread(
         }
 
         override fun clear() {
+            if (mLayoutTestEnabled) return
             // Отложенные кадры иначе дошли бы после чёрного и зажгли ленту снова
             mDelayLine.clear()
             val client = mClient.get()
@@ -177,7 +186,7 @@ class HyperionThread(
                         mLastSentFrame = null
                     }
                 } catch (e: IOException) {
-                    mCallback.onConnectionError(e.hashCode(), e.message)
+                    reportConnectionLost(e.message)
                 }
             }
         }
@@ -190,6 +199,11 @@ class HyperionThread(
             }
             mPendingFrame = null
             mLastSentFrame = null
+            // Снимок восстанавливаемого кадра пишется также из потока отправки.
+            synchronized(mSendLock) {
+                mRestoreFrame = null
+                mRestoreFrameTimeMs = 0L
+            }
 
             if (!mKeepAliveExecutor.isShutdown) {
                 mKeepAliveExecutor.shutdownNow()
@@ -222,6 +236,8 @@ class HyperionThread(
         }
     }
 
+    fun isOutputConnected(): Boolean = mClient.get()?.isConnected() == true
+
     val receiver: HyperionThreadListener
         get() = mListener
 
@@ -229,6 +245,20 @@ class HyperionThread(
     @Throws(IOException::class)
     private fun deliver(client: HyperionClient, buffer: ByteArray, width: Int, height: Int) {
         synchronized(mSendLock) {
+            if (mLayoutTestEnabled) return
+            val now = System.currentTimeMillis()
+            if (mRestoreFrame == null || now - mRestoreFrameTimeMs >= 1000L) {
+                val snapshot = mRestoreFrame
+                val copy = if (snapshot != null && snapshot.data.size == buffer.size &&
+                    snapshot.width == width && snapshot.height == height) {
+                    snapshot.data
+                } else {
+                    ByteArray(buffer.size)
+                }
+                buffer.copyInto(copy)
+                mRestoreFrame = FrameData(copy, width, height)
+                mRestoreFrameTimeMs = now
+            }
             client.setImage(buffer, width, height, mPriority, FRAME_DURATION)
 
             if (client is HyperionFlatBuffers) {
@@ -267,13 +297,47 @@ class HyperionThread(
         val frame = mDelayLine.takeDue(System.currentTimeMillis()) ?: return
         try {
             val client = mClient.get()
-            if (!mStandbyPaused.get() && client != null && client.isConnected()) {
+            if (!mStandbyPaused.get() && !mLayoutTestEnabled && client != null && client.isConnected()) {
                 deliver(client, frame.data, frame.width, frame.height)
             }
         } catch (e: IOException) {
             handleError(e)
         } finally {
             mDelayLine.recycle(frame)
+        }
+    }
+
+    /**
+     * Переключаем режим в очереди отправки, чтобы USB и сетевые клиенты не получили
+     * запоздалый видеокадр поверх тестового. После теста восстанавливаем последний кадр
+     * даже на статичном экране, где энкодер не выдал ничего нового.
+     */
+    fun setLayoutTestEnabled(enabled: Boolean) {
+        if (enabled && !OutputType.of(mConnectionType).supportsLedLayoutTest) return
+        mLayoutTestEnabled = enabled
+        if (enabled) {
+            mDelayLine.clear()
+            mPendingTask?.cancel(false)
+        }
+        try {
+            mExecutor.execute {
+                val client = mClient.get() as? AddressableLedClient ?: return@execute
+                client.setLayoutTestEnabled(enabled)
+                if (!enabled) {
+                    val output = mClient.get() ?: return@execute
+                    if (output !== client || !output.isConnected()) return@execute
+                    try {
+                        synchronized(mSendLock) {
+                            val frame = mRestoreFrame ?: mPendingFrame ?: return@synchronized
+                            deliver(output, frame.data.copyOf(), frame.width, frame.height)
+                        }
+                    } catch (e: IOException) {
+                        handleError(e)
+                    }
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            // Отключение вывода могло завершить очередь одновременно с закрытием экрана.
         }
     }
 
@@ -330,7 +394,11 @@ class HyperionThread(
         mKeepAliveExecutor.scheduleWithFixedDelay({
             if (mStandbyPaused.get()) return@scheduleWithFixedDelay
             val client = mClient.get() ?: return@scheduleWithFixedDelay
-            if (!client.isConnected()) return@scheduleWithFixedDelay
+            if (!client.isConnected()) {
+                reportConnectionLost("Primary output disconnected")
+                scheduleClientRecovery()
+                return@scheduleWithFixedDelay
+            }
             // У WLED и Adalight своя логика keepalive.
             if (client !is HyperionFlatBuffers) return@scheduleWithFixedDelay
 
@@ -351,10 +419,11 @@ class HyperionThread(
             try {
                 val client = createClient()
                 if (client != null && client.isConnected()) {
+                    if (client is AddressableLedClient) client.setLayoutTestEnabled(mLayoutTestEnabled)
                     mClient.set(client)
                     mConnected.set(true)
                     AnalyticsHelper.logProtocolStarted(mContext, mConnectionType)
-                    mCallback.onConnected()
+                    reportConnectionRestored()
                     Log.i(TAG, "Connected to $mConnectionType at $mHost:$mPort")
                     return
                 }
@@ -483,8 +552,21 @@ class HyperionThread(
         mConfig.haTurnOffLights
     )
 
+    private fun reportConnectionLost(reason: String?) {
+        if (mConnected.get() && mConnectionLossNotified.compareAndSet(false, true)) {
+            mCallback.onConnectionError(0, reason)
+        }
+    }
+
+    private fun reportConnectionRestored() {
+        if (!mExecutor.isShutdown) {
+            mConnectionLossNotified.set(false)
+            mCallback.onConnected()
+        }
+    }
+
     private fun handleError(e: IOException) {
-        mCallback.onConnectionError(e.hashCode(), e.message)
+        reportConnectionLost(e.message)
 
         // Не пересоздавать клиент во сне: для Adalight новое открытие порта сбрасывает Arduino.
         if (mReconnectEnabled.get() && mConnected.get() && !mStandbyPaused.get()) {
@@ -496,6 +578,9 @@ class HyperionThread(
 
                 if (newClient != null && newClient.isConnected()) {
                     installRecoveredClient(newClient)
+                    if (mClient.get() === newClient && !mExecutor.isShutdown) {
+                        reportConnectionRestored()
+                    }
                 }
             } catch (ignored: IOException) {
             }
@@ -516,6 +601,7 @@ class HyperionThread(
             }
             return
         }
+        if (newClient is AddressableLedClient) newClient.setLayoutTestEnabled(mLayoutTestEnabled)
         val old = mClient.getAndSet(newClient)
         if (old != null && old !== newClient) {
             // Сокет прежнего клиента иначе остаётся открытым до конца процесса
@@ -566,11 +652,11 @@ class HyperionThread(
                         installRecoveredClient(newClient)
                         if (mClient.get() === newClient) {
                             Log.i(TAG, "Recovered $mConnectionType connection")
-                            mCallback.onConnected()
+                            reportConnectionRestored()
                         }
                     }
                 } catch (e: IOException) {
-                    mCallback.onConnectionError(e.hashCode(), e.message)
+                    reportConnectionLost(e.message)
                 }
             } finally {
                 mRecovering.set(false)

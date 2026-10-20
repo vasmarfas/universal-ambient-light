@@ -124,6 +124,7 @@
     <item>ADB (Скриншот, ~200мс)</item>
     <item>Accessibility (Android 11+)</item>
     <item>MTK аппаратный захват (Root)</item>
+    <item>MStar VSS аппаратный захват (Root)</item>
   </string-array>
   <string-array name="pref_list_capture_method_values">
     <item>media_projection</item>
@@ -134,6 +135,7 @@
     <item>adb_local</item>
     <item>accessibility</item>
     <item>mtk_thal_capture</item>
+    <item>mstar_vss_capture</item>
   </string-array>
 
   <string name="pref_title_adb_port">ADB Порт</string>
@@ -603,6 +605,7 @@
   <string name="effect_comet">Комета</string>
   <string name="effect_layout_test">Проверка раскладки</string>
   <string name="effect_layout_test_hint">Верх красный, правая сторона зелёная, низ синий, левая жёлтая. Белая точка бежит от первого светодиода в сторону нумерации. Если цвета или путь точки не совпадают с лентой, поправьте раскладку.</string>
+  <string name="effect_layout_test_strip_hint">На ленте границы сторон в этом эффекте смещаются из-за глубины сканирования и отступов захвата. Точная проверка каждого светодиода: «Раскладка LED», переключатель «Адресная проверка светодиодов».</string>
   <string name="home_source_effect">Эффект: %1$s</string>
   <string name="remote_error_update_tv">На ТВ стоит старая версия приложения, в ней этого ещё нет. Обновите приложение на ТВ.</string>
 
@@ -840,5 +843,11 @@
   <string name="pref_summary_mqtt_password_set">Сохранён</string>
   <string name="pref_title_z2m_base_topic">Базовая тема Zigbee2MQTT</string>
   <string name="lamps_hint_z2m">Список ламп приходит от брокера, его там держит сам Zigbee2MQTT. Проверьте адрес брокера, вход и базовую тему.</string>
-    <string name="error_mstar_capture_stopped">Аппаратный захват MStar остановлен: %1$s</string>
+    <string name="remote_layout_test_unsupported_output">На телевизоре должен быть выбран адресный вывод светодиодов</string>
+    <string name="remote_layout_test_no_device">К телевизору не подключено USB-устройство</string>
+    <string name="remote_layout_test_start_failed">Не удалось запустить проверку ленты на телевизоре</string>
+    <string name="remote_layout_test_timeout">Время ожидания USB-разрешения на телевизоре истекло</string>
+    <string name="remote_layout_test_denied">Нет разрешения на USB или не удалось запустить проверку на телевизоре</string>
+    <string name="led_layout_direct_test">Адресная проверка светодиодов</string>
+
 </resources>

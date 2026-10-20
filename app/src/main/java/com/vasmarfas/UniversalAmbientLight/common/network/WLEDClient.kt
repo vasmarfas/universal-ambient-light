@@ -30,7 +30,7 @@ class WLEDClient(
     updateFrequency: Int = 25,
     rgbw: Boolean = false,
     brightness: Int = 255,
-) : HyperionClient, StreamingClient {
+) : HyperionClient, StreamingClient, AddressableLedClient {
 
     enum class Protocol {
         DDP,
@@ -61,7 +61,14 @@ class WLEDClient(
     private var mAddress: InetAddress? = null
 
     private val mSmoothing: ColorSmoothing
+    private val mLayoutTest = LedLayoutTestController(mContext) { leds -> sendLedData(leds) }
     private var mLedDataBuffer: Array<ColorRgb>? = null
+
+    override fun setLayoutTestEnabled(enabled: Boolean) {
+        if (enabled) mSmoothing.stop()
+        mLayoutTest.setEnabled(enabled, mLastLeds?.size ?: 0)
+        if (!enabled && isConnected()) mSmoothing.start()
+    }
 
     // Поддержание соединения
     private val mKeepAliveExecutor = Executors.newSingleThreadScheduledExecutor { r ->
@@ -93,7 +100,11 @@ class WLEDClient(
             mPort = port
         }
 
-        mSmoothing = ColorSmoothing { leds -> sendLedData(leds) }
+        mSmoothing = ColorSmoothing { leds ->
+            synchronized(mLayoutTest) {
+                if (!mLayoutTest.enabled) sendLedData(leds)
+            }
+        }
         mSmoothing.applyPreset(smoothingPreset)
         val presetValues = getPresetValues(smoothingPreset)
         if (settlingTime != presetValues.settlingTime) {
@@ -113,13 +124,13 @@ class WLEDClient(
 
     private fun startKeepAlive() {
         mKeepAliveExecutor.scheduleWithFixedDelay({
-            val lastLeds = mLastLeds
-            if (mPaused || !mConnected || lastLeds == null) return@scheduleWithFixedDelay
-            // Повторяем последний кадр, чтобы соединение не считалось потерянным.
-            // Копия обязательна: при outputDelay=0 сглаживание отдаёт свой рабочий массив
-            // и продолжает менять его в такт интерполяции — сериализация живого массива
-            // дала бы кадр из смеси старых и новых цветов. Раз в секунду копия дешёвая.
-            sendLedData(Array(lastLeds.size) { lastLeds[it].clone() })
+            synchronized(mLayoutTest) {
+                mLayoutTest.refresh()
+                val lastLeds = mLastLeds
+                if (mPaused || !mConnected || lastLeds == null) return@scheduleWithFixedDelay
+                // Повторяем копию: рабочий буфер сглаживания меняется на ходу.
+                sendLedData(Array(lastLeds.size) { lastLeds[it].clone() })
+            }
         }, 1000, 1000, TimeUnit.MILLISECONDS)
     }
 
@@ -250,7 +261,8 @@ class WLEDClient(
         mResumeExecutor.shutdownNow()
         // Последний кадр чёрный и мимо сглаживания: с задержкой вывода чёрные кадры из
         // очереди уйти не успевают, и WLED держал бы последний цвет до своего таймаута
-        sendLedData(Array(LedDataExtractor.getLedCount(mContext)) { ColorRgb(0, 0, 0) })
+        val count = maxOf(LedDataExtractor.getLedCount(mContext), mLastLeds?.size ?: 0)
+        sendLedData(Array(count) { ColorRgb(0, 0, 0) })
         mConnected = false
         val socket = mSocket
         if (socket != null && !socket.isClosed) {
@@ -261,6 +273,7 @@ class WLEDClient(
 
     @Throws(IOException::class)
     override fun clear(priority: Int) {
+        if (mLayoutTest.enabled) return
         val ledCount = LedDataExtractor.getLedCount(mContext)
         val blackLeds = Array(ledCount) { ColorRgb(0, 0, 0) }
         mSmoothing.setTargetColors(blackLeds)
@@ -278,6 +291,7 @@ class WLEDClient(
 
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
+        if (mLayoutTest.enabled) return
         val ledCount = LedDataExtractor.getLedCount(mContext)
         val r = (color shr 16) and 0xFF
         val g = (color shr 8) and 0xFF
@@ -303,6 +317,7 @@ class WLEDClient(
         if (!isConnected()) {
             throw IOException("Not connected to WLED")
         }
+        if (mLayoutTest.enabled) return
 
         val leds = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
         mLedDataBuffer = leds

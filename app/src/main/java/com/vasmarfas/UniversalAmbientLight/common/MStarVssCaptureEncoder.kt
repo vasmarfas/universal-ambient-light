@@ -1,6 +1,11 @@
 package com.vasmarfas.UniversalAmbientLight.common
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.hardware.display.DisplayManager
+import android.view.Display
+import android.os.Build
+import java.util.concurrent.locks.ReentrantLock
 import com.vasmarfas.UniversalAmbientLight.R
 import android.os.Handler
 import android.os.HandlerThread
@@ -25,8 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Нативный процесс передаёт кадры: ширина и высота (u32, little-endian),
  * затем пиксели RGB24. Вызовы драйвера не выполняются в главном потоке Android.
  * ADB и MediaProjection не используются, кадры не записываются на диск.
- * Нативный процесс завершается после трёх последовательных ошибок захвата
- * либо при обнаружении выхода записи за границы буфера.
+ * Временные ошибки захвата повторяются; переполнение буфера завершает процесс.
  */
 class MStarVssCaptureEncoder(
     private val mContext: Context,
@@ -67,6 +71,7 @@ class MStarVssCaptureEncoder(
 
     private fun params(): List<String> {
         // Физическое разрешение панели может отличаться от разрешения интерфейса Android (1920×1080).
+        @SuppressLint("PrivateApi") // OEM panel dimensions; guarded reflection with DisplayManager fallback.
         fun panelSize(property: String): Pair<Int, Int>? {
             val value = try {
                 val systemProperties = Class.forName("android.os.SystemProperties")
@@ -83,8 +88,8 @@ class MStarVssCaptureEncoder(
             val h = parts[1].trim().toIntOrNull() ?: return null
             return if (w in 1..16384 && h in 1..16384) w to h else null
         }
-        val display = mContext.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
-        val mode = display.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.mode
+        val display = mContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val mode = display.getDisplay(Display.DEFAULT_DISPLAY)?.mode
         val (sw, sh) = panelSize("vendor.display-size")
             ?: panelSize("sys.display-size")
             ?: ((mode?.physicalWidth ?: 1920).coerceAtLeast(1) to
@@ -157,8 +162,8 @@ class MStarVssCaptureEncoder(
             "set -- \$stat; " +
             "case \"\$3\" in Z|X) exit 0;; esac; " +
             "exe=\$(readlink /proc/\$pid/exe 2>/dev/null); " +
-            "case \"\$exe\" in /data/local/tmp/mstar_vss_server|" +
-            "'/data/local/tmp/mstar_vss_server (deleted)') ;; " +
+            "case \"\$exe\" in '${mContext.filesDir.absolutePath}/$BINARY'|" +
+            "'${mContext.filesDir.absolutePath}/$BINARY (deleted)') ;; " +
             "*) echo \"VSS PID identity mismatch\" >&2; exit 3;; esac; " +
             "case \$attempt in 2) kill -TERM \$pid;; 4) kill -KILL \$pid;; esac; " +
             "sleep 0.1; " +
@@ -183,7 +188,7 @@ class MStarVssCaptureEncoder(
     }
 
     // Не запускаем вторую очистку из finally: она дожидается первой, прежде чем
-    // освобождать mCaptureLock и разрешать новую аппаратную сессию.
+    // освобождать sCaptureLock и разрешать новую аппаратную сессию.
     private fun stopProcess(proc: java.lang.Process, pidHolder: AtomicInteger?, stop: StopTicket) {
         if (!stop.started.compareAndSet(false, true)) {
             try {
@@ -239,7 +244,7 @@ class MStarVssCaptureEncoder(
     private fun runCapture(expectedSession: Int) {
         // Один аппаратный VSS-поток на экземпляр приложения, включая завершение
         // старой сессии перед стартом следующей.
-        mCaptureLock.lock()
+        sCaptureLock.lock()
         var ownProcess: java.lang.Process? = null
         var ownPid: AtomicInteger? = null
         var ownStop: StopTicket? = null
@@ -249,19 +254,7 @@ class MStarVssCaptureEncoder(
             val expectedWidth = args[4].toInt()
             val expectedHeight = args[5].toInt()
             val bin = binary()
-            // На Tuvio TO55UFGCV5 (Ventura, Android 11) проверен запуск из /data/local/tmp.
-            // Исполнение из filesDir может быть заблокировано noexec или SELinux.
-            // Диагностический /data/local/tmp/mstar_probe не перезаписываем.
-            // Сравниваем с установленным через cmp и только при изменении заменяем файл атомарно.
-            // Работающий процесс продолжит использовать прежний inode до завершения.
-            val target = "/data/local/tmp/mstar_vss_server"
-            val command = "if ! cmp -s '${bin.absolutePath}' '$target'; then " +
-                "cp '${bin.absolutePath}' '${target}.new' && " +
-                "chmod 700 '${target}.new' && mv -f '${target}.new' '$target' || exit 1; fi; " +
-                // На Tuvio TO55UFGCV5 (Ventura, Android 11, Magisk) сохраняем
-                // shell родителем VSS, чтобы он выполнил wait() при завершении сервера.
-                "LD_LIBRARY_PATH=/vendor/lib:/system/lib '$target' ${args.joinToString(" ")}; " +
-                "result=\$?; exit \$result"
+            val command = "LD_LIBRARY_PATH=/vendor/lib:/system/lib '${bin.absolutePath}' ${args.joinToString(" ")}"
             val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
             ownProcess = proc
             val pidHolder = AtomicInteger(-1)
@@ -351,7 +344,7 @@ class MStarVssCaptureEncoder(
                 if (mProcess === ownProcess) { mProcess = null; mNativePid = null; mProcessStop = null }
                 mListener.sendStatus(false)
             }
-            mCaptureLock.unlock()
+            sCaptureLock.unlock()
         }
     }
 
@@ -360,9 +353,6 @@ class MStarVssCaptureEncoder(
         ((buffer[offset + 1].toInt() and 255) shl 8) or
         ((buffer[offset + 2].toInt() and 255) shl 16) or
         ((buffer[offset + 3].toInt() and 255) shl 24)
-
-    /** Захват запускается, но первый кадр ещё не получен. */
-    fun isStarting(): Boolean = mRunning && !mCapturing
 
     override fun isCapturing(): Boolean = mCapturing
     override fun sendStatus() = mListener.sendStatus(mCapturing)
@@ -400,11 +390,32 @@ class MStarVssCaptureEncoder(
     companion object {
         private const val TAG = "MStarVssCaptureEncoder"
         private const val BINARY = "mstar_vss_server"
-        private val mCaptureLock = java.util.concurrent.locks.ReentrantLock(true)
+        private val sCaptureLock = ReentrantLock(true)
 
-        /** Быстрая проверка прошивки без вызовов su или ioctl с правами root в UI-потоке. */
-        fun isAvailable(): Boolean =
-            android.os.Build.SUPPORTED_32_BIT_ABIS.contains("armeabi-v7a") &&
-            File("/vendor/lib/libmtal.so").exists()
+        @Volatile private var sCachedAvailable: Boolean? = null
+        private val sCheckStarted = AtomicBoolean(false)
+
+        fun isAvailable(): Boolean {
+            sCachedAvailable?.let { return it }
+            if (!Build.SUPPORTED_32_BIT_ABIS.contains("armeabi-v7a")) return false
+            if (sCheckStarted.compareAndSet(false, true)) {
+                Thread({
+                    val available = try {
+                        val command = "test -f /vendor/lib/libmtal.so && " +
+                            "for symbol in MTAL_Init MTVSS_Init MTVSS_CaptureOne MTVSS_DisconnectEx; do " +
+                            "grep -aq \"\$symbol\" /vendor/lib/libmtal.so || exit 1; done"
+                        val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+                        val completed = proc.waitFor(3, TimeUnit.SECONDS)
+                        if (!completed) proc.destroyForcibly()
+                        completed && proc.exitValue() == 0
+                    } catch (e: Exception) {
+                        Log.w(TAG, "VSS availability check failed", e)
+                        false
+                    }
+                    sCachedAvailable = available
+                }, "MStar-availability").apply { isDaemon = true }.start()
+            }
+            return false
+        }
     }
 }

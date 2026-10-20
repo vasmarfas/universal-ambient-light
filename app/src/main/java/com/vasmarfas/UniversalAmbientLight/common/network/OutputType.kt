@@ -34,6 +34,10 @@ enum class OutputType(
 
     enum class Group { STRIP, USB, LAMPS, SERVER }
 
+    /** Физические адресные LED: цвета можно послать без видеокадра. */
+    val supportsLedLayoutTest: Boolean
+        get() = group == Group.STRIP || this == ADALIGHT
+
     /** Лампы с привязкой к зонам экрана вместо адресной ленты. */
     val isLamps: Boolean
         get() = this == HUE || this == WIZ || this == YEELIGHT || this == LIFX || this == GOVEE ||

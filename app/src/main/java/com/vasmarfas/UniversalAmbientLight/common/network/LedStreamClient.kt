@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 abstract class LedStreamClient(
     private val mContext: Context,
     smoothing: SmoothingSettings,
-) : HyperionClient, StreamingClient {
+) : HyperionClient, StreamingClient, AddressableLedClient {
 
     /** Сглаживание из настроек; применяется одинаково для всех протоколов. */
     data class SmoothingSettings(
@@ -30,8 +30,19 @@ abstract class LedStreamClient(
         val updateFrequency: Int,
     )
 
-    private val mSmoothing = ColorSmoothing { leds -> deliver(leds) }
+    private val mLayoutTest = LedLayoutTestController(mContext) { leds -> deliver(leds) }
+    private val mSmoothing = ColorSmoothing { leds ->
+        synchronized(mLayoutTest) {
+            if (!mLayoutTest.enabled) deliver(leds)
+        }
+    }
     private var mLedBuffer: Array<ColorRgb>? = null
+
+    override fun setLayoutTestEnabled(enabled: Boolean) {
+        if (enabled) mSmoothing.stop()
+        mLayoutTest.setEnabled(enabled, mLastLeds?.size ?: 0)
+        if (!enabled && isConnected()) mSmoothing.start()
+    }
     private val mKeepAlive = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "${javaClass.simpleName}-keepalive").apply { isDaemon = true }
     }
@@ -72,10 +83,13 @@ abstract class LedStreamClient(
         mConnected = true
         mSmoothing.start()
         mKeepAlive.scheduleWithFixedDelay({
-            val last = mLastLeds ?: return@scheduleWithFixedDelay
-            if (mPaused || !mConnected) return@scheduleWithFixedDelay
-            if (System.currentTimeMillis() - mLastSendMs < KEEPALIVE_MS) return@scheduleWithFixedDelay
-            deliver(Array(last.size) { last[it].clone() })
+            synchronized(mLayoutTest) {
+                mLayoutTest.refresh()
+                val last = mLastLeds ?: return@scheduleWithFixedDelay
+                if (mPaused || !mConnected) return@scheduleWithFixedDelay
+                if (System.currentTimeMillis() - mLastSendMs < KEEPALIVE_MS) return@scheduleWithFixedDelay
+                deliver(Array(last.size) { last[it].clone() })
+            }
         }, KEEPALIVE_MS, KEEPALIVE_MS / 2, TimeUnit.MILLISECONDS)
     }
 
@@ -116,7 +130,8 @@ abstract class LedStreamClient(
         // остаться гореть последним цветом до таймаута приёмника
         if (mConnected) {
             try {
-                write(Array(LedDataExtractor.getLedCount(mContext)) { ColorRgb(0, 0, 0) })
+                val count = maxOf(LedDataExtractor.getLedCount(mContext), mLastLeds?.size ?: 0)
+                write(Array(count) { ColorRgb(0, 0, 0) })
             } catch (e: IOException) {
                 Log.w(TAG, "Final black frame failed: ${e.message}")
             }
@@ -127,6 +142,7 @@ abstract class LedStreamClient(
 
     @Throws(IOException::class)
     override fun clear(priority: Int) {
+        if (mLayoutTest.enabled) return
         mSmoothing.setTargetColors(Array(LedDataExtractor.getLedCount(mContext)) { ColorRgb(0, 0, 0) })
     }
 
@@ -142,6 +158,7 @@ abstract class LedStreamClient(
 
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
+        if (mLayoutTest.enabled) return
         val count = LedDataExtractor.getLedCount(mContext)
         mSmoothing.setTargetColors(Array(count) {
             ColorRgb((color shr 16) and 0xFF, (color shr 8) and 0xFF, color and 0xFF)
@@ -156,6 +173,7 @@ abstract class LedStreamClient(
     @Throws(IOException::class)
     override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
         if (!mConnected) throw IOException("Not connected")
+        if (mLayoutTest.enabled) return
         val leds = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedBuffer)
         mLedBuffer = leds
         if (leds.isNotEmpty()) mSmoothing.setTargetColors(leds)

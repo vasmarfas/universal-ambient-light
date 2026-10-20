@@ -2,6 +2,10 @@ package com.vasmarfas.UniversalAmbientLight.ui.settings
 
 import android.content.Context
 import android.widget.Toast
+import com.vasmarfas.UniversalAmbientLight.common.util.CaptureAvailabilityMonitor
+import com.vasmarfas.UniversalAmbientLight.common.MStarVssCaptureEncoder
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,8 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,10 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
+import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
-import com.vasmarfas.UniversalAmbientLight.common.util.CaptureAvailabilityMonitor
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.R
@@ -50,7 +52,7 @@ import kotlinx.coroutines.withContext
  * Группа «Захват»: источник и метод захвата, качество, частота кадров и цветокоррекция.
  */
 @Composable
-internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScreenState, onLedLayoutClick: () -> Unit, onCameraSetupClick: () -> Unit) {
+internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScreenState, onCameraSetupClick: () -> Unit) {
     val context = LocalContext.current
     val remote = LocalRemote.current
     val scope = rememberCoroutineScope()
@@ -103,7 +105,8 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
                         if (remoteCaps != null) {
                             value !in remoteCaps.methods
                         } else {
-                            value == "mtk_thal_capture" && !mtkAvailable
+                            (value == "mtk_thal_capture" && !MtkThalCaptureEncoder.isAvailable()) ||
+                                (value == "mstar_vss_capture" && !MStarVssCaptureEncoder.isAvailable())
                         }
                     }.toSet()
                 },
@@ -199,14 +202,6 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
             )
         }
 
-        ClickablePreference(
-            title = stringResource(R.string.pref_title_led_layout),
-            summary = stringResource(R.string.pref_summary_led_layout),
-            onClick = {
-                AnalyticsHelper.logLedLayoutOpened(context)
-                onLedLayoutClick()
-            }
-        )
         ListPreference(
             prefs = prefs,
             keyRes = R.string.pref_key_framerate,
