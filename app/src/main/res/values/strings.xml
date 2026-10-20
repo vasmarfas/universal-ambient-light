@@ -869,5 +869,5 @@
     <string name="remote_layout_test_timeout">Timed out waiting for USB permission on the TV</string>
     <string name="remote_layout_test_denied">USB permission or LED test start denied on the TV</string>
     <string name="led_layout_direct_test">Show LED layout test</string>
-    <string name="error_mstar_capture_stopped" translatable="false">MStar hardware capture stopped: %1$s</string>
+    <string name="error_mstar_capture_stopped">MStar hardware capture stopped: %1$s</string>
 </resources>

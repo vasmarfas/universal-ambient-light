@@ -849,5 +849,5 @@
     <string name="remote_layout_test_timeout">Время ожидания USB-разрешения на телевизоре истекло</string>
     <string name="remote_layout_test_denied">Нет разрешения на USB или не удалось запустить проверку на телевизоре</string>
     <string name="led_layout_direct_test">Адресная проверка светодиодов</string>
-
+    <string name="error_mstar_capture_stopped">Аппаратный захват MStar остановлен: %1$s</string>
 </resources>

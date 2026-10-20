@@ -213,7 +213,13 @@ int main(int argc, char **argv) {
             sleep_ms(500);
             continue;
         }
-        failed_frames = 0;
+        if (failed_frames > 0) {
+            /* После паузы без кадров темп считается заново, иначе кадры
+               шли бы без задержки, пока не догонят прежний график. */
+            origin = monotonic_ms();
+            paced_frames = 0;
+            failed_frames = 0;
+        }
         for (size_t i = 0, j = 0; i < pixel_length; i += 4) {
             rgb[j++] = pixels[i + 2];
             rgb[j++] = pixels[i + 1];
