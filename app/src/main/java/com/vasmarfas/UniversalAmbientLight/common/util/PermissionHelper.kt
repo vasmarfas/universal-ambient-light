@@ -90,12 +90,20 @@ object PermissionHelper {
      * подсветка тогда видит только его окно, а не весь экран. Конфигурация основного дисплея
      * оставляет в системном диалоге только весь экран.
      */
-    fun screenCaptureIntent(manager: MediaProjectionManager): Intent =
+    fun screenCaptureIntent(manager: MediaProjectionManager): Intent {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
-        } else {
-            manager.createScreenCaptureIntent()
+            try {
+                return manager.createScreenCaptureIntent(
+                    MediaProjectionConfig.createConfigForDefaultDisplay()
+                )
+            } catch (e: LinkageError) {
+                // Прошивка выдаёт себя за Android 14 (в Crashlytics это «Pixel 8 Pro»), а
+                // MediaProjectionConfig во framework нет: запрос без конфигурации
+                Log.w(TAG, "MediaProjectionConfig unavailable on SDK ${Build.VERSION.SDK_INT}", e)
+            }
         }
+        return manager.createScreenCaptureIntent()
+    }
 
     fun hasProjectMediaPermission(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

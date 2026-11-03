@@ -9,6 +9,7 @@ import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbKeyHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbPortResolver
+import com.vasmarfas.UniversalAmbientLight.common.util.AdbSetup
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import dadb.Dadb
@@ -136,6 +137,7 @@ class AdbEncoder(
                 }
                 mDadb = dadb
                 Log.i(TAG, "ADB connected to localhost:$port")
+                AdbSetup.grantTclAutoStart(mContext, dadb)
             }
         } catch (e: Exception) {
             Log.e(TAG, "ADB connection failed: ${e.message}. Ensure Wireless Debugging is ON.")

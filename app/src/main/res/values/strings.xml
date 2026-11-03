@@ -81,6 +81,7 @@
   <string name="usb_no_serial_devices">No USB serial devices found. Connect your device via USB OTG</string>
   <string name="usb_permission_denied_toast">USB device permission denied. Please allow USB access.</string>
   <string name="usb_permission_prompt">Confirm access to the USB device</string>
+  <string name="usb_permission_no_dialog">The system did not show the USB access request, and without it the app cannot open the controller. This is a firmware limitation: use a network controller such as WLED instead</string>
   <string name="pref_title_priority">Message Priority</string>
   <string name="pref_title_reconnect">Reconnect</string>
   <string name="pref_title_reconnect_delay">Reconnect Delay</string>

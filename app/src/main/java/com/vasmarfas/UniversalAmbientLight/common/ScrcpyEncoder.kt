@@ -5,10 +5,12 @@ import android.media.Image
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.os.PowerManager
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbKeyHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AdbPortResolver
+import com.vasmarfas.UniversalAmbientLight.common.util.AdbSetup
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
 import dadb.Dadb
@@ -260,6 +262,7 @@ class ScrcpyEncoder(
             dadb = Dadb.create("127.0.0.1", adbPort, kp)
             mCurrentDadb = dadb
             Log.i(TAG, "ADB connected")
+            AdbSetup.grantTclAutoStart(mContext, dadb)
 
             // ── Заливаем сервер заново, чтобы не нарваться на битую копию ─
             Log.i(TAG, "Pushing scrcpy-server to device…")
@@ -360,24 +363,42 @@ class ScrcpyEncoder(
             val socketInput = videoStream.source.inputStream()
             val lastActivity = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
             val finalVideoStream = videoStream
+            val sessionDadb = dadb
+            val power = mContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
 
-            // Сторож ловит только зависание на старте, когда кадров нет вообще.
-            // Рабочую сессию из-за пауз в данных перезапускать нельзя: на статичной
-            // картинке scrcpy законно может не присылать ничего.
+            // Сторож ловит зависание на старте, когда кадров нет вообще, и мёртвую сессию при
+            // включённом экране. Короткие паузы рабочей сессии не трогаем: на статичной
+            // картинке scrcpy может молчать, хотя обычно повторяет последний кадр раз в 100 мс.
+            // TCL Smart TV Pro (Android 14, merak): за ночь в дежурном режиме сервер scrcpy
+            // пропадает, а ADB-потоки не закрываются, и сессия ждала кадров, пока не убьют
+            // процесс. Пока экран погашен, кадров нет законно — такую тишину не считаем.
             Thread({
                 while (mRunning && !cleanExit) {
                     Thread.sleep(2000)
-                    val noDataTooLong = System.currentTimeMillis() - lastActivity.get() > 15000
-                    if (framesDecoded.get() == 0 && noDataTooLong) {
+                    val silentMs = System.currentTimeMillis() - lastActivity.get()
+                    val startupStall = framesDecoded.get() == 0 && silentMs > 15000
+                    val sessionStall = silentMs > SESSION_STALL_MS && power?.isInteractive == true
+                    if (startupStall || sessionStall) {
                         watchdogTriggered.set(true)
                         Log.w(
                             TAG,
-                            "Watchdog: scrcpy startup timeout (no first frame in 15s), restarting…"
+                            if (startupStall) {
+                                "Watchdog: scrcpy startup timeout (no first frame in 15s), restarting…"
+                            } else {
+                                "Watchdog: no video data for ${silentMs / 1000}s with the screen on, restarting…"
+                            }
                         )
+                        // На мёртвом соединении закрытие одного потока чтение не будит —
+                        // закрываем всё ADB-соединение, как в stopInternal.
                         try {
                             finalVideoStream.close()
                         } catch (_: Exception) {
                             // Причина рестарта уже залогирована; поток закрываем best-effort.
+                        }
+                        try {
+                            sessionDadb.close()
+                        } catch (_: Exception) {
+                            // Соединение и так мёртвое; закрываем best-effort.
                         }
                         break
                     }
@@ -640,7 +661,8 @@ class ScrcpyEncoder(
         val yPS = yP.pixelStride
         val uvRS = uP.rowStride
         val uvPS = uP.pixelStride
-        val targetW = mOptions.captureQuality.coerceIn(64, w)
+        // Узкий кадр с декодера (у screenrecord на TUVIO был шириной 16) не должен ронять поток
+        val targetW = mOptions.captureQuality.coerceIn(minOf(64, w), w)
         val step = max(1, w / targetW)
         val sw = (w / step).coerceAtLeast(1)
         val sh = (h / step).coerceAtLeast(1)
@@ -758,6 +780,7 @@ class ScrcpyEncoder(
         private const val CLEAR_DELAY_MS = 100L
         private const val CLEAR_FRAMES = 5
         private const val MAX_SESSION_ERRORS = 3
+        private const val SESSION_STALL_MS = 30_000L
         private const val MAX_FRAME_BYTES = 4 * 1024 * 1024  // 4 MB sanity limit
 
         private fun joinQuietly(thread: Thread?, timeoutMs: Long) {

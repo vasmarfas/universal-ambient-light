@@ -127,6 +127,7 @@ object AdbSetup {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 add("appops set $pkg START_FOREGROUND allow")
             }
+            if (TclBypass.isTclDevice()) add(tclAutoStartCommand(pkg))
             add("cmd deviceidle whitelist +$pkg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add("pm grant $pkg android.permission.POST_NOTIFICATIONS")
@@ -161,6 +162,24 @@ object AdbSetup {
             else -> Outcome(false, context.getString(R.string.adb_grant_partial, missing.joinToString()))
         }
     }
+
+    /**
+     * Своя операция TCL: при AUTO_START=ignore прошивка не доставляет приложению
+     * BOOT_COMPLETED, и после перезагрузки подсветка сама не поднимается (Smart TV Pro,
+     * Android 14). Энкодеры на ADB выдают её себе на каждом подключении, чтобы не ждать
+     * кнопки «Выдать через ADB». В AOSP такой операции нет. Блокирует.
+     */
+    fun grantTclAutoStart(context: Context, dadb: Dadb) {
+        if (!TclBypass.isTclDevice()) return
+        try {
+            val response = dadb.shell(tclAutoStartCommand(context.packageName))
+            if (response.exitCode != 0) Log.w(TAG, "AUTO_START grant -> ${response.allOutput.trim()}")
+        } catch (e: Exception) {
+            Log.w(TAG, "AUTO_START grant failed: ${e.message}")
+        }
+    }
+
+    private fun tclAutoStartCommand(pkg: String) = "appops set $pkg AUTO_START allow"
 
     /** Команда оболочки от имени shell через собственный ADB устройства. Блокирует. */
     fun shell(context: Context, command: String): String {

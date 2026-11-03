@@ -14,6 +14,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 
 /**
  * Запрашивает разрешение на первое (или конкретное) USB-последовательное устройство.
@@ -27,6 +28,9 @@ object UsbSerialPermissionHelper {
 
     // Значение action менять нельзя — оно уже используется в MainActivity
     const val ACTION_USB_PERMISSION = "com.vasmarfas.UniversalAmbientLight.USB_PERMISSION"
+
+    // С запасом на ответ с пульта: на настоящий диалог столько не думают
+    private const val DIALOG_TIMEOUT_MS = 20_000L
 
     @Volatile
     private var lastRequestedDeviceId: Int? = null
@@ -194,9 +198,12 @@ object UsbSerialPermissionHelper {
             }
         )
 
+        // Приёмник и таймаут ниже оба на главном потоке, засчитывается первый
+        var answered = false
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
+                answered = true
                 try {
                     ctx.unregisterReceiver(this)
                 } catch (_: Exception) {
@@ -250,6 +257,33 @@ object UsbSerialPermissionHelper {
                 R.string.usb_permission_prompt,
                 Toast.LENGTH_LONG
             ).show()
+            // Диалог показывает SystemUI. На YaOS X (Яндекс ТВ Станция) его нет: system_server
+            // пишет «unable to start UsbPermissionActivity» и не отвечает вовсе, поэтому
+            // вызывающих отпускаем по таймауту
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (answered) return@postDelayed
+                answered = true
+                context.applicationContext.unregisterReceiver(receiver)
+                if (usbManager.hasPermission(target)) {
+                    onReady()
+                    return@postDelayed
+                }
+                Log.w(TAG, "No answer to the USB permission request in ${DIALOG_TIMEOUT_MS}ms")
+                if (showToast) Toast.makeText(
+                    context.applicationContext,
+                    R.string.usb_permission_no_dialog,
+                    Toast.LENGTH_LONG
+                ).show()
+                // Тосты YaOS X тоже не показывает: причина должна остаться на главном экране.
+                // Работающую подсветку так не трогаем, иначе экран решил бы, что она остановлена
+                if (!ScreenGrabberService.sInstanceRunning) {
+                    ScreenGrabberService.notifyNotStarted(
+                        context.applicationContext,
+                        context.getString(R.string.usb_permission_no_dialog)
+                    )
+                }
+                onDenied?.invoke()
+            }, DIALOG_TIMEOUT_MS)
         } catch (e: Exception) {
             Log.e(TAG, "requestPermission failed: ${e.message}", e)
             // Диалог не открылся — широковещания не будет, приёмник снимаем сами,

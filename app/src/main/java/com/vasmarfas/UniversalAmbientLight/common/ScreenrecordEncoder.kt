@@ -528,7 +528,9 @@ class ScreenrecordEncoder(
         val uvPixStride = uPlane.pixelStride   // 1 for I420, 2 for NV12
 
         // Прореживание: captureQuality задаёт целевую ширину в пикселях
-        val targetW = mOptions.captureQuality.coerceIn(64, w)
+        // TUVIO TD55UFBHH11 (Android 11) отдаёт с декодера кадр шириной 16: нижняя граница
+        // 64 оказывалась выше верхней, и coerceIn ронял поток кодека
+        val targetW = mOptions.captureQuality.coerceIn(minOf(64, w), w)
         val step = max(1, w / targetW)
         val sw = (w / step).coerceAtLeast(1)
         val sh = (h / step).coerceAtLeast(1)

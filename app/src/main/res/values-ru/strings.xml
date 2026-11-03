@@ -81,6 +81,7 @@
   <string name="usb_no_serial_devices">USB-устройства не найдены. Подключите устройство через USB OTG</string>
   <string name="usb_permission_denied_toast">В доступе к USB-устройству отказано. Разрешите доступ к USB.</string>
   <string name="usb_permission_prompt">Подтвердите доступ к USB-устройству</string>
+  <string name="usb_permission_no_dialog">Система не показала запрос доступа к USB, без него приложение не может открыть контроллер. Это ограничение прошивки: вместо USB подключите сетевой контроллер, например WLED</string>
   <string name="pref_title_priority">Приоритет</string>
   <string name="pref_title_reconnect">Переподключение</string>
   <string name="pref_title_reconnect_delay">Задержка переподключения</string>
