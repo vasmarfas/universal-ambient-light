@@ -5,6 +5,7 @@ import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
 import com.vasmarfas.UniversalAmbientLight.ui.effects.titleRes
@@ -12,25 +13,44 @@ import com.vasmarfas.UniversalAmbientLight.ui.effects.titleRes
 /** Куда уходит свет: «WLED · 192.168.1.50:19446». */
 internal fun describeTarget(context: Context, prefs: Preferences): String {
     val type = OutputType.of(prefs.getString(R.string.pref_key_connection_type))
-    val label = context.getString(type.titleRes())
+    return "${context.getString(type.titleRes())} · ${describeAddress(context, prefs)}"
+}
+
+/** Вторая часть [describeTarget]: адрес, а у ламп и USB то, что его заменяет. */
+internal fun describeAddress(context: Context, prefs: Preferences): String {
+    val type = OutputType.of(prefs.getString(R.string.pref_key_connection_type))
     val host = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
     val lampsKey = type.lampsKey
     return when {
-        type == OutputType.ADALIGHT -> "$label · USB"
+        type == OutputType.ADALIGHT -> "USB"
         lampsKey != null && !type.needsHost -> {
             val lamps = HomeAssistantLamp.parseList(prefs.getString(lampsKey, "")).size
-            "$label · ${context.getString(R.string.devices_lamps_count, lamps)}"
+            context.getString(R.string.devices_lamps_count, lamps)
         }
 
         type == OutputType.HUE && !prefs.getString(R.string.pref_key_hue_area).isNullOrBlank() ->
-            "$label · ${prefs.getString(R.string.pref_key_hue_area_name).orEmpty().ifBlank { host }}"
+            prefs.getString(R.string.pref_key_hue_area_name).orEmpty().ifBlank { host }
 
-        host.isEmpty() && type == OutputType.E131 -> "$label · ${context.getString(R.string.home_target_multicast)}"
-        host.isEmpty() -> "$label · ${context.getString(R.string.home_target_no_host)}"
-        type.defaultPort == 0 || type == OutputType.HOME_ASSISTANT -> "$label · $host"
-        else -> "$label · $host:${prefs.getInt(R.string.pref_key_port)}"
+        host.isEmpty() && type == OutputType.E131 -> context.getString(R.string.home_target_multicast)
+        host.isEmpty() -> context.getString(R.string.home_target_no_host)
+        type.defaultPort == 0 || type == OutputType.HOME_ASSISTANT -> host
+        else -> "$host:${prefs.getInt(R.string.pref_key_port)}"
     }
 }
+
+/** То же для главного экрана: основной контроллер и сколько включено рядом с ним. */
+internal fun describeTargets(context: Context, prefs: Preferences): String {
+    val main = describeTarget(context, prefs)
+    val extra = ExtraOutputs.ids(prefs).count {
+        prefs.forOutput(it).getBoolean(R.string.pref_key_output_enabled)
+    }
+    return if (extra == 0) main else context.getString(R.string.home_target_with_extra, main, extra)
+}
+
+/** Как подписать дополнительный контроллер: своё имя, а без него - адрес. */
+internal fun describeOutput(context: Context, prefs: Preferences): String =
+    prefs.getString(R.string.pref_key_output_name)?.trim().orEmpty()
+        .ifEmpty { describeTarget(context, prefs) }
 
 /**
  * Чего не хватает, чтобы подсветке было куда светить; null - контроллер настроен.

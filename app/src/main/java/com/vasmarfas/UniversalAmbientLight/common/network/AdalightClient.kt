@@ -5,6 +5,7 @@ import android.hardware.usb.UsbManager
 import android.util.Log
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.vasmarfas.UniversalAmbientLight.common.util.LedDataExtractor
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbSerialProberFactory
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -14,6 +15,7 @@ import kotlin.math.max
 
 class AdalightClient(
     private val mContext: Context,
+    private val mPrefs: Preferences,
     private val mPriority: Int,
     baudRate: Int,
     protocol: String = "ada",
@@ -60,7 +62,7 @@ class AdalightClient(
     private val mSmoothing: ColorSmoothing
     private var mLedDataBuffer: Array<ColorRgb>? = null
 
-    private val mLayoutTest = LedLayoutTestController(mContext) { leds -> sendLedData(leds) }
+    private val mLayoutTest = LedLayoutTestController(mPrefs) { leds -> sendLedData(leds) }
 
     override fun setLayoutTestEnabled(enabled: Boolean) {
         if (enabled) mSmoothing.stop()
@@ -287,7 +289,7 @@ class AdalightClient(
         mSmoothing.stop()
         mKeepAlive.shutdownNow()
         if (mConnected) {
-            val ledCount = maxOf(LedDataExtractor.getLedCount(mContext), mLastLeds?.size ?: 0)
+            val ledCount = maxOf(LedDataExtractor.getLedCount(mPrefs), mLastLeds?.size ?: 0)
             sendLedData(Array(ledCount) { ColorRgb(0, 0, 0) })
         }
         mConnected = false
@@ -303,7 +305,7 @@ class AdalightClient(
     override fun clear(priority: Int) {
         if (mLayoutTest.enabled) return
         // Отправляем все светодиоды чёрными
-        val ledCount = LedDataExtractor.getLedCount(mContext)
+        val ledCount = LedDataExtractor.getLedCount(mPrefs)
         val blackLeds = Array(ledCount) { ColorRgb(0, 0, 0) }
         mSmoothing.setTargetColors(blackLeds)
     }
@@ -322,7 +324,7 @@ class AdalightClient(
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
         if (mLayoutTest.enabled) return
         // Число светодиодов берём из настроек
-        val ledCount = LedDataExtractor.getLedCount(mContext)
+        val ledCount = LedDataExtractor.getLedCount(mPrefs)
 
         val r = (color shr 16) and 0xFF
         val g = (color shr 8) and 0xFF
@@ -351,7 +353,7 @@ class AdalightClient(
 
         if (mLayoutTest.enabled) return
 
-        val leds = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
+        val leds = LedDataExtractor.extractLEDData(mPrefs, data, width, height, mLedDataBuffer)
         mLedDataBuffer = leds
         if (leds.isEmpty()) return
 

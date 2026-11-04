@@ -25,14 +25,14 @@ import androidx.core.app.ServiceCompat
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.ConnectionConfig
-import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
+import com.vasmarfas.UniversalAmbientLight.common.network.OutputFanOut
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
-import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.AppOptions
 import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.common.util.LocalNetworkAccess
@@ -42,34 +42,6 @@ import java.util.Objects
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-
-/**
- * Отдаёт кадры сразу двум приёмникам — основному подключению и дополнительному выводу на
- * Home Assistant. Энкодер знает только про один listener, поэтому композиция подменяет его.
- */
-private class DualHyperionThreadListener(
-    private val mPrimary: HyperionThread.HyperionThreadListener,
-    private val mSecondary: HyperionThread.HyperionThreadListener?,
-) : HyperionThread.HyperionThreadListener {
-    override fun sendFrame(data: ByteArray, width: Int, height: Int) {
-        mPrimary.sendFrame(data, width, height)
-        mSecondary?.sendFrame(data, width, height)
-    }
-
-    override fun clear() {
-        mPrimary.clear()
-        mSecondary?.clear()
-    }
-
-    override fun disconnect() {
-        mPrimary.disconnect()
-        mSecondary?.disconnect()
-    }
-
-    override fun sendStatus(isGrabbing: Boolean) {
-        mPrimary.sendStatus(isGrabbing)
-    }
-}
 
 class ScreenGrabberService : Service() {
 
@@ -84,11 +56,13 @@ class ScreenGrabberService : Service() {
     private var mMediaProjectionManager: MediaProjectionManager? = null
     private var mHyperionThread: HyperionThread? = null
     @Volatile private var mLayoutTestEnabled = false
-    private var mLayoutTestOutputOnly = false
+    @Volatile private var mLayoutTestOutputOnly = false
 
-    // Дополнительный вывод на Home Assistant — работает параллельно с основным
-    // подключением (например, основной вывод на WLED, а сбоку ещё лампы HA)
-    private var mSecondaryHyperionThread: HyperionThread? = null
+    // Какой контроллер проверяется; у дополнительного свой поток и свой экран раскладки
+    @Volatile private var mLayoutTestOutput = ExtraOutputs.MAIN
+
+    // Контроллеры, работающие вместе с основным. Трогаем только с главного потока
+    private val mExtraOutputs = LinkedHashMap<Int, ExtraOutput>()
     private var mFrameRate: Int = 0
     private var mCaptureQuality: Int = 0
     private var mHorizontalLEDCount: Int = 0
@@ -124,6 +98,7 @@ class ScreenGrabberService : Service() {
     private var mPendingOutputRestart = false
     private var mPendingCaptureRestart = false
     private var mPendingSessionRestart = false
+    private var mPendingExtraSync = false
     private val mApplySettings = Runnable { applyPendingSettings() }
 
     // Задержка по приложениям: раз в несколько секунд смотрим, что на экране. Статистика
@@ -146,6 +121,13 @@ class ScreenGrabberService : Service() {
         sSleepAt = 0L
         CaptureLauncher.stop(this)
     }
+
+    private class ExtraOutput(val thread: HyperionThread, val config: ConnectionConfig)
+
+    /** Проверка раскладки идёт на потоке основного вывода, а не дополнительного контроллера. */
+    private val layoutTestOnPrimary: Boolean
+        get() = mLayoutTestEnabled &&
+                (mLayoutTestOutputOnly || mLayoutTestOutput == ExtraOutputs.MAIN)
 
     /**
      * Выход одного энкодера. После отцепления (перезапуск захвата с новыми настройками)
@@ -188,7 +170,7 @@ class ScreenGrabberService : Service() {
             if (DEBUG) Log.d(TAG, "Connected to Hyperion server")
             mHasConnected = true
             mEverConnected = true
-            if (mLayoutTestEnabled) sLayoutTestConnected = true
+            if (layoutTestOnPrimary) sLayoutTestConnected = true
             val prefs = Preferences(baseContext)
             val host = prefs.getString(R.string.pref_key_host, null)
             AnalyticsHelper.logConnectionSuccess(baseContext, mConnectionType, host)
@@ -207,7 +189,7 @@ class ScreenGrabberService : Service() {
         }
 
         override fun onConnectionError(errorID: Int, error: String?) {
-            if (mLayoutTestEnabled) sLayoutTestConnected = false
+            if (layoutTestOnPrimary) sLayoutTestConnected = false
             Log.e(TAG, "Connection error: " + (error ?: "unknown"))
             AnalyticsHelper.logConnectionError(baseContext, mConnectionType, error)
             if (mEverConnected && mReconnectEnabled) {
@@ -262,17 +244,21 @@ class ScreenGrabberService : Service() {
     }
 
     /**
-     * Дополнительное подключение — необязательная надстройка над основным выводом, поэтому
+     * Дополнительный контроллер — необязательная надстройка над основным выводом, поэтому
      * его сбои не должны валить сервис и основной канал: только лог, без mStartError и
      * haltStartup(). HyperionThread сам продолжит переподключаться на общих основаниях.
      */
-    private val mSecondaryReceiver = object : HyperionThreadBroadcaster {
+    private inner class ExtraOutputReceiver(private val mId: Int) : HyperionThreadBroadcaster {
         override fun onConnected() {
-            if (DEBUG) Log.d(TAG, "Connected to the additional Home Assistant output")
+            if (DEBUG) Log.d(TAG, "Connected to additional controller $mId")
+            if (mLayoutTestEnabled && mLayoutTestOutput == mId) {
+                sLayoutTestConnected = true
+                notifyActivity()
+            }
         }
 
         override fun onConnectionError(errorID: Int, error: String?) {
-            Log.w(TAG, "Additional Home Assistant output error: " + (error ?: "unknown"))
+            Log.w(TAG, "Additional controller $mId error: " + (error ?: "unknown"))
         }
 
         override fun onReceiveStatus(isCapturing: Boolean) {}
@@ -288,11 +274,11 @@ class ScreenGrabberService : Service() {
 
                     // Возобновляем вывод, если он был приглушён на время простоя
                     mStandby?.cancelPause()
-                    mHyperionThread?.resumeSending()
-                    mSecondaryHyperionThread?.resumeSending()
-
-                    // Снимаем блокировку отправки WLED после ошибки EPERM, чтобы продолжить при пробуждении
-                    mHyperionThread?.resetBlockedIfWLED()
+                    forEachOutput {
+                        it.resumeSending()
+                        // Снимаем блокировку отправки WLED после ошибки EPERM, чтобы продолжить при пробуждении
+                        it.resetBlockedIfWLED()
+                    }
 
                     if (!isCapturing) {
                         val backend = mActiveBackend
@@ -366,8 +352,7 @@ class ScreenGrabberService : Service() {
         mHandler = handler
         mStandby = StandbyController(this, handler) {
             if (DEBUG) Log.v(TAG, "Standby: pausing all LED output")
-            mHyperionThread?.pauseSending()
-            mSecondaryHyperionThread?.pauseSending()
+            forEachOutput { it.pauseSending() }
         }
 
         // На запуске пробуем shell-обход для устройств TCL
@@ -383,195 +368,148 @@ class ScreenGrabberService : Service() {
 
     private fun prepared(outputOnly: Boolean = false): Boolean {
         AnalyticsHelper.syncCrashlyticsContext(baseContext)
-        val prefs = Preferences(baseContext)
+        val shared = Preferences(baseContext)
+        // Адресная проверка без захвата открывает только проверяемый контроллер, и на это
+        // время он занимает место основного вывода
+        val prefs = if (outputOnly) shared.forOutput(mLayoutTestOutput) else shared
         mConnectionType =
             prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
 
         // Для адресного теста видеозахват не нужен, но выбранный контроллер,
         // локальная сеть и раскладка должны быть настроены так же, как при обычном выводе.
-        validateSettings(baseContext)?.let { error ->
+        validateOutput(baseContext, prefs)?.let { error ->
             mStartError = error.message
             AnalyticsHelper.logServiceError(baseContext, error.code, error.details)
             return false
         }
 
-        val host = prefs.getString(R.string.pref_key_host, null)?.trim()
-        val port = prefs.getInt(R.string.pref_key_port, -1)
-        val priority =
-            prefs.getString(R.string.pref_key_priority, "100")?.takeIf { it.isNotBlank() } ?: "100"
-        mFrameRate = prefs.getInt(R.string.pref_key_framerate)
+        mFrameRate = shared.getInt(R.string.pref_key_framerate)
 
         try {
-            val captureQualityStr = prefs.getString(R.string.pref_key_capture_quality, "128")
+            val captureQualityStr = shared.getString(R.string.pref_key_capture_quality, "128")
                 ?.takeIf { it.isNotBlank() } ?: "128"
             mCaptureQuality = Integer.parseInt(captureQualityStr)
         } catch (e: NumberFormatException) {
             mCaptureQuality = 128
         }
 
-        mHorizontalLEDCount = prefs.getInt(R.string.pref_key_x_led)
-        mVerticalLEDCount = prefs.getInt(R.string.pref_key_y_led)
-        mSendAverageColor = prefs.getBoolean(R.string.pref_key_use_avg_color)
-        mReconnectEnabled = prefs.getBoolean(R.string.pref_key_reconnect)
-        val delay = prefs.getInt(R.string.pref_key_reconnect_delay)
-        val baudRate = prefs.getInt(R.string.pref_key_adalight_baudrate)
-        val wledColorOrder = prefs.getString(R.string.pref_key_wled_color_order, "rgb")
-
-        val wledProtocol = prefs.getString(R.string.pref_key_wled_protocol, "ddp") ?: "ddp"
-        val wledRgbw = prefs.getBoolean(R.string.pref_key_wled_rgbw, false)
-        val wledBrightness = prefs.getInt(R.string.pref_key_wled_brightness, 255)
-
-        val adalightProtocol = prefs.getString(R.string.pref_key_adalight_protocol, "ada") ?: "ada"
-
-        val smoothingEnabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
-        val smoothingPreset = prefs.getString(R.string.pref_key_smoothing_preset, "off") ?: "off"
-        val settlingTime = prefs.getInt(R.string.pref_key_settling_time, 50)
-        val outputDelayMs = effectiveOutputDelay(prefs)
-        val updateFrequency = prefs.getInt(R.string.pref_key_update_frequency, 60)
-
-        val haToken = prefs.getString(R.string.pref_key_ha_token, "") ?: ""
-        val haLamps = prefs.getString(R.string.pref_key_ha_lamps, "") ?: ""
-        val haUpdateIntervalMs = prefs.getInt(R.string.pref_key_ha_update_interval, 500)
-            .coerceAtLeast(100).toLong()
-        val haChangeThreshold = prefs.getInt(R.string.pref_key_ha_change_threshold, 10)
-            .coerceIn(0, 255)
-        val haTransitionMs = prefs.getInt(R.string.pref_key_ha_transition, 300)
-            .coerceIn(0, 10_000)
-        val haBrightnessMode = prefs.getString(
-            R.string.pref_key_ha_brightness_mode,
-            HomeAssistantClient.BRIGHTNESS_MODE_SCREEN
-        ) ?: HomeAssistantClient.BRIGHTNESS_MODE_SCREEN
-        val haBrightnessMax = prefs.getInt(R.string.pref_key_ha_brightness, 255).coerceIn(1, 255)
-        val haDarkOffEnabled = prefs.getBoolean(R.string.pref_key_ha_dark_off, true)
-        val haDarkThreshold = prefs.getInt(R.string.pref_key_ha_dark_threshold, 10)
-            .coerceIn(1, 255)
-        val haTurnOffLights = prefs.getBoolean(R.string.pref_key_ha_turn_off_lights, true)
-
-        val ha2Enabled = prefs.getBoolean(R.string.pref_key_ha2_enabled, false)
-        val ha2Host = prefs.getString(R.string.pref_key_ha2_host, "")?.trim() ?: ""
-        val ha2Port = prefs.getInt(R.string.pref_key_ha2_port, 8123)
-        val ha2Token = prefs.getString(R.string.pref_key_ha2_token, "") ?: ""
-        val ha2Lamps = prefs.getString(R.string.pref_key_ha2_lamps, "") ?: ""
-        val ha2UpdateIntervalMs = prefs.getInt(R.string.pref_key_ha2_update_interval, 500)
-            .coerceAtLeast(100).toLong()
-        val ha2ChangeThreshold = prefs.getInt(R.string.pref_key_ha2_change_threshold, 10)
-            .coerceIn(0, 255)
-        val ha2TransitionMs = prefs.getInt(R.string.pref_key_ha2_transition, 300)
-            .coerceIn(0, 10_000)
-        val ha2BrightnessMode = prefs.getString(
-            R.string.pref_key_ha2_brightness_mode,
-            HomeAssistantClient.BRIGHTNESS_MODE_SCREEN
-        ) ?: HomeAssistantClient.BRIGHTNESS_MODE_SCREEN
-        val ha2BrightnessMax = prefs.getInt(R.string.pref_key_ha2_brightness, 255).coerceIn(1, 255)
-        val ha2DarkOffEnabled = prefs.getBoolean(R.string.pref_key_ha2_dark_off, true)
-        val ha2DarkThreshold = prefs.getInt(R.string.pref_key_ha2_dark_threshold, 10)
-            .coerceIn(1, 255)
-        val ha2TurnOffLights = prefs.getBoolean(R.string.pref_key_ha2_turn_off_lights, true)
+        mHorizontalLEDCount = shared.getInt(R.string.pref_key_x_led)
+        mVerticalLEDCount = shared.getInt(R.string.pref_key_y_led)
+        mSendAverageColor = shared.getBoolean(R.string.pref_key_use_avg_color)
 
         mMediaProjectionManager =
             getSystemService(MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
-        val method = prefs.getString(R.string.pref_key_capture_method, "media_projection")
+        val method = shared.getString(R.string.pref_key_capture_method, "media_projection")
         if (!outputOnly && mMediaProjectionManager == null && method == "media_projection") {
             mStartError = resources.getString(R.string.error_media_projection_denied)
             AnalyticsHelper.logServiceError(baseContext, "media_projection_manager_null", null)
             return false
         }
-        // Безопасный парсинг приоритета (на случай пустой или некорректной строки)
-        val priorityValue = try {
-            priority.toInt()
-        } catch (e: NumberFormatException) {
-            100
-        }
 
-        val outputType = OutputType.of(mConnectionType)
-        // Выбор E1.31 в списке контроллеров не сохраняет пустой адрес, если старый тоже был
-        // пустым: отсутствующий ключ значит то же, что пустое поле, то есть мультикаст
-        val finalHost = host ?: if (outputType == OutputType.E131) "" else "localhost"
-        val finalPort = if (port > 0) port else when (outputType) {
-            OutputType.WLED -> if (wledProtocol == "ddp") OutputType.DDP.defaultPort
-                else outputType.defaultPort
-            else -> outputType.defaultPort.takeIf { it > 0 } ?: OutputType.HYPERION.defaultPort
-        }
-
-        val config = ConnectionConfig(
-            host = finalHost,
-            port = finalPort,
-            priority = priorityValue,
-            reconnect = mReconnectEnabled,
-            reconnectDelaySeconds = delay,
-            connectionType = mConnectionType,
-            baudRate = baudRate,
-            wledColorOrder = wledColorOrder ?: "rgb",
-            wledProtocol = wledProtocol,
-            wledRgbw = wledRgbw,
-            wledBrightness = wledBrightness,
-            adalightProtocol = adalightProtocol,
-            smoothingEnabled = smoothingEnabled,
-            smoothingPreset = smoothingPreset,
-            settlingTime = settlingTime,
-            outputDelayMs = outputDelayMs,
-            updateFrequency = updateFrequency,
-            haToken = haToken,
-            haLamps = haLamps,
-            haUpdateIntervalMs = haUpdateIntervalMs,
-            haChangeThreshold = haChangeThreshold,
-            haTransitionMs = haTransitionMs,
-            haBrightnessMode = haBrightnessMode,
-            haBrightnessMax = haBrightnessMax,
-            haDarkOffEnabled = haDarkOffEnabled,
-            haDarkThreshold = haDarkThreshold,
-            haTurnOffLights = haTurnOffLights,
-            dmxUniverse = prefs.getInt(R.string.pref_key_dmx_universe),
-            dmxLedsPerUniverse = prefs.getInt(R.string.pref_key_dmx_leds_per_universe),
-            opcChannel = prefs.getInt(R.string.pref_key_opc_channel),
-            lamps = OutputType.of(mConnectionType).lampsKey?.let { prefs.getString(it, "") }.orEmpty(),
-            hueUsername = prefs.getString(R.string.pref_key_hue_username, "").orEmpty(),
-            nanoleafToken = prefs.getString(R.string.pref_key_nanoleaf_token, "").orEmpty(),
-            hueClientKey = prefs.getString(R.string.pref_key_hue_clientkey, "").orEmpty(),
-            hueArea = prefs.getString(R.string.pref_key_hue_area, "").orEmpty(),
-            mqttUsername = prefs.getString(R.string.pref_key_mqtt_username, "").orEmpty(),
-            mqttPassword = prefs.getString(R.string.pref_key_mqtt_password, "").orEmpty(),
-            z2mBaseTopic = prefs.getString(R.string.pref_key_z2m_base_topic, null)?.trim()
-                ?.ifEmpty { null } ?: Zigbee2MqttClient.DEFAULT_BASE_TOPIC
-        )
-        val thread = HyperionThread(mReceiver, baseContext, config)
-        if (mLayoutTestEnabled) thread.setLayoutTestEnabled(true)
+        val config = ConnectionConfig.from(prefs, effectiveOutputDelay(shared))
+        mReconnectEnabled = config.reconnect
+        val thread = HyperionThread(mReceiver, baseContext, config, prefs)
+        if (layoutTestOnPrimary) thread.setLayoutTestEnabled(true)
         if (mCalibrating) thread.setCalibrating(true)
         mHyperionThread = thread
         thread.start()
 
-        // Дополнительные лампы не участвуют в адресной проверке первичного контроллера:
-        // при самостоятельном тесте не открываем второе подключение без видеозахвата.
-        if (!outputOnly && ha2Enabled && ha2Token.isNotBlank() && ha2Host.isNotBlank() &&
-            ha2Port in 1..65535 && HomeAssistantLamp.parseList(ha2Lamps).isNotEmpty()
-        ) {
-            val secondaryConfig = config.copy(
-                host = ha2Host,
-                port = ha2Port,
-                connectionType = "homeassistant",
-                haToken = ha2Token,
-                haLamps = ha2Lamps,
-                haUpdateIntervalMs = ha2UpdateIntervalMs,
-                haChangeThreshold = ha2ChangeThreshold,
-                haTransitionMs = ha2TransitionMs,
-                haBrightnessMode = ha2BrightnessMode,
-                haBrightnessMax = ha2BrightnessMax,
-                haDarkOffEnabled = ha2DarkOffEnabled,
-                haDarkThreshold = ha2DarkThreshold,
-                haTurnOffLights = ha2TurnOffLights
-            )
-            val secondaryThread = HyperionThread(mSecondaryReceiver, baseContext, secondaryConfig)
-            mSecondaryHyperionThread = secondaryThread
-            secondaryThread.start()
-        } else if (!outputOnly && ha2Enabled) {
-            Log.w(TAG, "Additional Home Assistant output enabled but not fully configured, skipping")
-        }
-        mOutput = DualHyperionThreadListener(thread.receiver, mSecondaryHyperionThread?.receiver)
+        publishOutput()
+        // Дополнительные контроллеры не участвуют в проверке основного: при самостоятельном
+        // тесте не открываем лишних подключений без видеозахвата.
+        if (!outputOnly) syncExtraOutputs()
         if (mCaptureSource == "screen") startAppWatch()
 
         mStartError = null
         return true
     }
+
+    private inline fun forEachOutput(action: (HyperionThread) -> Unit) {
+        mHyperionThread?.let(action)
+        mExtraOutputs.values.forEach { action(it.thread) }
+    }
+
+    private fun publishOutput() {
+        mOutput = mHyperionThread?.let { primary ->
+            OutputFanOut(primary.receiver, mExtraOutputs.values.map { it.thread.receiver })
+        }
+    }
+
+    /** Какие контроллеры должны работать сейчас; выключенный поднимается только для проверки. */
+    private fun wantedExtraOutputs(): Map<Int, ConnectionConfig> {
+        val shared = Preferences(baseContext)
+        val delay = effectiveOutputDelay(shared)
+        val wanted = LinkedHashMap<Int, ConnectionConfig>()
+        for (id in ExtraOutputs.ids(shared)) {
+            val prefs = shared.forOutput(id)
+            val testing = mLayoutTestEnabled && mLayoutTestOutput == id
+            if (!testing && !prefs.getBoolean(R.string.pref_key_output_enabled)) continue
+            val error = validateOutput(baseContext, prefs)
+            if (error != null) {
+                Log.w(TAG, "Additional controller $id is not configured: ${error.code}")
+                continue
+            }
+            wanted[id] = ConnectionConfig.from(prefs, delay)
+        }
+        return wanted
+    }
+
+    /**
+     * Приводит работающие контроллеры к настройкам. Поток пересоздаётся, только если изменился
+     * его конфиг: раскладку клиент перечитывает сам, а перезапуск на каждую её правку гасил бы
+     * ленту. Основной вывод при этом не трогаем.
+     */
+    private fun syncExtraOutputs() {
+        val wanted = wantedExtraOutputs()
+        val stale = mExtraOutputs.filter { (id, output) ->
+            // Задержку меняют на ходу, поток из-за неё пересоздавать незачем
+            wanted[id]?.copy(outputDelayMs = output.config.outputDelayMs) != output.config
+        }
+        if (stale.isEmpty()) {
+            startExtraOutputs()
+            return
+        }
+        mExtraOutputs -= stale.keys
+        publishOutput()
+        stale.values.forEach { it.thread.interrupt() }
+        Thread({
+            // Новое подключение только после закрытия старого: сессия у моста Hue одна
+            stale.values.forEach { closeOutput(it.thread) }
+            mHandler?.post { startExtraOutputs() }
+        }, "extra-output-restart").apply { isDaemon = true }.start()
+    }
+
+    private fun startExtraOutputs() {
+        if (mHyperionThread == null || mLayoutTestOutputOnly) return
+        val missing = wantedExtraOutputs().filterKeys { it !in mExtraOutputs }
+        if (missing.isEmpty()) return
+        val shared = Preferences(baseContext)
+        for ((id, config) in missing) {
+            val thread = HyperionThread(ExtraOutputReceiver(id), baseContext, config, shared.forOutput(id))
+            if (mLayoutTestEnabled && mLayoutTestOutput == id) thread.setLayoutTestEnabled(true)
+            if (mCalibrating) thread.setCalibrating(true)
+            mExtraOutputs[id] = ExtraOutput(thread, config)
+            thread.start()
+        }
+        publishOutput()
+    }
+
+    private fun closeOutput(thread: HyperionThread) {
+        try {
+            thread.receiver.disconnect()
+        } catch (e: Exception) {
+            // Закрытие идёт разом для всех контроллеров: сбой одного клиента не должен
+            // оставить остальные гореть
+            Log.w(TAG, "Output shutdown failed: ${e.message}")
+        }
+    }
+
+    private fun layoutTestThread(): HyperionThread? =
+        if (mLayoutTestOutputOnly || mLayoutTestOutput == ExtraOutputs.MAIN) {
+            mHyperionThread
+        } else {
+            mExtraOutputs[mLayoutTestOutput]?.thread
+        }
 
     private fun setSleepTimer(minutes: Int) {
         val handler = mHandler ?: return
@@ -597,16 +535,14 @@ class ScreenGrabberService : Service() {
         mHandler?.removeCallbacks(mEndCalibration)
         mCalibrating = calibrating
         if (!calibrating) mDarkUntil = 0L
-        mHyperionThread?.setCalibrating(calibrating)
-        mSecondaryHyperionThread?.setCalibrating(calibrating)
+        forEachOutput { it.setCalibrating(calibrating) }
         if (calibrating) mHandler?.postDelayed(mEndCalibration, MAX_CALIBRATION_MS)
         Log.i(TAG, if (calibrating) "Delay calibration started" else "Delay calibration finished")
     }
 
     private fun applyOutputDelay() {
         val delay = effectiveOutputDelay(Preferences(this))
-        mHyperionThread?.setOutputDelay(delay)
-        mSecondaryHyperionThread?.setOutputDelay(delay)
+        forEachOutput { it.setOutputDelay(delay) }
     }
 
     /** Следить за приложением на экране есть смысл, только когда заданы задержки по приложениям. */
@@ -793,10 +729,11 @@ class ScreenGrabberService : Service() {
                 ACTION_LAYOUT_TEST -> {
                     val enabled = intent.getBooleanExtra(EXTRA_LAYOUT_TEST_ENABLED, false)
                     if (enabled) {
+                        mLayoutTestOutput = intent.getIntExtra(EXTRA_OUTPUT_ID, ExtraOutputs.MAIN)
                         if (mHyperionThread == null) {
                             // При выключенном захвате открываем только адресный вывод.
                             // Ни MediaProjection, ни VSS, ни новый энкодер не запускаются.
-                            val outputType = Preferences(this).getString(
+                            val outputType = Preferences(this).forOutput(mLayoutTestOutput).getString(
                                 R.string.pref_key_connection_type, "hyperion"
                             )
                             if (!OutputType.of(outputType).supportsLedLayoutTest) {
@@ -815,14 +752,18 @@ class ScreenGrabberService : Service() {
                             }
                         } else {
                             mLayoutTestEnabled = true
-                            sLayoutTestConnected = mHyperionThread?.isOutputConnected() == true
-                            mHyperionThread?.setLayoutTestEnabled(true)
+                            val thread = layoutTestThread()
+                            sLayoutTestConnected = thread?.isOutputConnected() == true
+                            // Потока нет у выключенного контроллера: поднимается на время проверки
+                            if (thread != null) thread.setLayoutTestEnabled(true) else syncExtraOutputs()
                             notifyActivity()
                         }
                     } else {
                         mLayoutTestEnabled = false
                         sLayoutTestConnected = false
-                        mHyperionThread?.setLayoutTestEnabled(false)
+                        layoutTestThread()?.setLayoutTestEnabled(false)
+                        val testedExtra = !mLayoutTestOutputOnly && mLayoutTestOutput != ExtraOutputs.MAIN
+                        mLayoutTestOutput = ExtraOutputs.MAIN
                         if (mLayoutTestOutputOnly) {
                             // Тест был единственной причиной работы сервиса:
                             // гасим ленту и освобождаем соединение при закрытии страницы.
@@ -831,6 +772,8 @@ class ScreenGrabberService : Service() {
                             stopSelf()
                         } else if (mHyperionThread == null) {
                             stopSelf()
+                        } else if (testedExtra) {
+                            syncExtraOutputs()
                         }
                     }
                 }
@@ -1142,32 +1085,20 @@ class ScreenGrabberService : Service() {
      * а не перезапускают.
      */
     private fun shutDownHyperionThread(fadeOut: Boolean = false) {
-        val thread = mHyperionThread
-        val secondary = mSecondaryHyperionThread
+        val threads = listOfNotNull(mHyperionThread) + mExtraOutputs.values.map { it.thread }
         mHyperionThread = null
-        mSecondaryHyperionThread = null
+        mExtraOutputs.clear()
         mOutput = null
-        if (thread == null && secondary == null) return
-        thread?.interrupt()
-        secondary?.interrupt()
+        if (threads.isEmpty()) return
+        threads.forEach { it.interrupt() }
         Thread({
             if (fadeOut) {
                 repeat(FADE_OUT_FRAMES) {
                     SystemClock.sleep(FADE_OUT_STEP_MS)
-                    thread?.receiver?.clear()
-                    secondary?.receiver?.clear()
+                    threads.forEach { it.receiver.clear() }
                 }
             }
-            try {
-                thread?.receiver?.disconnect()
-            } catch (e: Exception) {
-                Log.w(TAG, "HyperionThread shutdown failed: ${e.message}")
-            }
-            try {
-                secondary?.receiver?.disconnect()
-            } catch (e: Exception) {
-                Log.w(TAG, "Additional Home Assistant output shutdown failed: ${e.message}")
-            }
+            threads.forEach { closeOutput(it) }
         }, "hyperion-shutdown").apply { isDaemon = true }.start()
     }
 
@@ -1424,8 +1355,10 @@ class ScreenGrabberService : Service() {
             options,
             useRoot,
             onFatalError = { errorMsg ->
-                mStartError = errorMsg
-                haltStartup()
+                mHandler?.post {
+                    mStartError = errorMsg
+                    haltStartup()
+                }
             }
         )
         mActiveBackend = encoder
@@ -1526,6 +1459,7 @@ class ScreenGrabberService : Service() {
         sLayoutTestConnected = false
         mLayoutTestEnabled = false
         mLayoutTestOutputOnly = false
+        mLayoutTestOutput = ExtraOutputs.MAIN
         stopAppWatch()
         mNotificationManager?.cancel(NOTIFICATION_ID)
 
@@ -1666,6 +1600,7 @@ class ScreenGrabberService : Service() {
             getString(R.string.pref_key_capture_method)
         )
         val effectKeys = EFFECT_KEYS.map { getString(it) }.toSet()
+        val keyExtraOutputs = getString(R.string.pref_key_extra_outputs)
         val keyOutputDelay = getString(R.string.pref_key_output_delay)
         val keyDelayProfiles = getString(R.string.pref_key_delay_profiles)
         val listener =
@@ -1695,12 +1630,17 @@ class ScreenGrabberService : Service() {
                 val output = key in outputKeys
                 val capture = key in captureKeys
                 val session = key in sessionKeys
-                if (output || capture || session) {
+                val extra = ExtraOutputs.isOutputKey(key)
+                if (output || capture || session || extra) {
                     mPendingOutputRestart = mPendingOutputRestart || output
                     mPendingCaptureRestart = mPendingCaptureRestart || capture
                     mPendingSessionRestart = mPendingSessionRestart || session
+                    mPendingExtraSync = mPendingExtraSync || extra
                     mHandler?.removeCallbacks(mApplySettings)
-                    mHandler?.postDelayed(mApplySettings, APPLY_SETTINGS_DELAY_MS)
+                    // Удалённый контроллер ждать незачем: его ключи стёрты, и за паузу клиент
+                    // успел бы послать кадры по раскладке из умолчаний
+                    val delay = if (key == keyExtraOutputs) 0L else APPLY_SETTINGS_DELAY_MS
+                    mHandler?.postDelayed(mApplySettings, delay)
                 }
             }
         sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
@@ -1712,9 +1652,11 @@ class ScreenGrabberService : Service() {
         val session = mPendingSessionRestart
         val capture = mPendingCaptureRestart
         val output = mPendingOutputRestart
+        val extra = mPendingExtraSync
         mPendingSessionRestart = false
         mPendingCaptureRestart = false
         mPendingOutputRestart = false
+        mPendingExtraSync = false
         if (mActiveBackend == null || mHyperionThread == null) return
 
         when {
@@ -1728,6 +1670,8 @@ class ScreenGrabberService : Service() {
 
             output -> restartOutput()
         }
+        // Перезапуск сессии и вывода сами приводят контроллеры к настройкам
+        if (extra && !session && !output) syncExtraOutputs()
     }
 
     /**
@@ -1745,28 +1689,16 @@ class ScreenGrabberService : Service() {
     /** Пересоздаёт потоки вывода под работающим энкодером. */
     private fun restartOutput() {
         val oldPrimary = mHyperionThread ?: return
-        val oldSecondary = mSecondaryHyperionThread
         Log.i(TAG, "Connection settings changed, restarting the output")
         mStartInProgress = true
         mHasConnected = false
         notifyActivity()
         mOutput = null
         mHyperionThread = null
-        mSecondaryHyperionThread = null
         oldPrimary.interrupt()
-        oldSecondary?.interrupt()
         Thread({
             // Старый вывод закрываем до нового: Adalight заново открывает тот же USB-порт
-            try {
-                oldPrimary.receiver.disconnect()
-            } catch (e: Exception) {
-                Log.w(TAG, "Old output shutdown failed: ${e.message}")
-            }
-            try {
-                oldSecondary?.receiver?.disconnect()
-            } catch (e: Exception) {
-                Log.w(TAG, "Old additional output shutdown failed: ${e.message}")
-            }
+            closeOutput(oldPrimary)
             mHandler?.post {
                 // Пока закрывался старый вывод, подсветку могли выключить
                 if ((mActiveBackend == null && !mLayoutTestOutputOnly) ||
@@ -1867,6 +1799,7 @@ class ScreenGrabberService : Service() {
         const val ACTION_CLEAR = BASE + "ACTION_CLEAR"
         const val ACTION_LAYOUT_TEST = BASE + "ACTION_LAYOUT_TEST"
         const val EXTRA_LAYOUT_TEST_ENABLED = BASE + "EXTRA_LAYOUT_TEST_ENABLED"
+        const val EXTRA_OUTPUT_ID = BASE + "EXTRA_OUTPUT_ID"
         const val ACTION_DETECT_FRAME = BASE + "ACTION_DETECT_FRAME"
         const val ACTION_SLEEP_TIMER = BASE + "ACTION_SLEEP_TIMER"
         const val EXTRA_SLEEP_MINUTES = BASE + "EXTRA_SLEEP_MINUTES"
@@ -1918,19 +1851,6 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_ha_dark_off,
             R.string.pref_key_ha_dark_threshold,
             R.string.pref_key_ha_turn_off_lights,
-            R.string.pref_key_ha2_enabled,
-            R.string.pref_key_ha2_host,
-            R.string.pref_key_ha2_port,
-            R.string.pref_key_ha2_token,
-            R.string.pref_key_ha2_lamps,
-            R.string.pref_key_ha2_update_interval,
-            R.string.pref_key_ha2_change_threshold,
-            R.string.pref_key_ha2_transition,
-            R.string.pref_key_ha2_brightness_mode,
-            R.string.pref_key_ha2_brightness,
-            R.string.pref_key_ha2_dark_off,
-            R.string.pref_key_ha2_dark_threshold,
-            R.string.pref_key_ha2_turn_off_lights,
             R.string.pref_key_dmx_universe,
             R.string.pref_key_dmx_leds_per_universe,
             R.string.pref_key_opc_channel,
@@ -1986,8 +1906,11 @@ class ScreenGrabberService : Service() {
          * когда настройки пригодны.
          */
         @JvmStatic
-        fun validateSettings(context: Context): SettingsError? {
-            val prefs = Preferences(context)
+        fun validateSettings(context: Context): SettingsError? =
+            validateOutput(context, Preferences(context))
+
+        /** Та же проверка для любого контроллера: [prefs] - его настройки. */
+        private fun validateOutput(context: Context, prefs: Preferences): SettingsError? {
             val connectionType =
                 prefs.getString(R.string.pref_key_connection_type, "hyperion") ?: "hyperion"
             val type = OutputType.of(connectionType)

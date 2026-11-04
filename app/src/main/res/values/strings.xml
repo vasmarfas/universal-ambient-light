@@ -36,13 +36,13 @@
   <string name="led_layout_bottom_gap_label">Bottom gap (for soundbar)</string>
   <string name="led_layout_capture_margin_label">Capture margin (%)</string>
   <string name="led_layout_capture_margin_top_label">Top capture margin (%)</string>
-  <string name="led_layout_capture_margin_top_help">0–40%. Top edge offset from screen.</string>
+  <string name="led_layout_capture_margin_top_help">0–90%. Top edge offset from screen.</string>
   <string name="led_layout_capture_margin_right_label">Right capture margin (%)</string>
-  <string name="led_layout_capture_margin_right_help">0–40%. Right edge offset from screen.</string>
+  <string name="led_layout_capture_margin_right_help">0–90%. Right edge offset from screen.</string>
   <string name="led_layout_capture_margin_bottom_label">Bottom capture margin (%)</string>
-  <string name="led_layout_capture_margin_bottom_help">0–40%. Bottom edge offset from screen.</string>
+  <string name="led_layout_capture_margin_bottom_help">0–90%. Bottom edge offset from screen.</string>
   <string name="led_layout_capture_margin_left_label">Left capture margin (%)</string>
-  <string name="led_layout_capture_margin_left_help">0–40%. Left edge offset from screen.</string>
+  <string name="led_layout_capture_margin_left_help">0–90%. Left edge offset from screen.</string>
     <string name="led_layout_offset_label">LED offset (steps along perimeter)</string>
     <string name="led_layout_offset_help">Positive – along layout direction, negative – opposite.</string>
     <string name="led_layout_scan_depth_label">Scan Depth (%)</string>
@@ -450,9 +450,6 @@
   <string name="error_ha_no_lamps">No Home Assistant lights are assigned to zones. Open Settings → Connection → Lights and zones</string>
 
   <!-- Second, additional Home Assistant output -->
-  <string name="pref_group_ha_secondary">Additional Home Assistant output</string>
-  <string name="pref_title_ha2_enabled">Also drive Home Assistant lights</string>
-  <string name="pref_summary_ha2_enabled">Runs alongside the main connection above — e.g. main output on WLED, plus side lamps on Home Assistant</string>
 
   <!-- Adalight advanced settings -->
   <string name="pref_title_adalight_protocol">Adalight Protocol</string>
@@ -779,6 +776,19 @@
   <string name="output_hyperion_summary">The picture goes to a Hyperion or HyperHDR server that drives the LEDs</string>
 
   <!-- Controller settings -->
+  <string name="extra_outputs_title">Additional controllers</string>
+  <string name="extra_outputs_summary_empty">A second strip, side bars or lamps next to the main controller</string>
+  <string name="extra_outputs_summary_count">Added: %1$d</string>
+  <string name="extra_outputs_hint">They run together with the main controller and show the same picture. Each one has its own address and LED layout: the layout sets which sides it covers, and capture margins narrow it down to a part of the screen.</string>
+  <string name="extra_outputs_add">Add controller</string>
+  <string name="extra_output_title">Additional controller</string>
+  <string name="extra_output_off">off</string>
+  <string name="extra_output_delete">Delete controller</string>
+  <string name="extra_output_delete_confirm">Its address and LED layout will be lost.</string>
+  <string name="pref_title_output_enabled">Enabled</string>
+  <string name="pref_title_output_name">Name</string>
+  <string name="pref_summary_output_name_empty">Not set</string>
+  <string name="home_target_with_extra" translatable="false">%1$s + %2$d</string>
   <string name="controller_change">Change</string>
   <string name="controller_no_address">address not set</string>
   <string name="pref_title_color_order">Color order</string>

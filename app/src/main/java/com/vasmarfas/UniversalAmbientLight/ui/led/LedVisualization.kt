@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.R
 
 /**
@@ -139,10 +140,10 @@ fun LedVisualization(
                 }
 
                 // Область захвата со своими отступами по каждой стороне — внутренний прямоугольник
-                val marginTop = captureMarginTop.coerceIn(0, 40)
-                val marginRight = captureMarginRight.coerceIn(0, 40)
-                val marginBottom = captureMarginBottom.coerceIn(0, 40)
-                val marginLeft = captureMarginLeft.coerceIn(0, 40)
+                val marginTop = captureMarginTop.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
+                val marginRight = captureMarginRight.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
+                val marginBottom = captureMarginBottom.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
+                val marginLeft = captureMarginLeft.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
                 if (marginTop > 0 || marginRight > 0 || marginBottom > 0 || marginLeft > 0) {
                     val screenWidth = width - screenPadding * 2
                     val screenHeight = height - screenPadding * 2

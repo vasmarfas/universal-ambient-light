@@ -63,6 +63,7 @@ import com.vasmarfas.UniversalAmbientLight.common.network.LedDiscovery
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.network.WLEDClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.components.RequestLocalNetworkAccess
@@ -95,10 +96,18 @@ private val HUE_BRIDGE_KEYS = listOf(
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
+fun DevicePickerScreen(
+    onBackClick: () -> Unit,
+    onLedLayoutClick: () -> Unit,
+    outputId: Int = ExtraOutputs.MAIN,
+) {
     val context = LocalContext.current
     val remote = LocalRemote.current
-    val prefs = rememberSettingsPreferences()
+    val prefs = rememberSettingsPreferences(outputId)
+    val extra = outputId != ExtraOutputs.MAIN
+    val busyHosts = remember(prefs) {
+        if (extra) ExtraOutputs.busyHosts(prefs.forOutput(ExtraOutputs.MAIN), outputId) else emptySet()
+    }
     var current by remember(prefs) { mutableStateOf(OutputType.of(prefs.getString(R.string.pref_key_connection_type))) }
     var currentHost by remember(prefs) { mutableStateOf(prefs.getString(R.string.pref_key_host)?.trim().orEmpty()) }
 
@@ -144,6 +153,7 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
 
     fun pick(type: OutputType, host: String?, port: Int) {
         applyController(context, prefs, current, type, host, port)
+        if (!extra) AnalyticsHelper.updateProtocolProperty(context, type.id)
         current = type
         currentHost = prefs.getString(R.string.pref_key_host)?.trim().orEmpty()
         if (host == null || type != OutputType.WLED) {
@@ -214,7 +224,7 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
                 )
             }
 
-            val devices = found.filter { it.type !in SELF_ADDRESSED_LAMPS }
+            val devices = found.filter { it.type !in SELF_ADDRESSED_LAMPS && it.host !in busyHosts }
             val lamps = found.filter { it.type in SELF_ADDRESSED_LAMPS }.groupBy { it.type }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (device in devices) {
@@ -290,13 +300,18 @@ fun DevicePickerScreen(onBackClick: () -> Unit, onLedLayoutClick: () -> Unit) {
 
             GroupTitle(stringResource(R.string.devices_manual))
             for (group in OutputType.Group.entries) {
+                // USB-порт у приложения один, разрешение на него и диалоги завязаны на основной вывод
+                val types = OutputType.entries.filter {
+                    it.group == group && !(extra && it == OutputType.ADALIGHT)
+                }
+                if (types.isEmpty()) continue
                 Text(
                     text = stringResource(group.titleRes()),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (type in OutputType.entries.filter { it.group == group }) {
+                    for (type in types) {
                         DeviceRow(
                             icon = group.icon,
                             title = stringResource(type.titleRes()),
@@ -414,7 +429,6 @@ private fun applyController(
     if (newPort > 0) prefs.putString(R.string.pref_key_port, newPort.toString())
 
     AnalyticsHelper.logProtocolChanged(context, old.id, type.id)
-    AnalyticsHelper.updateProtocolProperty(context, type.id)
     AnalyticsHelper.logSettingChanged(context, "controller_picked", if (host != null) "found:${type.id}" else type.id)
 }
 
@@ -434,7 +448,7 @@ private fun GroupTitle(text: String) {
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
@@ -446,7 +460,7 @@ private fun Hint(text: String) {
 }
 
 @Composable
-private fun DeviceRow(
+internal fun DeviceRow(
     icon: ImageVector,
     title: String,
     subtitle: String,

@@ -1,6 +1,5 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.common.util.LedLayoutTestPattern
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
@@ -10,7 +9,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
  * явно: ряд контроллеров не очищает хвост после сокращения числа LED.
  */
 internal class LedLayoutTestController(
-    private val mContext: Context,
+    private val mPrefs: Preferences,
     private val mSend: (Array<ColorRgb>) -> Unit,
 ) {
     @Volatile
@@ -39,7 +38,7 @@ internal class LedLayoutTestController(
     @Synchronized
     fun refresh() {
         if (!enabled) return
-        val layout = LedLayout.from(Preferences(mContext))
+        val layout = LedLayout.from(mPrefs)
         if (layout == mLayout) return
         val colors = LedLayoutTestPattern.build(layout)
         val count = maxOf(mMaxLedCount, colors.size)

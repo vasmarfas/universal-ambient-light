@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -17,6 +18,8 @@ class HyperionThread(
     private val mCallback: ScreenGrabberService.HyperionThreadBroadcaster,
     private val mContext: Context,
     config: ConnectionConfig,
+    /** Настройки этого контроллера: клиент читает из них раскладку прямо на ходу. */
+    private val mPrefs: Preferences,
 ) : Thread(TAG) {
 
     // Home Assistant настроек много — клиент собирается прямо из конфига
@@ -446,7 +449,7 @@ class HyperionThread(
         val host = mHost
         return when (OutputType.of(mConnectionType)) {
             OutputType.WLED -> WLEDClient(
-                mContext,
+                mPrefs,
                 host,
                 mPort,
                 mPriority,
@@ -463,7 +466,7 @@ class HyperionThread(
 
             // DDP понимают не только WLED: xLights, FPP, ESPixelStick - клиент тот же
             OutputType.DDP -> WLEDClient(
-                mContext,
+                mPrefs,
                 host,
                 mPort,
                 mPriority,
@@ -477,7 +480,7 @@ class HyperionThread(
             )
 
             OutputType.ADALIGHT -> AdalightClient(
-                mContext, mPriority, mBaudRate, mAdalightProtocol,
+                mContext, mPrefs, mPriority, mBaudRate, mAdalightProtocol,
                 effectiveSmoothing, mSmoothingPreset, mSettlingTime, effectiveDelayMs, mUpdateFrequency
             )
 
@@ -497,22 +500,22 @@ class HyperionThread(
             )
 
             OutputType.E131 -> E131Client(
-                mContext, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
+                mPrefs, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
                 mWledColorOrder, streamSmoothing()
             )
 
             OutputType.ARTNET -> ArtNetClient(
-                mContext, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
+                mPrefs, host, mPort, mConfig.dmxUniverse, mConfig.dmxLedsPerUniverse,
                 mWledColorOrder, streamSmoothing()
             )
 
             OutputType.TPM2NET -> Tpm2NetClient(
-                mContext, host, mPort, mConfig.dmxLedsPerUniverse, mWledColorOrder, streamSmoothing()
+                mPrefs, host, mPort, mConfig.dmxLedsPerUniverse, mWledColorOrder, streamSmoothing()
             )
 
-            OutputType.UDP_RAW -> UdpRawClient(mContext, host, mPort, mWledColorOrder, streamSmoothing())
+            OutputType.UDP_RAW -> UdpRawClient(mPrefs, host, mPort, mWledColorOrder, streamSmoothing())
             OutputType.OPC -> OpcClient(
-                mContext, host, mPort, mConfig.opcChannel, mWledColorOrder, streamSmoothing()
+                mPrefs, host, mPort, mConfig.opcChannel, mWledColorOrder, streamSmoothing()
             )
 
             OutputType.HUE -> if (mConfig.hueArea.isNotBlank()) {

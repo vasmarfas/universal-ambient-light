@@ -1,6 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 import java.util.UUID
 
@@ -12,14 +12,14 @@ import java.util.UUID
  * Без адреса пакеты идут мультикастом 239.255.x.y - так приёмник ищет их по умолчанию.
  */
 class E131Client(
-    context: Context,
+    prefs: Preferences,
     private val mHost: String,
     port: Int,
     private val mFirstUniverse: Int,
     private val mLedsPerUniverse: Int,
     private val mColorOrder: String,
     smoothing: SmoothingSettings,
-) : LedStreamClient(context, smoothing) {
+) : LedStreamClient(prefs, smoothing) {
 
     private val mPort = if (port > 0) port else DEFAULT_PORT
     private val mLinks = HashMap<Int, UdpLink>()

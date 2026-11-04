@@ -17,6 +17,9 @@ on both phones and Android TV.
   Zigbee2MQTT, Home Assistant and a Hyperion / HyperHDR server.
 - **Device search**: finds WLED, Hyperion, HyperHDR, Hue bridges, Nanoleaf, Home Assistant,
   WiZ, Yeelight, LIFX, Govee and Art-Net nodes on the local network in a few seconds.
+- **Several controllers at once**: next to the main controller you can add others, for example
+  a second WLED on the wall or bars at the sides of the TV. Each one has its own address, LED
+  layout and part of the screen.
 - **Phone and Android TV**: separate layouts for touchscreens and D-pad navigation.
 - **Camera capture**: films the TV with the device camera and corrects perspective by four
   corners, for TVs where screen capture is unavailable.
@@ -97,6 +100,25 @@ An experimental build with **external USB camera (UVC) support** is available fo
     - Bottom: 60 LEDs (default)
     - Left: 34 LEDs (default)
 - **LED Layout**: Configure starting corner, direction (clockwise/counterclockwise), and enable/disable individual sides.
+
+### 2.1. Additional Controllers
+**Settings → Additional controllers** adds outputs that run together with the main controller and
+show the same picture. A controller here is set up the same way as the main one: pick a device or
+type, enter the address, open its LED layout.
+
+- **A frame on the wall** is the same perimeter with its own LED counts.
+- **A bar at the side of the TV** is a layout with one side: set the left count and leave the
+  others at 0. **Scan depth** sets how far into the picture it looks.
+- **A part of an edge** is set with capture margins: a right margin of 75% on a top strip leaves
+  the left quarter of the top edge.
+- **Mixed outputs** work too: Adalight as the main controller and WLED bars next to it, or a
+  strip plus Home Assistant lamps. Adalight itself can only be the main controller, USB is opened
+  for it.
+
+Smoothing and the output delay are common to all controllers, so the strips move together. Picture
+settings are common too, brightness of WLED and DDP is set per controller. **Show LED layout test** in
+the layout of a controller lights that controller only. A controller that cannot connect does not
+stop the others; it retries in the background and shows up only in the log.
 
 ### 3. Capture Settings
 - **Capture Source**: Choose between **Screen** (default) or **Camera** mode.

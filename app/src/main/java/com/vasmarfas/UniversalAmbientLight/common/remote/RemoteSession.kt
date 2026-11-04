@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.content.edit
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import org.json.JSONArray
 import org.json.JSONObject
@@ -281,11 +282,15 @@ object RemoteSession {
      * Адресная проверка выполняется только на телевизоре. Команды отправляются
      * последовательно, чтобы выключение при уходе со страницы не обгоняло включение.
      */
-    fun setRemoteLayoutTest(enabled: Boolean, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+    fun setRemoteLayoutTest(
+        enabled: Boolean,
+        output: Int = ExtraOutputs.MAIN,
+        onResult: (Boolean, String?) -> Unit = { _, _ -> },
+    ) {
         mSender.execute {
             val result = try {
                 if (enabled) flushPending()
-                call(RemoteProtocol.OP_LAYOUT_TEST, JSONObject().put("enabled", enabled),
+                call(RemoteProtocol.OP_LAYOUT_TEST, JSONObject().put("enabled", enabled).put("output", output),
                     RemoteClient.LONG_TIMEOUT_MS)
                 Pair(true, null)
             } catch (e: Exception) {

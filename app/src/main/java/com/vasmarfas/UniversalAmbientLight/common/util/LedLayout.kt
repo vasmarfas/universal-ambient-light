@@ -68,6 +68,12 @@ data class LedLayout(
 
     companion object {
 
+        /**
+         * Предел отступа области захвата и их суммы на пару противоположных сторон. Отступами
+         * контроллер выбирает свою часть экрана, например только левую четверть верхнего края.
+         */
+        const val MAX_CAPTURE_MARGIN = 90
+
         fun from(prefs: Preferences): LedLayout {
             val xLed = prefs.getInt(R.string.pref_key_x_led)
             val yLed = prefs.getInt(R.string.pref_key_y_led)

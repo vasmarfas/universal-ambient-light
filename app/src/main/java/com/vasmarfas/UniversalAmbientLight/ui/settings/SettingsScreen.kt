@@ -41,8 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
-import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
@@ -50,8 +48,6 @@ import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.openAccessibilitySettings
 import com.vasmarfas.UniversalAmbientLight.R
-import com.vasmarfas.UniversalAmbientLight.ui.devices.HueAreaDialog
-import com.vasmarfas.UniversalAmbientLight.ui.devices.PairDialog
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +64,7 @@ fun SettingsScreen(
     onRemoteTvsClick: () -> Unit = {},
     onDelayClick: () -> Unit = {},
     onControllerClick: () -> Unit = {},
+    onExtraOutputsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val remote = LocalRemote.current
@@ -124,7 +121,12 @@ fun SettingsScreen(
                     )
                 }
                 ConnectionSection(prefs, state, onControllerClick, onLedLayoutClick)
-                HomeAssistantSecondarySection(prefs, state)
+                // Старый ТВ про дополнительные контроллеры не знает и молча проигнорировал бы их
+                if (remote == null ||
+                    remote.caps?.features?.contains(RemoteProtocol.FEATURE_EXTRA_OUTPUTS) == true
+                ) {
+                    ExtraOutputsPreference(prefs, onExtraOutputsClick)
+                }
                 CaptureSection(prefs, state, onCameraSetupClick)
                 CameraIdleSection(prefs, state)
                 BorderDetectionSection(prefs, state)
@@ -291,85 +293,5 @@ fun SettingsScreen(
             onDismiss = { state.showAdbPairingDialog = false }
         )
     }
-    if (state.showHaLampsDialog) {
-        ZoneLampsDialog(
-            prefs = prefs,
-            title = stringResource(R.string.ha_lamps_dialog_title),
-            hint = stringResource(R.string.ha_lamps_hint),
-            keyLamps = R.string.pref_key_ha_lamps,
-            fetch = { homeAssistantLights(prefs, R.string.pref_key_host, R.string.pref_key_port, R.string.pref_key_ha_token) },
-            onSaved = { state.haLampsSpec = it },
-            onDismiss = { state.showHaLampsDialog = false },
-            identify = { homeAssistantFlash(prefs, R.string.pref_key_host, R.string.pref_key_port, R.string.pref_key_ha_token, it) }
-        )
-    }
-    if (state.showLampsDialog) {
-        OutputLampsDialog(
-            prefs = prefs,
-            type = OutputType.of(state.connectionType),
-            onSaved = { state.lampsSpec = it },
-            onDismiss = { state.showLampsDialog = false }
-        )
-    }
-    if (state.showPairDialog) {
-        val type = OutputType.of(state.connectionType)
-        PairDialog(
-            prefs = prefs,
-            type = type,
-            onPaired = {
-                state.showPairDialog = false
-                state.pairingKey = prefs.getString(
-                    if (type == OutputType.HUE) R.string.pref_key_hue_username else R.string.pref_key_nanoleaf_token
-                ).orEmpty()
-                // Мосту сразу нужны лампы или зона: без них подсветке нечего включать
-                if (type == OutputType.HUE && state.lampsSpec.isBlank() && state.hueArea.isBlank()) {
-                    state.showHueAreaDialog = true
-                }
-            },
-            onDismiss = { state.showPairDialog = false }
-        )
-    }
-    if (state.showHueAreaDialog) {
-        HueAreaDialog(
-            prefs = prefs,
-            onPicked = { area ->
-                state.showHueAreaDialog = false
-                state.hueArea = area.orEmpty()
-                state.hueAreaName = prefs.getString(R.string.pref_key_hue_area_name).orEmpty()
-                if (area == null && state.lampsSpec.isBlank()) state.showLampsDialog = true
-            },
-            onRepair = {
-                state.showHueAreaDialog = false
-                state.showPairDialog = true
-            },
-            onDismiss = { state.showHueAreaDialog = false }
-        )
-    }
-    if (state.showHa2LampsDialog) {
-        ZoneLampsDialog(
-            prefs = prefs,
-            title = stringResource(R.string.ha_lamps_dialog_title),
-            hint = stringResource(R.string.ha_lamps_hint),
-            keyLamps = R.string.pref_key_ha2_lamps,
-            fetch = { homeAssistantLights(prefs, R.string.pref_key_ha2_host, R.string.pref_key_ha2_port, R.string.pref_key_ha2_token) },
-            onSaved = { state.ha2LampsSpec = it },
-            onDismiss = { state.showHa2LampsDialog = false },
-            identify = { homeAssistantFlash(prefs, R.string.pref_key_ha2_host, R.string.pref_key_ha2_port, R.string.pref_key_ha2_token, it) }
-        )
-    }
+    ConnectionDialogs(prefs, state)
 }
-
-private fun homeAssistantLights(prefs: Preferences, keyHost: Int, keyPort: Int, keyToken: Int) =
-    HomeAssistantClient.fetchLights(
-        prefs.getString(keyHost, "")?.trim().orEmpty(),
-        prefs.getInt(keyPort, 8123),
-        prefs.getString(keyToken, "").orEmpty()
-    )
-
-private fun homeAssistantFlash(prefs: Preferences, keyHost: Int, keyPort: Int, keyToken: Int, entityId: String) =
-    HomeAssistantClient.flash(
-        prefs.getString(keyHost, "")?.trim().orEmpty(),
-        prefs.getInt(keyPort, 8123),
-        prefs.getString(keyToken, "").orEmpty(),
-        entityId
-    )

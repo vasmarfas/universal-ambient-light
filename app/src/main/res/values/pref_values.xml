@@ -165,6 +165,14 @@
     <string name="pref_key_ha_turn_off_lights" translatable="false">pref_key_ha_turn_off_lights</string>
     <bool name="pref_default_ha_turn_off_lights" translatable="false">true</bool>
 
+    <!-- Контроллеры рядом с основным: номера в списке, их настройки под префиксом номера -->
+    <string name="pref_key_extra_outputs" translatable="false">pref_key_extra_outputs</string>
+
+    <string name="pref_key_output_enabled" translatable="false">pref_key_output_enabled</string>
+    <bool name="pref_default_output_enabled" translatable="false">true</bool>
+
+    <string name="pref_key_output_name" translatable="false">pref_key_output_name</string>
+
     <!-- Второе, дополнительное подключение Home Assistant -->
     <string name="pref_key_ha2_enabled" translatable="false">pref_key_ha2_enabled</string>
     <bool name="pref_default_ha2_enabled" translatable="false">false</bool>

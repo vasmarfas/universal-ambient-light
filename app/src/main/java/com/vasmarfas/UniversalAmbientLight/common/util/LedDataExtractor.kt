@@ -1,6 +1,5 @@
 package com.vasmarfas.UniversalAmbientLight.common.util
 
-import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.network.ColorRgb
 
@@ -17,29 +16,20 @@ object LedDataExtractor {
      * @return массив с результатом — переиспользованный или новый.
      */
     fun extractLEDData(
-        context: Context,
+        prefs: Preferences,
         screenData: ByteArray,
         width: Int,
         height: Int,
         reuseBuffer: Array<ColorRgb>?,
     ): Array<ColorRgb> {
         return extractPerimeterPixels(
-            screenData, width, height, readLayout(context), reuseBuffer
+            screenData, width, height, readLayout(prefs), reuseBuffer
         )
     }
 
-    fun extractLEDData(
-        context: Context,
-        screenData: ByteArray,
-        width: Int,
-        height: Int,
-    ): Array<ColorRgb> {
-        return extractLEDData(context, screenData, width, height, null)
-    }
-
-    fun getLedCount(context: Context): Int {
+    fun getLedCount(prefs: Preferences): Int {
         return try {
-            LedLayout.from(Preferences(context)).ledCount()
+            LedLayout.from(prefs).ledCount()
         } catch (e: Exception) {
             // Та же причина, что и в readLayout: без числа светодиодов клиент не соберёт
             // пакет, поэтому берём типовую ленту вместо падения
@@ -52,9 +42,9 @@ object LedDataExtractor {
      * Настройки читаются на каждом кадре: пользователь правит раскладку прямо во время
      * работы ленты и должен видеть результат сразу.
      */
-    private fun readLayout(context: Context): LedLayout {
+    private fun readLayout(prefs: Preferences): LedLayout {
         return try {
-            LedLayout.from(Preferences(context))
+            LedLayout.from(prefs)
         } catch (e: Exception) {
             // Защитный периметр: разбор кадра идёт в потоке отправки, и падение на чтении
             // настроек оборвало бы его целиком — лучше отработать на значениях по умолчанию
@@ -115,10 +105,10 @@ object LedDataExtractor {
         var ledIdx = 0
 
         // Область захвата со своим отступом для каждой стороны
-        val marginTop = layout.captureMarginTop.coerceIn(0, 40)
-        val marginRight = layout.captureMarginRight.coerceIn(0, 40)
-        val marginBottom = layout.captureMarginBottom.coerceIn(0, 40)
-        val marginLeft = layout.captureMarginLeft.coerceIn(0, 40)
+        val marginTop = layout.captureMarginTop.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
+        val marginRight = layout.captureMarginRight.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
+        val marginBottom = layout.captureMarginBottom.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
+        val marginLeft = layout.captureMarginLeft.coerceIn(0, LedLayout.MAX_CAPTURE_MARGIN)
 
         val marginTopPx = height * marginTop / 100f
         val marginRightPx = width * marginRight / 100f

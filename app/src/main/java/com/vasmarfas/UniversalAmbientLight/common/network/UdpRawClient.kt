@@ -1,7 +1,7 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
 import android.util.Log
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 
 /**
@@ -10,12 +10,12 @@ import java.io.IOException
  * в протоколе нет, поэтому лента обязана влезть в один пакет без фрагментации.
  */
 class UdpRawClient(
-    context: Context,
+    prefs: Preferences,
     host: String,
     port: Int,
     private val mColorOrder: String,
     smoothing: SmoothingSettings,
-) : LedStreamClient(context, smoothing) {
+) : LedStreamClient(prefs, smoothing) {
 
     private val mLink = UdpLink(host, if (port > 0) port else DEFAULT_PORT)
     private var mBuffer = ByteArray(0)

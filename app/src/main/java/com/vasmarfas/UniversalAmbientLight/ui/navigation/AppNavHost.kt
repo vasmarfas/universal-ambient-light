@@ -26,20 +26,25 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.NavHost
+import androidx.navigation.navArgument
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import com.vasmarfas.UniversalAmbientLight.common.remote.PairingPayload
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteProtocol
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.ui.calibration.CalibrationScreen
 import com.vasmarfas.UniversalAmbientLight.ui.camera.CameraSetupScreen
 import com.vasmarfas.UniversalAmbientLight.ui.delay.DelayScreen
 import com.vasmarfas.UniversalAmbientLight.ui.devices.DevicePickerScreen
+import com.vasmarfas.UniversalAmbientLight.ui.devices.ExtraOutputScreen
+import com.vasmarfas.UniversalAmbientLight.ui.devices.ExtraOutputsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.effects.EffectsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.home.describeSource
-import com.vasmarfas.UniversalAmbientLight.ui.home.describeTarget
+import com.vasmarfas.UniversalAmbientLight.ui.home.describeTargets
 import com.vasmarfas.UniversalAmbientLight.ui.home.setupIssue
 import com.vasmarfas.UniversalAmbientLight.ui.home.HelpDialog
 import com.vasmarfas.UniversalAmbientLight.ui.home.HomeStatus
@@ -59,6 +64,14 @@ import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteHostScreen
 import com.vasmarfas.UniversalAmbientLight.ui.remote.RemoteTvsScreen
 import com.vasmarfas.UniversalAmbientLight.ui.remote.TvRemoteScreen
 import com.vasmarfas.UniversalAmbientLight.ui.settings.SettingsScreen
+
+private val outputArgument = listOf(
+    navArgument(Screen.ARG_OUTPUT) {
+        type = NavType.IntType
+        defaultValue = ExtraOutputs.MAIN
+    }
+)
+
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -100,7 +113,7 @@ fun AppNavHost(
             var captureSource by remember(prefs) {
                 mutableStateOf(prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen")
             }
-            var target by remember(prefs) { mutableStateOf(describeTarget(context, prefs)) }
+            var target by remember(prefs) { mutableStateOf(describeTargets(context, prefs)) }
             var source by remember(prefs) { mutableStateOf(describeSource(context, prefs)) }
             var setupHint by remember(prefs) { mutableStateOf(setupIssue(context, prefs)) }
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -109,7 +122,7 @@ fun AppNavHost(
                     if (event == Lifecycle.Event.ON_RESUME) {
                         captureSource =
                             prefs.getString(R.string.pref_key_capture_source, "screen") ?: "screen"
-                        target = describeTarget(context, prefs)
+                        target = describeTargets(context, prefs)
                         source = describeSource(context, prefs)
                         setupHint = setupIssue(context, prefs)
                     }
@@ -186,7 +199,7 @@ fun AppNavHost(
                 onSleepTimer = if (sleepSupported) onSleepTimer else null,
                 setupHint = setupHint,
                 onSetupClick = {
-                    navController.navigate(Screen.Devices.route) { launchSingleTop = true }
+                    navController.navigate(Screen.Devices.of()) { launchSingleTop = true }
                 },
                 topContent = {
                     if (remote != null) {
@@ -329,7 +342,7 @@ fun AppNavHost(
             SettingsScreen(
                 onBackClick = { navController.popBackStack() },
                 onLedLayoutClick = {
-                    navController.navigate(Screen.LedLayout.route) { launchSingleTop = true }
+                    navController.navigate(Screen.LedLayout.of()) { launchSingleTop = true }
                 },
                 onCameraSetupClick = {
                     navController.navigate(Screen.CameraSetup.route) { launchSingleTop = true }
@@ -344,32 +357,72 @@ fun AppNavHost(
                     navController.navigate(Screen.Delay.route) { launchSingleTop = true }
                 },
                 onControllerClick = {
-                    navController.navigate(Screen.Devices.route) { launchSingleTop = true }
+                    navController.navigate(Screen.Devices.of()) { launchSingleTop = true }
+                },
+                onExtraOutputsClick = {
+                    navController.navigate(Screen.OutputList.route) { launchSingleTop = true }
                 }
             )
         }
-        composable(Screen.Devices.route) {
+        composable(Screen.Devices.route, arguments = outputArgument) { entry ->
             val context = LocalContext.current
+            val outputId = entry.arguments?.getInt(Screen.ARG_OUTPUT) ?: ExtraOutputs.MAIN
             LaunchedEffect(Unit) {
                 AnalyticsHelper.logScreenView(context, "devices", "DevicePickerScreen")
             }
             DevicePickerScreen(
                 onBackClick = { navController.popBackStack() },
                 onLedLayoutClick = {
-                    navController.navigate(Screen.LedLayout.route) {
+                    navController.navigate(Screen.LedLayout.of(outputId)) {
                         popUpTo(Screen.Devices.route) { inclusive = true }
                     }
-                }
+                },
+                outputId = outputId
             )
         }
-        composable(Screen.LedLayout.route) {
+        composable(Screen.LedLayout.route, arguments = outputArgument) { entry ->
             val context = LocalContext.current
             LaunchedEffect(Unit) {
                 AnalyticsHelper.logScreenView(context, "led_layout", "LedLayoutScreen")
                 AnalyticsHelper.logLedLayoutOpened(context)
             }
             LedLayoutScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                outputId = entry.arguments?.getInt(Screen.ARG_OUTPUT) ?: ExtraOutputs.MAIN
+            )
+        }
+        composable(Screen.OutputList.route) {
+            val context = LocalContext.current
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "extra_outputs", "ExtraOutputsScreen")
+            }
+            ExtraOutputsScreen(
+                onBackClick = { navController.popBackStack() },
+                onOutputClick = { id ->
+                    navController.navigate(Screen.OutputDetails.of(id)) { launchSingleTop = true }
+                },
+                onOutputAdded = { id ->
+                    // Новому контроллеру сначала нужен адрес; назад из выбора - на его настройки
+                    navController.navigate(Screen.OutputDetails.of(id)) { launchSingleTop = true }
+                    navController.navigate(Screen.Devices.of(id)) { launchSingleTop = true }
+                }
+            )
+        }
+        composable(Screen.OutputDetails.route, arguments = outputArgument) { entry ->
+            val context = LocalContext.current
+            val outputId = entry.arguments?.getInt(Screen.ARG_OUTPUT) ?: ExtraOutputs.MAIN
+            LaunchedEffect(Unit) {
+                AnalyticsHelper.logScreenView(context, "extra_output", "ExtraOutputScreen")
+            }
+            ExtraOutputScreen(
+                outputId = outputId,
+                onBackClick = { navController.popBackStack() },
+                onControllerClick = {
+                    navController.navigate(Screen.Devices.of(outputId)) { launchSingleTop = true }
+                },
+                onLedLayoutClick = {
+                    navController.navigate(Screen.LedLayout.of(outputId)) { launchSingleTop = true }
+                }
             )
         }
         composable(Screen.CameraSetup.route) {

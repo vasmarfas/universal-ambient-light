@@ -1,8 +1,8 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.util.LedDataExtractor
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
  * тишины считают источник пропавшим и возвращаются к своему эффекту.
  */
 abstract class LedStreamClient(
-    private val mContext: Context,
+    private val mPrefs: Preferences,
     smoothing: SmoothingSettings,
 ) : HyperionClient, StreamingClient, AddressableLedClient {
 
@@ -30,7 +30,7 @@ abstract class LedStreamClient(
         val updateFrequency: Int,
     )
 
-    private val mLayoutTest = LedLayoutTestController(mContext) { leds -> deliver(leds) }
+    private val mLayoutTest = LedLayoutTestController(mPrefs) { leds -> deliver(leds) }
     private val mSmoothing = ColorSmoothing { leds ->
         synchronized(mLayoutTest) {
             if (!mLayoutTest.enabled) deliver(leds)
@@ -130,7 +130,7 @@ abstract class LedStreamClient(
         // остаться гореть последним цветом до таймаута приёмника
         if (mConnected) {
             try {
-                val count = maxOf(LedDataExtractor.getLedCount(mContext), mLastLeds?.size ?: 0)
+                val count = maxOf(LedDataExtractor.getLedCount(mPrefs), mLastLeds?.size ?: 0)
                 write(Array(count) { ColorRgb(0, 0, 0) })
             } catch (e: IOException) {
                 Log.w(TAG, "Final black frame failed: ${e.message}")
@@ -143,7 +143,7 @@ abstract class LedStreamClient(
     @Throws(IOException::class)
     override fun clear(priority: Int) {
         if (mLayoutTest.enabled) return
-        mSmoothing.setTargetColors(Array(LedDataExtractor.getLedCount(mContext)) { ColorRgb(0, 0, 0) })
+        mSmoothing.setTargetColors(Array(LedDataExtractor.getLedCount(mPrefs)) { ColorRgb(0, 0, 0) })
     }
 
     @Throws(IOException::class)
@@ -159,7 +159,7 @@ abstract class LedStreamClient(
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
         if (mLayoutTest.enabled) return
-        val count = LedDataExtractor.getLedCount(mContext)
+        val count = LedDataExtractor.getLedCount(mPrefs)
         mSmoothing.setTargetColors(Array(count) {
             ColorRgb((color shr 16) and 0xFF, (color shr 8) and 0xFF, color and 0xFF)
         })
@@ -174,7 +174,7 @@ abstract class LedStreamClient(
     override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
         if (!mConnected) throw IOException("Not connected")
         if (mLayoutTest.enabled) return
-        val leds = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedBuffer)
+        val leds = LedDataExtractor.extractLEDData(mPrefs, data, width, height, mLedBuffer)
         mLedBuffer = leds
         if (leds.isNotEmpty()) mSmoothing.setTargetColors(leds)
     }

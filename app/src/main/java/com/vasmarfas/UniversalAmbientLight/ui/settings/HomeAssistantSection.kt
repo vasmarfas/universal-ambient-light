@@ -18,25 +18,12 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 /**
  * Настройки вывода на лампы Home Assistant: токен, привязка ламп к зонам и ритм
  * обновлений — лампы не лента, им нельзя слать цвет на каждый кадр.
- *
- * Ключи настроек и префикс аналитики передаются параметрами: этот же набор полей
- * обслуживает и основное подключение (внутри группы «Подключение»), и дополнительное.
  */
 @Composable
 internal fun ColumnScope.HomeAssistantSection(
     prefs: Preferences,
-    analyticsPrefix: String,
-    keyToken: Int,
     lampsSpec: String,
     onLampsClick: () -> Unit,
-    keyUpdateInterval: Int,
-    keyChangeThreshold: Int,
-    keyTransition: Int,
-    keyBrightnessMode: Int,
-    keyBrightness: Int,
-    keyDarkOff: Int,
-    keyDarkThreshold: Int,
-    keyTurnOffLights: Int,
 ) {
     val context = LocalContext.current
 
@@ -44,28 +31,17 @@ internal fun ColumnScope.HomeAssistantSection(
     val tokenEmptySummary = stringResource(R.string.pref_summary_ha_token_empty)
     EditTextPreference(
         prefs = prefs,
-        keyRes = keyToken,
+        keyRes = R.string.pref_key_ha_token,
         title = stringResource(R.string.pref_title_ha_token),
         // Сам токен в списке не светим — это ключ от всего умного дома
         summaryProvider = { value -> if (value.isBlank()) tokenEmptySummary else tokenSetSummary },
         onValueChange = {
-            AnalyticsHelper.logSettingChanged(context, "${analyticsPrefix}_token", "set")
+            AnalyticsHelper.logSettingChanged(context, "ha_token", "set")
         }
     )
 
     LampZonesPreference(lampsSpec, onLampsClick)
-    LampBehaviorSection(
-        prefs = prefs,
-        analyticsPrefix = analyticsPrefix,
-        keyUpdateInterval = keyUpdateInterval,
-        keyChangeThreshold = keyChangeThreshold,
-        keyTransition = keyTransition,
-        keyBrightnessMode = keyBrightnessMode,
-        keyBrightness = keyBrightness,
-        keyDarkOff = keyDarkOff,
-        keyDarkThreshold = keyDarkThreshold,
-        keyTurnOffLights = keyTurnOffLights,
-    )
+    LampBehaviorSection(prefs = prefs, analyticsPrefix = "ha")
 }
 
 /** Сводка «сколько ламп привязано к зонам», по нажатию открывается диалог ламп. */
@@ -88,23 +64,12 @@ internal fun LampZonesPreference(lampsSpec: String, onClick: () -> Unit) {
  * Общий для Home Assistant и ламп основного подключения.
  */
 @Composable
-internal fun ColumnScope.LampBehaviorSection(
-    prefs: Preferences,
-    analyticsPrefix: String,
-    keyUpdateInterval: Int,
-    keyChangeThreshold: Int,
-    keyTransition: Int,
-    keyBrightnessMode: Int,
-    keyBrightness: Int,
-    keyDarkOff: Int,
-    keyDarkThreshold: Int,
-    keyTurnOffLights: Int,
-) {
+internal fun ColumnScope.LampBehaviorSection(prefs: Preferences, analyticsPrefix: String) {
     val context = LocalContext.current
 
     ListPreference(
         prefs = prefs,
-        keyRes = keyUpdateInterval,
+        keyRes = R.string.pref_key_ha_update_interval,
         title = stringResource(R.string.pref_title_ha_update_interval),
         entriesRes = R.array.pref_list_ha_update_interval,
         entryValuesRes = R.array.pref_list_ha_update_interval_values,
@@ -115,7 +80,7 @@ internal fun ColumnScope.LampBehaviorSection(
 
     SliderPreference(
         prefs = prefs,
-        keyRes = keyChangeThreshold,
+        keyRes = R.string.pref_key_ha_change_threshold,
         title = stringResource(R.string.pref_title_ha_change_threshold),
         range = 0..255,
         onValueChange = {
@@ -129,7 +94,7 @@ internal fun ColumnScope.LampBehaviorSection(
 
     ListPreference(
         prefs = prefs,
-        keyRes = keyTransition,
+        keyRes = R.string.pref_key_ha_transition,
         title = stringResource(R.string.pref_title_ha_transition),
         entriesRes = R.array.pref_list_ha_transition,
         entryValuesRes = R.array.pref_list_ha_transition_values,
@@ -140,13 +105,13 @@ internal fun ColumnScope.LampBehaviorSection(
 
     var brightnessMode by remember {
         mutableStateOf(
-            prefs.getString(keyBrightnessMode)
+            prefs.getString(R.string.pref_key_ha_brightness_mode)
                 ?: HomeAssistantClient.BRIGHTNESS_MODE_SCREEN
         )
     }
     ListPreference(
         prefs = prefs,
-        keyRes = keyBrightnessMode,
+        keyRes = R.string.pref_key_ha_brightness_mode,
         title = stringResource(R.string.pref_title_ha_brightness_mode),
         entriesRes = R.array.pref_list_ha_brightness_mode,
         entryValuesRes = R.array.pref_list_ha_brightness_mode_values,
@@ -159,7 +124,7 @@ internal fun ColumnScope.LampBehaviorSection(
         val brightnessMaxSummary = stringResource(R.string.pref_summary_ha_brightness_max)
         SliderPreference(
             prefs = prefs,
-            keyRes = keyBrightness,
+            keyRes = R.string.pref_key_ha_brightness,
             title = stringResource(R.string.pref_title_ha_brightness),
             range = 1..255,
             summaryProvider = { value ->
@@ -176,12 +141,12 @@ internal fun ColumnScope.LampBehaviorSection(
     }
 
     var darkOffEnabled by remember {
-        mutableStateOf(prefs.getBoolean(keyDarkOff, true))
+        mutableStateOf(prefs.getBoolean(R.string.pref_key_ha_dark_off, true))
     }
     key(darkOffEnabled) {
         CheckBoxPreference(
             prefs = prefs,
-            keyRes = keyDarkOff,
+            keyRes = R.string.pref_key_ha_dark_off,
             title = stringResource(R.string.pref_title_ha_dark_off),
             summary = stringResource(R.string.pref_summary_ha_dark_off),
             onValueChange = { enabled ->
@@ -193,7 +158,7 @@ internal fun ColumnScope.LampBehaviorSection(
     if (darkOffEnabled) {
         SliderPreference(
             prefs = prefs,
-            keyRes = keyDarkThreshold,
+            keyRes = R.string.pref_key_ha_dark_threshold,
             title = stringResource(R.string.pref_title_ha_dark_threshold),
             range = 1..255,
             onValueChange = {
@@ -208,7 +173,7 @@ internal fun ColumnScope.LampBehaviorSection(
 
     CheckBoxPreference(
         prefs = prefs,
-        keyRes = keyTurnOffLights,
+        keyRes = R.string.pref_key_ha_turn_off_lights,
         title = stringResource(R.string.pref_title_ha_turn_off_lights),
         summary = stringResource(R.string.pref_summary_ha_turn_off_lights),
         onValueChange = {

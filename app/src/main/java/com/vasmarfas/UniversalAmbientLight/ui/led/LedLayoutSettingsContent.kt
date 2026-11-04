@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.util.LedLayout
 import com.vasmarfas.UniversalAmbientLight.ui.components.NumberStepper
 
 /**
@@ -167,7 +168,7 @@ internal fun LedLayoutSettingsContent(
         label = stringResource(R.string.led_layout_capture_margin_left_label),
         value = captureMarginLeftText.toIntOrNull() ?: 0,
         onValueChange = { onCaptureMarginLeftTextChange(it.toString()) },
-        range = 0..40,
+        range = captureMarginRange(captureMarginRightText),
         supportingText = stringResource(R.string.led_layout_capture_margin_left_help)
     )
 
@@ -177,7 +178,7 @@ internal fun LedLayoutSettingsContent(
         label = stringResource(R.string.led_layout_capture_margin_top_label),
         value = captureMarginTopText.toIntOrNull() ?: 0,
         onValueChange = { onCaptureMarginTopTextChange(it.toString()) },
-        range = 0..40,
+        range = captureMarginRange(captureMarginBottomText),
         supportingText = stringResource(R.string.led_layout_capture_margin_top_help)
     )
 
@@ -187,7 +188,7 @@ internal fun LedLayoutSettingsContent(
         label = stringResource(R.string.led_layout_capture_margin_right_label),
         value = captureMarginRightText.toIntOrNull() ?: 0,
         onValueChange = { onCaptureMarginRightTextChange(it.toString()) },
-        range = 0..40,
+        range = captureMarginRange(captureMarginLeftText),
         supportingText = stringResource(R.string.led_layout_capture_margin_right_help)
     )
 
@@ -197,7 +198,7 @@ internal fun LedLayoutSettingsContent(
         label = stringResource(R.string.led_layout_capture_margin_bottom_label),
         value = captureMarginBottomText.toIntOrNull() ?: 0,
         onValueChange = { onCaptureMarginBottomTextChange(it.toString()) },
-        range = 0..40,
+        range = captureMarginRange(captureMarginTopText),
         supportingText = stringResource(R.string.led_layout_capture_margin_bottom_help)
     )
 
@@ -309,6 +310,10 @@ internal fun LedLayoutSettingsContent(
     }
 
 }
+
+/** Вместе с противоположным отступ обязан оставить снимаемой области место. */
+private fun captureMarginRange(oppositeText: String): IntRange =
+    0..(LedLayout.MAX_CAPTURE_MARGIN - (oppositeText.toIntOrNull() ?: 0)).coerceAtLeast(0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

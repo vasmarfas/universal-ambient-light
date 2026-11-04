@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 /**
@@ -33,12 +34,14 @@ fun rememberRemoteSnapshot(): RemoteSession.Snapshot {
 /**
  * Настройки, с которыми работает экран: зеркало телевизора в режиме пульта, иначе свои.
  * Новый снимок с ТВ (переподключение) пересоздаёт экран — поля перечитывают значения.
+ * [outputId] открывает тот же экран для дополнительного контроллера.
  */
 @Composable
-fun rememberSettingsPreferences(): Preferences {
+fun rememberSettingsPreferences(outputId: Int = ExtraOutputs.MAIN): Preferences {
     val context = LocalContext.current
     val remote = LocalRemote.current
-    return remember(remote?.tv?.id, remote?.revision) {
-        if (remote != null) RemoteSession.preferences(context) else Preferences(context)
+    return remember(remote?.tv?.id, remote?.revision, outputId) {
+        val prefs = if (remote != null) RemoteSession.preferences(context) else Preferences(context)
+        prefs.forOutput(outputId)
     }
 }

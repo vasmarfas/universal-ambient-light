@@ -5,7 +5,10 @@ import android.content.Context
 import android.os.DeadSystemException
 import android.os.Looper
 import android.util.Log
+import androidx.core.content.edit
+import com.vasmarfas.UniversalAmbientLight.common.remote.PrefsCodec
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.common.util.UsbRootPermissionHelper
@@ -248,6 +251,11 @@ class AmbilightApplication : Application() {
             if (prefs.contains(R.string.pref_key_boot) && prefs.getBoolean(R.string.pref_key_boot)) {
                 prefs.putBoolean(R.string.pref_key_lighting_was_active, true)
             }
+        }
+        val stored = Preferences.defaultSharedPreferences(this)
+        val changes = ExtraOutputs.migrateHa2(stored.all)
+        if (changes.isNotEmpty()) {
+            stored.edit(commit = true) { changes.forEach { (key, value) -> PrefsCodec.put(this, key, value) } }
         }
     }
 

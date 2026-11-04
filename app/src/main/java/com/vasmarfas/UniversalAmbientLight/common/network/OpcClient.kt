@@ -1,6 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -11,13 +11,13 @@ import java.net.Socket
  * заголовок из четырёх байт (канал, команда 0, длина) и RGB подряд.
  */
 class OpcClient(
-    context: Context,
+    prefs: Preferences,
     private val mHost: String,
     port: Int,
     private val mChannel: Int,
     private val mColorOrder: String,
     smoothing: SmoothingSettings,
-) : LedStreamClient(context, smoothing) {
+) : LedStreamClient(prefs, smoothing) {
 
     private val mPort = if (port > 0) port else DEFAULT_PORT
     private var mSocket: Socket? = null

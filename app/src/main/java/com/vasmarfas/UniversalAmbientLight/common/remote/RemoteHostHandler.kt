@@ -25,6 +25,7 @@ import com.vasmarfas.UniversalAmbientLight.common.util.DebugInfoHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DelayProfiles
 import com.vasmarfas.UniversalAmbientLight.common.util.DevOptionsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.ForegroundApp
 import com.vasmarfas.UniversalAmbientLight.common.util.PermissionHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
@@ -145,8 +146,9 @@ internal class RemoteHostHandler(
      * USB-разрешение на стороне ТВ; системный диалог, если нужен, появится там.
      */
     private fun layoutTest(client: RemoteServer.Client, request: JSONObject): JSONObject {
+        val output = request.optInt("output", ExtraOutputs.MAIN)
         val outputType = OutputType.of(
-            Preferences(mContext).getString(R.string.pref_key_connection_type)
+            Preferences(mContext).forOutput(output).getString(R.string.pref_key_connection_type)
         )
         if (!outputType.supportsLedLayoutTest)
             throw RemoteCommandException(
@@ -169,7 +171,7 @@ internal class RemoteHostHandler(
                     throw RemoteCommandException(RemoteProtocol.ERR_FAILED, mContext.getString(R.string.remote_layout_test_no_device))
                 mLayoutTestClient = client
                 if (ScreenGrabberService.sInstanceRunning || outputType != OutputType.ADALIGHT) {
-                    if (!dispatchLayoutTest(true)) {
+                    if (!dispatchLayoutTest(true, output)) {
                         mLayoutTestClient = null
                         throw RemoteCommandException(RemoteProtocol.ERR_FAILED, mContext.getString(R.string.remote_layout_test_start_failed))
                     }
@@ -181,7 +183,7 @@ internal class RemoteHostHandler(
                         context = mContext, device = null,
                         onReady = {
                             if (mLayoutTestClient === client) {
-                                permissionGranted = dispatchLayoutTest(true)
+                                permissionGranted = dispatchLayoutTest(true, output)
                                 if (!permissionGranted) mLayoutTestClient = null
                             }
                             permissionDone.countDown()
@@ -230,11 +232,12 @@ internal class RemoteHostHandler(
         return JSONObject()
     }
 
-    private fun dispatchLayoutTest(enabled: Boolean): Boolean {
+    private fun dispatchLayoutTest(enabled: Boolean, output: Int = ExtraOutputs.MAIN): Boolean {
         if (!enabled && !ScreenGrabberService.sInstanceRunning) return true
         val intent = Intent(mContext, ScreenGrabberService::class.java).apply {
             action = ScreenGrabberService.ACTION_LAYOUT_TEST
             putExtra(ScreenGrabberService.EXTRA_LAYOUT_TEST_ENABLED, enabled)
+            putExtra(ScreenGrabberService.EXTRA_OUTPUT_ID, output)
         }
         try {
             if (enabled && !ScreenGrabberService.sInstanceRunning) {
@@ -364,7 +367,9 @@ internal class RemoteHostHandler(
         }
         // Стороны и разрыв снизу меняют число светодиодов на ходу; на ТВ экран раскладки
         // делает то же самое — гасит ленту разом, иначе хвост старой раскладки остаётся гореть
-        if (keys.any { it in clearOnChangeKeys }) sendToService(ScreenGrabberService.ACTION_CLEAR)
+        if (keys.any { it.substringAfter('.') in clearOnChangeKeys }) {
+            sendToService(ScreenGrabberService.ACTION_CLEAR)
+        }
         return JSONObject()
     }
 
@@ -511,6 +516,7 @@ internal class RemoteHostHandler(
             RemoteProtocol.FEATURE_CALIBRATION,
             RemoteProtocol.FEATURE_SLEEP,
             RemoteProtocol.FEATURE_LAYOUT_TEST,
+            RemoteProtocol.FEATURE_EXTRA_OUTPUTS,
         )
     }
 }

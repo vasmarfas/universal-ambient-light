@@ -1,6 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 
 /**
@@ -9,14 +9,14 @@ import java.io.IOException
  * [ledsPerUniverse] светодиодов, у каждой - свой пакет.
  */
 class ArtNetClient(
-    context: Context,
+    prefs: Preferences,
     host: String,
     port: Int,
     private val mFirstUniverse: Int,
     private val mLedsPerUniverse: Int,
     private val mColorOrder: String,
     smoothing: SmoothingSettings,
-) : LedStreamClient(context, smoothing) {
+) : LedStreamClient(prefs, smoothing) {
 
     private val mLink = UdpLink(host, if (port > 0) port else DEFAULT_PORT)
     private var mSequence = 0

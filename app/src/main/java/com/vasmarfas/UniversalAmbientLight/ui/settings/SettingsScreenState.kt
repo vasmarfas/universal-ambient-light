@@ -80,10 +80,6 @@ class SettingsScreenState(prefs: Preferences) {
     var hueArea by mutableStateOf(prefs.getString(R.string.pref_key_hue_area).orEmpty())
     var hueAreaName by mutableStateOf(prefs.getString(R.string.pref_key_hue_area_name).orEmpty())
 
-    /** Дополнительное подключение Home Assistant — работает параллельно с основным. */
-    var ha2Enabled by mutableStateOf(prefs.getBoolean(R.string.pref_key_ha2_enabled, false))
-    var ha2LampsSpec by mutableStateOf(prefs.getString(R.string.pref_key_ha2_lamps) ?: "")
-
     var resetRevision by mutableIntStateOf(0)
 
     fun resetPicture(prefs: Preferences) {
@@ -101,7 +97,6 @@ class SettingsScreenState(prefs: Preferences) {
     var showAdbPairingDialog by mutableStateOf(false)
     var showAccessibilityDisclosure by mutableStateOf(false)
     var showHaLampsDialog by mutableStateOf(false)
-    var showHa2LampsDialog by mutableStateOf(false)
     var showLampsDialog by mutableStateOf(false)
     var showPairDialog by mutableStateOf(false)
     var showHueAreaDialog by mutableStateOf(false)

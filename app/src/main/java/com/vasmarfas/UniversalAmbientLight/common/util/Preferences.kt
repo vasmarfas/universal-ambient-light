@@ -13,14 +13,20 @@ import java.util.concurrent.ConcurrentHashMap
  * Числа хранятся строками — так их понимает EditTextPreference.
  *
  * [preferences] подменяется на зеркало настроек телевизора, когда экран настроек управляет
- * им с телефона: ключи и умолчания те же, меняется только хранилище.
+ * им с телефона: ключи и умолчания те же, меняется только хранилище. [keyPrefix] уводит те
+ * же ключи в настройки дополнительного контроллера, см. [forOutput].
  */
 class Preferences(
-    context: Context,
+    private val context: Context,
     private val preferences: SharedPreferences = defaultSharedPreferences(context),
+    private val keyPrefix: String = "",
 ) {
 
     private val resources = context.resources
+
+    /** Настройки контроллера из [ExtraOutputs]; [ExtraOutputs.MAIN] — основные. */
+    fun forOutput(id: Int): Preferences =
+        Preferences(context, preferences, ExtraOutputs.keyPrefix(id))
 
     fun contains(@StringRes keyResourceId: Int): Boolean = preferences.contains(key(keyResourceId))
 
@@ -103,7 +109,14 @@ class Preferences(
         preferences.edit { keyResourceIds.forEach { remove(key(it)) } }
     }
 
-    private fun key(keyResourceId: Int) = resources.getString(keyResourceId)
+    /** Стирает все настройки контроллера: их ключи нигде не перечислены. */
+    fun removeOutput(id: Int) {
+        val prefix = ExtraOutputs.keyPrefix(id)
+        val keys = preferences.all.keys.filter { it.startsWith(prefix) }
+        preferences.edit { keys.forEach { remove(it) } }
+    }
+
+    private fun key(keyResourceId: Int) = keyPrefix + resources.getString(keyResourceId)
 
     private fun defaultKey(keyResourceId: Int, type: String, warnIfMissing: Boolean = true): Int {
         val cacheKey = (keyResourceId.toLong() shl 8) or typeTag(type).toLong()

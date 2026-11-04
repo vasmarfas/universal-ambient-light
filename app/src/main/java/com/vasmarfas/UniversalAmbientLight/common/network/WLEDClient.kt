@@ -1,8 +1,8 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
 import android.util.Log
 import com.vasmarfas.UniversalAmbientLight.common.util.LedDataExtractor
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 class WLEDClient(
-    private val mContext: Context, // Needed for LedDataExtractor
+    private val mPrefs: Preferences,
     private val mHost: String,
     port: Int,
     private val mPriority: Int,
@@ -61,7 +61,7 @@ class WLEDClient(
     private var mAddress: InetAddress? = null
 
     private val mSmoothing: ColorSmoothing
-    private val mLayoutTest = LedLayoutTestController(mContext) { leds -> sendLedData(leds) }
+    private val mLayoutTest = LedLayoutTestController(mPrefs) { leds -> sendLedData(leds) }
     private var mLedDataBuffer: Array<ColorRgb>? = null
 
     override fun setLayoutTestEnabled(enabled: Boolean) {
@@ -261,7 +261,7 @@ class WLEDClient(
         mResumeExecutor.shutdownNow()
         // Последний кадр чёрный и мимо сглаживания: с задержкой вывода чёрные кадры из
         // очереди уйти не успевают, и WLED держал бы последний цвет до своего таймаута
-        val count = maxOf(LedDataExtractor.getLedCount(mContext), mLastLeds?.size ?: 0)
+        val count = maxOf(LedDataExtractor.getLedCount(mPrefs), mLastLeds?.size ?: 0)
         sendLedData(Array(count) { ColorRgb(0, 0, 0) })
         mConnected = false
         val socket = mSocket
@@ -274,7 +274,7 @@ class WLEDClient(
     @Throws(IOException::class)
     override fun clear(priority: Int) {
         if (mLayoutTest.enabled) return
-        val ledCount = LedDataExtractor.getLedCount(mContext)
+        val ledCount = LedDataExtractor.getLedCount(mPrefs)
         val blackLeds = Array(ledCount) { ColorRgb(0, 0, 0) }
         mSmoothing.setTargetColors(blackLeds)
     }
@@ -292,7 +292,7 @@ class WLEDClient(
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
         if (mLayoutTest.enabled) return
-        val ledCount = LedDataExtractor.getLedCount(mContext)
+        val ledCount = LedDataExtractor.getLedCount(mPrefs)
         val r = (color shr 16) and 0xFF
         val g = (color shr 8) and 0xFF
         val b = color and 0xFF
@@ -319,7 +319,7 @@ class WLEDClient(
         }
         if (mLayoutTest.enabled) return
 
-        val leds = LedDataExtractor.extractLEDData(mContext, data, width, height, mLedDataBuffer)
+        val leds = LedDataExtractor.extractLEDData(mPrefs, data, width, height, mLedDataBuffer)
         mLedDataBuffer = leds
         if (leds.isEmpty()) return
 

@@ -36,13 +36,13 @@
   <string name="led_layout_bottom_gap_label">Пропуск снизу (для саундбара)</string>
   <string name="led_layout_capture_margin_label">Отступ от края захвата (%)</string>
   <string name="led_layout_capture_margin_top_label">Отступ сверху (%)</string>
-  <string name="led_layout_capture_margin_top_help">0–40%. Отступ от верхнего края экрана.</string>
+  <string name="led_layout_capture_margin_top_help">0–90%. Отступ от верхнего края экрана.</string>
   <string name="led_layout_capture_margin_right_label">Отступ справа (%)</string>
-  <string name="led_layout_capture_margin_right_help">0–40%. Отступ от правого края экрана.</string>
+  <string name="led_layout_capture_margin_right_help">0–90%. Отступ от правого края экрана.</string>
   <string name="led_layout_capture_margin_bottom_label">Отступ снизу (%)</string>
-  <string name="led_layout_capture_margin_bottom_help">0–40%. Отступ от нижнего края экрана.</string>
+  <string name="led_layout_capture_margin_bottom_help">0–90%. Отступ от нижнего края экрана.</string>
   <string name="led_layout_capture_margin_left_label">Отступ слева (%)</string>
-  <string name="led_layout_capture_margin_left_help">0–40%. Отступ от левого края экрана.</string>
+  <string name="led_layout_capture_margin_left_help">0–90%. Отступ от левого края экрана.</string>
     <string name="led_layout_offset_label">Смещение LED (шагов по периметру)</string>
     <string name="led_layout_offset_help">Положительное — по направлению обхода, отрицательное — против.</string>
     <string name="led_layout_scan_depth_label">Глубина сканирования (%)</string>
@@ -431,9 +431,6 @@
   <string name="error_ha_no_lamps">Ни одна лампа Home Assistant не привязана к зоне. Откройте Настройки → Подключение → Лампы и зоны</string>
 
   <!-- Второе, дополнительное подключение к Home Assistant -->
-  <string name="pref_group_ha_secondary">Дополнительный вывод на Home Assistant</string>
-  <string name="pref_title_ha2_enabled">Также управлять лампами Home Assistant</string>
-  <string name="pref_summary_ha2_enabled">Работает вместе с основным подключением выше — например, основной вывод на WLED, а по бокам ещё и лампы Home Assistant</string>
 
   <!-- Adalight advanced settings -->
   <string name="pref_title_adalight_protocol">Протокол Adalight</string>
@@ -759,6 +756,18 @@
   <string name="output_hyperion_summary">Картинка уходит на сервер Hyperion или HyperHDR, светом управляет он</string>
 
   <!-- Controller settings -->
+  <string name="extra_outputs_title">Дополнительные контроллеры</string>
+  <string name="extra_outputs_summary_empty">Вторая лента, боковые планки или лампы рядом с основным контроллером</string>
+  <string name="extra_outputs_summary_count">Добавлено: %1$d</string>
+  <string name="extra_outputs_hint">Работают вместе с основным контроллером и показывают ту же картинку. У каждого свой адрес и своя раскладка: в ней задаются стороны, а отступы захвата сужают область до части экрана.</string>
+  <string name="extra_outputs_add">Добавить контроллер</string>
+  <string name="extra_output_title">Дополнительный контроллер</string>
+  <string name="extra_output_off">выключен</string>
+  <string name="extra_output_delete">Удалить контроллер</string>
+  <string name="extra_output_delete_confirm">Его адрес и раскладка будут потеряны.</string>
+  <string name="pref_title_output_enabled">Включён</string>
+  <string name="pref_title_output_name">Название</string>
+  <string name="pref_summary_output_name_empty">Не задано</string>
   <string name="controller_change">Сменить</string>
   <string name="controller_no_address">адрес не задан</string>
   <string name="pref_title_color_order">Порядок цветов</string>

@@ -91,6 +91,7 @@ object AnalyticsHelper {
                 prefs.getString(R.string.pref_key_capture_method, "media_projection")
                     ?: "media_projection"
             )
+            crashlytics.setCustomKey("extra_outputs", ExtraOutputs.ids(prefs).size)
             crashlytics.setCustomKey("device_form_factor", deviceFormFactor(context))
             crashlytics.setCustomKey("manufacturer", Build.MANUFACTURER ?: "unknown")
             crashlytics.setCustomKey("framerate", safeGetInt(prefs, R.string.pref_key_framerate))

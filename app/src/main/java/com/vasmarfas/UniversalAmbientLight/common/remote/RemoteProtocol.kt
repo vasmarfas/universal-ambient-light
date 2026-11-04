@@ -78,6 +78,7 @@ object RemoteProtocol {
     const val FEATURE_CALIBRATION = "calibration"
     const val FEATURE_SLEEP = "sleep"
     const val FEATURE_LAYOUT_TEST = "layout_test"
+    const val FEATURE_EXTRA_OUTPUTS = "extra_outputs"
 
     /** Сколько телефонов держит ТВ одновременно; больше — признак ошибки, а не сценарий. */
     const val MAX_CLIENTS = 4

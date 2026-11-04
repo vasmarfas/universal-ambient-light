@@ -1,6 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common.network
 
-import android.content.Context
+import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import java.io.IOException
 
 /**
@@ -9,13 +9,13 @@ import java.io.IOException
  * [ledsPerPacket] светодиодов; номер пакета и их число приёмник берёт из заголовка.
  */
 class Tpm2NetClient(
-    context: Context,
+    prefs: Preferences,
     host: String,
     port: Int,
     private val mLedsPerPacket: Int,
     private val mColorOrder: String,
     smoothing: SmoothingSettings,
-) : LedStreamClient(context, smoothing) {
+) : LedStreamClient(prefs, smoothing) {
 
     private val mLink = UdpLink(host, if (port > 0) port else DEFAULT_PORT)
 

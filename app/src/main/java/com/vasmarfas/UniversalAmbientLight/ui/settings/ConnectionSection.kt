@@ -25,11 +25,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantClient
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.network.Zigbee2MqttClient
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
+import com.vasmarfas.UniversalAmbientLight.common.util.ExtraOutputs
 import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 import com.vasmarfas.UniversalAmbientLight.ui.components.focusHighlight
+import com.vasmarfas.UniversalAmbientLight.ui.devices.HueAreaDialog
+import com.vasmarfas.UniversalAmbientLight.ui.devices.PairDialog
 import com.vasmarfas.UniversalAmbientLight.ui.devices.icon
 import com.vasmarfas.UniversalAmbientLight.ui.devices.titleRes
 
@@ -269,18 +273,8 @@ internal fun ColumnScope.ConnectionSection(
 
             OutputType.HOME_ASSISTANT -> HomeAssistantSection(
                 prefs = prefs,
-                analyticsPrefix = "ha",
-                keyToken = R.string.pref_key_ha_token,
                 lampsSpec = state.haLampsSpec,
                 onLampsClick = { state.showHaLampsDialog = true },
-                keyUpdateInterval = R.string.pref_key_ha_update_interval,
-                keyChangeThreshold = R.string.pref_key_ha_change_threshold,
-                keyTransition = R.string.pref_key_ha_transition,
-                keyBrightnessMode = R.string.pref_key_ha_brightness_mode,
-                keyBrightness = R.string.pref_key_ha_brightness,
-                keyDarkOff = R.string.pref_key_ha_dark_off,
-                keyDarkThreshold = R.string.pref_key_ha_dark_threshold,
-                keyTurnOffLights = R.string.pref_key_ha_turn_off_lights,
             )
 
             OutputType.HYPERION -> HyperionSettings(prefs, state)
@@ -431,18 +425,97 @@ private fun PairingPreference(title: String, paired: Boolean, onClick: () -> Uni
 /** Лампы основного подключения живут на тех же настройках ритма, что и Home Assistant. */
 @Composable
 private fun ColumnScope.MainLampBehavior(prefs: Preferences) {
-    LampBehaviorSection(
-        prefs = prefs,
-        analyticsPrefix = "lamps",
-        keyUpdateInterval = R.string.pref_key_ha_update_interval,
-        keyChangeThreshold = R.string.pref_key_ha_change_threshold,
-        keyTransition = R.string.pref_key_ha_transition,
-        keyBrightnessMode = R.string.pref_key_ha_brightness_mode,
-        keyBrightness = R.string.pref_key_ha_brightness,
-        keyDarkOff = R.string.pref_key_ha_dark_off,
-        keyDarkThreshold = R.string.pref_key_ha_dark_threshold,
-        keyTurnOffLights = R.string.pref_key_ha_turn_off_lights,
+    LampBehaviorSection(prefs = prefs, analyticsPrefix = "lamps")
+}
+
+/**
+ * Вход к контроллерам, работающим вместе с основным. Отдельный экран: иначе экран настроек
+ * рос бы на целую группу с каждым новым контроллером.
+ */
+@Composable
+internal fun ExtraOutputsPreference(prefs: Preferences, onClick: () -> Unit) {
+    val count = ExtraOutputs.ids(prefs).size
+    ClickablePreference(
+        title = stringResource(R.string.extra_outputs_title),
+        summary = if (count == 0) {
+            stringResource(R.string.extra_outputs_summary_empty)
+        } else {
+            stringResource(R.string.extra_outputs_summary_count, count)
+        },
+        onClick = onClick
     )
+}
+
+/** Диалоги, которые открывает [ConnectionSection]: что у основного контроллера, что у дополнительного. */
+@Composable
+internal fun ConnectionDialogs(prefs: Preferences, state: SettingsScreenState) {
+    if (state.showHaLampsDialog) {
+        ZoneLampsDialog(
+            prefs = prefs,
+            title = stringResource(R.string.ha_lamps_dialog_title),
+            hint = stringResource(R.string.ha_lamps_hint),
+            keyLamps = R.string.pref_key_ha_lamps,
+            fetch = {
+                HomeAssistantClient.fetchLights(
+                    prefs.getString(R.string.pref_key_host, "")?.trim().orEmpty(),
+                    prefs.getInt(R.string.pref_key_port, 8123),
+                    prefs.getString(R.string.pref_key_ha_token, "").orEmpty()
+                )
+            },
+            onSaved = { state.haLampsSpec = it },
+            onDismiss = { state.showHaLampsDialog = false },
+            identify = {
+                HomeAssistantClient.flash(
+                    prefs.getString(R.string.pref_key_host, "")?.trim().orEmpty(),
+                    prefs.getInt(R.string.pref_key_port, 8123),
+                    prefs.getString(R.string.pref_key_ha_token, "").orEmpty(),
+                    it
+                )
+            }
+        )
+    }
+    if (state.showLampsDialog) {
+        OutputLampsDialog(
+            prefs = prefs,
+            type = OutputType.of(state.connectionType),
+            onSaved = { state.lampsSpec = it },
+            onDismiss = { state.showLampsDialog = false }
+        )
+    }
+    if (state.showPairDialog) {
+        val type = OutputType.of(state.connectionType)
+        PairDialog(
+            prefs = prefs,
+            type = type,
+            onPaired = {
+                state.showPairDialog = false
+                state.pairingKey = prefs.getString(
+                    if (type == OutputType.HUE) R.string.pref_key_hue_username else R.string.pref_key_nanoleaf_token
+                ).orEmpty()
+                // Мосту сразу нужны лампы или зона: без них подсветке нечего включать
+                if (type == OutputType.HUE && state.lampsSpec.isBlank() && state.hueArea.isBlank()) {
+                    state.showHueAreaDialog = true
+                }
+            },
+            onDismiss = { state.showPairDialog = false }
+        )
+    }
+    if (state.showHueAreaDialog) {
+        HueAreaDialog(
+            prefs = prefs,
+            onPicked = { area ->
+                state.showHueAreaDialog = false
+                state.hueArea = area.orEmpty()
+                state.hueAreaName = prefs.getString(R.string.pref_key_hue_area_name).orEmpty()
+                if (area == null && state.lampsSpec.isBlank()) state.showLampsDialog = true
+            },
+            onRepair = {
+                state.showHueAreaDialog = false
+                state.showPairDialog = true
+            },
+            onDismiss = { state.showHueAreaDialog = false }
+        )
+    }
 }
 
 /** Текущий контроллер крупно, с иконкой: с него начинается настройка подключения. */

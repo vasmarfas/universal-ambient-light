@@ -151,6 +151,21 @@ class LedDataExtractorTest {
         assertNotSame(buffer, leds)
     }
 
+    @Test
+    fun `capture margins narrow a strip down to a part of the edge`() {
+        val leds = topLeds(
+            frame(SIZE) { x, _ -> if (x < SIZE / 4) RED else GREEN },
+            LedLayout(topLed = 2, startCorner = "top_left", captureMarginRight = 75)
+        )
+        assertArrayEquals(arrayOf(RED, RED), leds)
+    }
+
+    @Test
+    fun `a bar on one side takes its colors from that side only`() {
+        val leds = topLeds(halves(), LedLayout(leftLed = 3))
+        assertArrayEquals(arrayOf(RED, RED, RED), leds)
+    }
+
     private fun topLeds(
         screenData: ByteArray,
         layout: LedLayout,
