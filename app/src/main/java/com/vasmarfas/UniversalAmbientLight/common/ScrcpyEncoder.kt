@@ -245,6 +245,10 @@ class ScrcpyEncoder(
         var bytesReceived = 0L
         val sessionActive = AtomicBoolean(true)
         val watchdogTriggered = AtomicBoolean(false)
+        // Image смотрит прямо в память кодека: stop() снимает её с отображения, и чтение
+        // кадра падает SIGSEGV мимо всех catch. join этого не закрывает: его таймаут короче
+        // кадра на загруженном ТВ, а после interrupt супервизора он возвращается сразу
+        val frameLock = Any()
 
         try {
             // ── Определяем версию сервера ─────────────────────────────────
@@ -486,22 +490,24 @@ class ScrcpyEncoder(
                                 val isConfig =
                                     (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                                 if (!isConfig && info.size > 0) {
-                                    val img = finalDecoder.getOutputImage(idx)
-                                    if (img != null) {
-                                        try {
-                                            if (!sessionActive.get()) break
-                                            processImageDirect(img)
-                                            val decoded = framesDecoded.incrementAndGet()
-                                            if (decoded == 1) Log.i(
-                                                TAG,
-                                                "✓ First frame (${img.width}×${img.height})"
-                                            )
-                                            if (decoded % 100 == 0) Log.d(
-                                                TAG,
-                                                "Frames: $decoded bytes: $bytesReceived queue: ${mFrameQueue.size}"
-                                            )
-                                        } finally {
-                                            img.close()
+                                    synchronized(frameLock) {
+                                        val img = finalDecoder.getOutputImage(idx)
+                                        if (img != null) {
+                                            try {
+                                                if (!sessionActive.get()) break
+                                                processImageDirect(img)
+                                                val decoded = framesDecoded.incrementAndGet()
+                                                if (decoded == 1) Log.i(
+                                                    TAG,
+                                                    "✓ First frame (${img.width}×${img.height})"
+                                                )
+                                                if (decoded % 100 == 0) Log.d(
+                                                    TAG,
+                                                    "Frames: $decoded bytes: $bytesReceived queue: ${mFrameQueue.size}"
+                                                )
+                                            } finally {
+                                                img.close()
+                                            }
                                         }
                                     }
                                 }
@@ -617,13 +623,15 @@ class ScrcpyEncoder(
             // release() не зависит от stop(): тот бросает на сломанном или не запущенном
             // кодеке, а неосвобождённый декодер освобождает FinalizerDaemon, и на Xiaomi
             // MiTV (Android 10) native_finalize висит дольше 10 с и роняет процесс.
-            try {
-                decoder?.stop()
-            } catch (_: Exception) {
-            }
-            try {
-                decoder?.release()
-            } catch (_: Exception) {
+            synchronized(frameLock) {
+                try {
+                    decoder?.stop()
+                } catch (_: Exception) {
+                }
+                try {
+                    decoder?.release()
+                } catch (_: Exception) {
+                }
             }
             try {
                 videoStream?.close()

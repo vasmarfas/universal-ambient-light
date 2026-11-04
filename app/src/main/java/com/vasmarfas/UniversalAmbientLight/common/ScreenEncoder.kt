@@ -293,9 +293,7 @@ class ScreenEncoder(
         } catch (e: Exception) {
             if (DEBUG) Log.w(TAG, "Capture error", e)
         } finally {
-            // stopInternal с другого потока мог закрыть ImageReader между acquire и close —
-            // тогда close() бросает IllegalStateException, а необработанным он уронил бы
-            // весь поток захвата
+            // Сбой закрытия одного кадра не должен ронять весь поток захвата
             try {
                 img?.close()
             } catch (_: Exception) {
@@ -489,6 +487,16 @@ class ScreenEncoder(
         }
     }
 
+    // Кадр читается прямо из буфера ImageReader, а close() снимает буфер с отображения: чтение
+    // с другого потока падает SIGSEGV мимо всех catch. На потоке захвата кадр либо уже
+    // дочитан, либо ещё не взят.
+    private fun closeImageReader() {
+        val reader = mImageReader ?: return
+        mImageReader = null
+        val handler = mCaptureHandler
+        if (handler == null || !handler.post { reader.close() }) reader.close()
+    }
+
     private fun stopInternal(disconnect: Boolean) {
         synchronized(this) {
             if (DEBUG) Log.i(TAG, "Stopping (disconnect=$disconnect)")
@@ -505,8 +513,7 @@ class ScreenEncoder(
             // буферы поверх Binder, и закрытие после исчезновения looper'а приводит к взаимоблокировке
             // в FinalizerDaemon (BinderInternal$GcWatcher timed out): нативный финализатор не может
             // взять нужную блокировку Binder.
-            mImageReader?.close()
-            mImageReader = null
+            closeImageReader()
 
             mCaptureThread?.quitSafely()
             mCaptureThread = null
@@ -576,7 +583,7 @@ class ScreenEncoder(
             return
         }
 
-        mImageReader?.close()
+        closeImageReader()
 
         val imageReader = ImageReader.newInstance(
             mCaptureWidth, mCaptureHeight,
@@ -589,8 +596,7 @@ class ScreenEncoder(
             virtualDisplay.surface = imageReader.surface
         } catch (e: IllegalStateException) {
             Log.w(TAG, "setOrientation: surface assignment failed: ${e.message}")
-            mImageReader?.close()
-            mImageReader = null
+            closeImageReader()
             return
         }
 

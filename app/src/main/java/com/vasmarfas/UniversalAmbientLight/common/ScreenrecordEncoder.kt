@@ -155,6 +155,9 @@ class ScreenrecordEncoder(
         var codecInThread: Thread? = null
         var codecOutThread: Thread? = null
         var cleanExit = false
+        // Кадр читается прямо из памяти кодека, а stop() снимает её с отображения: чтение
+        // падает SIGSEGV мимо всех catch, поэтому кодек останавливают между кадрами
+        val frameLock = Any()
         val watchdogFlag = java.util.concurrent.atomic.AtomicBoolean(false)
         val codecFailureFlag = java.util.concurrent.atomic.AtomicBoolean(false)
         val hasDecodedFrame = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -237,23 +240,25 @@ class ScreenrecordEncoder(
                                 val isConfig =
                                     (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                                 if (!isConfig && info.size > 0) {
-                                    val img = finalDecoder.getOutputImage(idx)
-                                    if (img != null) {
-                                        try {
-                                            processImageDirect(img)
-                                            val decoded = framesDecoded.incrementAndGet()
-                                            hasDecodedFrame.set(true)
-                                            lastDecodeActivity.set(System.currentTimeMillis())
-                                            if (decoded == 1) Log.i(
-                                                TAG,
-                                                "✓ First frame decoded (${img.width}×${img.height})"
-                                            )
-                                            if (decoded % 100 == 0) Log.d(
-                                                TAG,
-                                                "Frames: $decoded, bytes in: ${bytesReceived.get()}, queue: ${mDataQueue.size}"
-                                            )
-                                        } finally {
-                                            img.close()
+                                    synchronized(frameLock) {
+                                        val img = finalDecoder.getOutputImage(idx)
+                                        if (img != null) {
+                                            try {
+                                                processImageDirect(img)
+                                                val decoded = framesDecoded.incrementAndGet()
+                                                hasDecodedFrame.set(true)
+                                                lastDecodeActivity.set(System.currentTimeMillis())
+                                                if (decoded == 1) Log.i(
+                                                    TAG,
+                                                    "✓ First frame decoded (${img.width}×${img.height})"
+                                                )
+                                                if (decoded % 100 == 0) Log.d(
+                                                    TAG,
+                                                    "Frames: $decoded, bytes in: ${bytesReceived.get()}, queue: ${mDataQueue.size}"
+                                                )
+                                            } finally {
+                                                img.close()
+                                            }
                                         }
                                     }
                                 }
@@ -402,13 +407,15 @@ class ScreenrecordEncoder(
             }
             // release() отдельно от stop(), как в ScrcpyEncoder: иначе декодер уходит
             // в финализатор, который на части ТВ виснет и роняет процесс.
-            try {
-                decoder?.stop()
-            } catch (_: Exception) {
-            }
-            try {
-                decoder?.release()
-            } catch (_: Exception) {
+            synchronized(frameLock) {
+                try {
+                    decoder?.stop()
+                } catch (_: Exception) {
+                }
+                try {
+                    decoder?.release()
+                } catch (_: Exception) {
+                }
             }
             try {
                 codecOutThread?.join(300)
