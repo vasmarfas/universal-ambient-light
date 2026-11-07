@@ -237,6 +237,16 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  announce:
+    needs: github_release
+    # a draft is announced by the release event once it is published by hand
+    if: ${{ !cancelled() && needs.github_release.result == 'success' && inputs.github_publish }}
+    uses: ./.github/workflows/announce.yml
+    with:
+      tag: v${{ inputs.version_name }}
+      notes: ${{ inputs.release_notes_github }}
+    secrets: inherit
+
   google_play:
     runs-on: ubuntu-latest
     needs: [build, unit_tests, tests_override]

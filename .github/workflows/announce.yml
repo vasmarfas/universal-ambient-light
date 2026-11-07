@@ -1,0 +1,39 @@
+name: Announce
+
+on:
+  release:
+    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      notes:
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - name: Post to the project chat
+      env:
+        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        NOTES: ${{ inputs.notes || github.event.release.body }}
+      run: |
+        set -eu
+        {
+          printf 'Universal Ambient Light %s\n\n' "$TAG"
+          printf '%b\n' "$NOTES" | sed -E '/^\|/d; s/^#+ *//; s/\*\*//g' | awk 'n + length($0) > 1500 { print "…"; exit } { n += length($0) + 1; print }'
+          printf '\nСкачать / Download: https://github.com/%s/releases/tag/%s\n' "$GITHUB_REPOSITORY" "$TAG"
+          printf 'Google Play: https://play.google.com/store/apps/details?id=com.vasmarfas.UniversalAmbientLight\n'
+          printf 'RuStore: https://www.rustore.ru/catalog/app/com.vasmarfas.UniversalAmbientLight\n'
+        } | cat -s > message.txt
+        curl -fsS "https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage" \
+          --data-urlencode chat_id=@vasmarfas_chat \
+          --data-urlencode message_thread_id=17 \
+          --data-urlencode text@message.txt \
+          --data-urlencode 'link_preview_options={"is_disabled":true}' > /dev/null
