@@ -22,11 +22,22 @@ jobs:
       env:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
         TAG: ${{ inputs.tag || github.event.release.tag_name }}
-        NOTES: ${{ inputs.notes || github.event.release.body }}
+        NOTES: ${{ inputs.notes }}
+        BODY: ${{ github.event.release.body }}
       run: |
         set -eu
+        # the notes of the release form keep their lines, a markdown body wraps on its own
+        if [ -n "$NOTES" ]; then printf '%b\n' "$NOTES" | sed 's/$/  /'; else printf '%s\n' "$BODY"; fi > notes.md
         {
-          printf '## Universal Ambient Light %s\n\n%b\n\n' "$TAG" "$NOTES"
+          printf '## Universal Ambient Light %s\n\n' "$TAG"
+          if [ "$(wc -m < notes.md)" -gt 500 ]; then
+            printf '<details><summary>Что нового / What is new</summary>\n\n'
+            cat notes.md
+            printf '\n</details>\n\n'
+          else
+            cat notes.md
+            printf '\n'
+          fi
           printf '[Скачать / Download](https://github.com/%s/releases/tag/%s) · ' "$GITHUB_REPOSITORY" "$TAG"
           printf '[Google Play](https://play.google.com/store/apps/details?id=com.vasmarfas.UniversalAmbientLight) · '
           printf '[RuStore](https://www.rustore.ru/catalog/app/com.vasmarfas.UniversalAmbientLight)\n'
