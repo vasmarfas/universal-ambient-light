@@ -199,6 +199,8 @@
   <string name="pref_summary_border_detection_enabled">Ignore black bars around the picture (works for 16:9, 1.85:1, 2.39:1 content). Off by default.</string>
   <string name="pref_title_border_threshold">Black threshold (RGB 0–64)</string>
   <string name="pref_title_border_check_interval">Detection interval (frames)</string>
+  <string name="pref_title_border_ignore_subtitles">Ignore subtitles in the bottom bar</string>
+  <string name="pref_summary_border_ignore_subtitles">Takes the bar height from the top edge and checks only the corners at the bottom, so subtitles in the bar do not reduce the crop. Dark scenes keep the crop. Subtitles over the picture still reach the LEDs.</string>
   <string name="pref_group_camera_idle">Camera Sleep Mode</string>
   <string name="pref_title_camera_idle_enabled">Enable sleep mode</string>
   <string name="pref_summary_camera_idle_enabled">Camera capture receives no standby signal from the TV, so a powered-off screen keeps streaming sensor noise to the strip. When enabled, the LEDs turn off once the picture goes blank, and frame transmission pauses until the picture returns. Disabled by default.</string>
@@ -236,6 +238,16 @@
   <string name="pref_title_language">Language</string>
   <string name="pref_title_reset_picture">Reset picture settings</string>
   <string name="pref_summary_reset_picture">Capture rate and quality, color correction, smoothing and black bar cropping go back to their defaults. The connection, LED layout and camera calibration stay as they are</string>
+  <string name="pref_title_backup_save">Save settings to a file</string>
+  <string name="pref_summary_backup_save">All settings except pairing with the phone. Tokens and passwords of your lights are stored in the file as plain text</string>
+  <string name="pref_title_backup_restore">Restore settings from a file</string>
+  <string name="pref_summary_backup_restore">Replaces all current settings. On a TV this needs a file manager, or do it from the phone remote</string>
+  <string name="backup_saved">Settings saved: %1$s</string>
+  <string name="backup_save_failed">Could not save the file</string>
+  <string name="backup_restored">Settings restored</string>
+  <string name="backup_restored_without_method">Settings restored. The capture method from the file is not available here, the current one stays</string>
+  <string name="backup_read_failed">Could not read settings from this file</string>
+  <string name="backup_no_picker">No file manager found on this device</string>
   <string name="pref_key_language">language</string>
   <string-array name="pref_list_language">
     <item>Default</item>

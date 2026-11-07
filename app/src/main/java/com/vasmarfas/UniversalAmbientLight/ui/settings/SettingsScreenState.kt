@@ -127,6 +127,7 @@ class SettingsScreenState(prefs: Preferences) {
             R.string.pref_key_border_detection_enabled,
             R.string.pref_key_border_threshold,
             R.string.pref_key_border_check_interval,
+            R.string.pref_key_border_ignore_subtitles,
         )
     }
 }

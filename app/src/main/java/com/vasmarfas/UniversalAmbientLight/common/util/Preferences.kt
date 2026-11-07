@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class Preferences(
     private val context: Context,
-    private val preferences: SharedPreferences = defaultSharedPreferences(context),
+    val preferences: SharedPreferences = defaultSharedPreferences(context),
     private val keyPrefix: String = "",
 ) {
 

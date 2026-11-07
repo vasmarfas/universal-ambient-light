@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -75,7 +76,9 @@ fun SettingsScreen(
         AnalyticsHelper.logSettingsOpened(context)
     }
 
-    val state = remember(prefs) { SettingsScreenState(prefs) }
+    var restoreRevision by remember { mutableIntStateOf(0) }
+    val state = remember(prefs, restoreRevision) { SettingsScreenState(prefs) }
+    val backup = rememberBackupActions(prefs) { restoreRevision++ }
 
     Scaffold(
         topBar = {
@@ -106,7 +109,7 @@ fun SettingsScreen(
         // Новый снимок настроек с ТВ пересоздаёт поля — они перечитывают значения. Ключ —
         // ревизия, а не сам prefs: объект пересоздаётся при каждом возврате на экран, и
         // прокрутка теряла бы сохранённое место
-        key(remote?.tv?.id, remote?.revision, state.resetRevision) {
+        key(remote?.tv?.id, remote?.revision, state.resetRevision, restoreRevision) {
             Column(
                 modifier = Modifier
                     .padding(paddingValues)
@@ -132,7 +135,7 @@ fun SettingsScreen(
                 BorderDetectionSection(prefs, state)
                 SmoothingSection(prefs, state, onDelayClick)
                 if (remote == null) RemoteSection(onRemoteHostClick, onRemoteTvsClick)
-                GeneralSection(prefs, state)
+                GeneralSection(prefs, state, backup)
             }
         }
     }

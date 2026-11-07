@@ -36,6 +36,12 @@ object CaptureLauncher {
 
     class Result(val outcome: Outcome, val message: String? = null)
 
+    /** Методы захвата, которые есть в этой сборке и работают на этом железе. */
+    fun availableMethods(context: Context): List<String> =
+        context.resources.getStringArray(R.array.pref_list_capture_method_values)
+            .filter { (it != "mtk_thal_capture" || MtkThalCaptureEncoder.isAvailable()) &&
+                (it != "mstar_vss_capture" || MStarVssCaptureEncoder.isAvailable()) }
+
     fun start(context: Context): Result {
         val app = context.applicationContext
         ScreenGrabberService.validateSettings(app)?.let { return Result(Outcome.FAILED, it.message) }

@@ -51,6 +51,9 @@
 
     <application
         android:name=".AmbilightApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:theme="@style/AppTheme"
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"

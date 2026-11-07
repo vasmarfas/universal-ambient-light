@@ -56,5 +56,18 @@ internal fun ColumnScope.BorderDetectionSection(prefs: Preferences, state: Setti
                 )
             }
         )
+        CheckBoxPreference(
+            prefs = prefs,
+            keyRes = R.string.pref_key_border_ignore_subtitles,
+            title = stringResource(R.string.pref_title_border_ignore_subtitles),
+            summary = stringResource(R.string.pref_summary_border_ignore_subtitles),
+            onValueChange = { enabled ->
+                AnalyticsHelper.logSettingChanged(
+                    context,
+                    "border_ignore_subtitles",
+                    enabled.toString()
+                )
+            }
+        )
     }
 }

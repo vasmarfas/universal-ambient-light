@@ -201,6 +201,8 @@
   <string name="pref_summary_border_detection_enabled">Игнорировать чёрные полосы вокруг картинки (16:9, 1.85:1, 2.39:1). По умолчанию выключено.</string>
   <string name="pref_title_border_threshold">Порог чёрного (RGB 0–64)</string>
   <string name="pref_title_border_check_interval">Интервал детекции (кадры)</string>
+  <string name="pref_title_border_ignore_subtitles">Игнорировать субтитры в нижней полосе</string>
+  <string name="pref_summary_border_ignore_subtitles">Высота полосы берётся по верхнему краю, снизу проверяются только углы, поэтому субтитры в полосе не уменьшают обрезку. В тёмных сценах обрезка сохраняется. Субтитры поверх картинки всё равно попадают на ленту.</string>
   <string name="pref_group_camera_idle">Режим сна (камера)</string>
   <string name="pref_title_camera_idle_enabled">Включить режим сна</string>
   <string name="pref_summary_camera_idle_enabled">При захвате с камеры телевизор не передаёт сигнал перехода в режим ожидания, поэтому выключенный экран продолжает передавать на ленту шум матрицы. При включении подсветка отключается, как только изображение становится тёмным, и передача кадров возобновляется при появлении картинки. По умолчанию выключено.</string>
@@ -238,6 +240,16 @@
   <string name="pref_title_language">Язык</string>
   <string name="pref_title_reset_picture">Сбросить настройки картинки</string>
   <string name="pref_summary_reset_picture">Частота и качество захвата, цветокоррекция, сглаживание и обрезка чёрных полос вернутся к значениям по умолчанию. Подключение, раскладка ленты и калибровка камеры останутся как есть</string>
+  <string name="pref_title_backup_save">Сохранить настройки в файл</string>
+  <string name="pref_summary_backup_save">Все настройки, кроме сопряжения с телефоном. Токены и пароли ламп лежат в файле открытым текстом</string>
+  <string name="pref_title_backup_restore">Восстановить настройки из файла</string>
+  <string name="pref_summary_backup_restore">Заменяет все текущие настройки. На ТВ для этого нужен файловый менеджер, либо восстановите с телефона-пульта</string>
+  <string name="backup_saved">Настройки сохранены: %1$s</string>
+  <string name="backup_save_failed">Не удалось сохранить файл</string>
+  <string name="backup_restored">Настройки восстановлены</string>
+  <string name="backup_restored_without_method">Настройки восстановлены. Метода захвата из файла здесь нет, оставлен текущий</string>
+  <string name="backup_read_failed">Не удалось прочитать настройки из этого файла</string>
+  <string name="backup_no_picker">На устройстве не найден файловый менеджер</string>
   <string name="pref_key_language">language</string>
   <string-array name="pref_list_language">
     <item>По умолчанию</item>

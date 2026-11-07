@@ -360,4 +360,6 @@
     <integer name="pref_default_border_threshold" translatable="false">18</integer>
     <string name="pref_key_border_check_interval" translatable="false">pref_key_border_check_interval</string>
     <integer name="pref_default_border_check_interval" translatable="false">60</integer>
+    <string name="pref_key_border_ignore_subtitles" translatable="false">pref_key_border_ignore_subtitles</string>
+    <bool name="pref_default_border_ignore_subtitles" translatable="false">false</bool>
 </resources>

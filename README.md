@@ -32,6 +32,7 @@ on both phones and Android TV.
 - **Phone remote**: pair with the TV by QR code, then start, stop and change every lighting
   setting of the TV from the phone. The phone also works as a TV remote with a touchpad
   mouse and a keyboard.
+- **Settings backup**: all settings go to a file and back, on a TV also through the phone remote.
 - **Sleep timer** that turns the lighting off after 15 minutes to 2 hours.
 - **Average color mode**: sends one dominant color instead of a full strip, for weak devices.
 - **Quick Settings tile** for switching the light on and off.
@@ -131,6 +132,9 @@ stop the others; it retries in the background and shows up only in the log.
     - *High (256px)* — For powerful devices only.
     - *Ultra (512px)* — Maximum quality for high-end devices.
 - **Send Average Color**: Enable for maximum performance (sends a single color for the whole strip).
+- **Ignore subtitles in the bottom bar**: an option of black bar detection, off by default. The bar
+  height comes from the top edge, the bottom is only checked near the corners, and dark scenes keep
+  the crop. Subtitles over the picture still reach the LEDs.
 
 ### 3.1. Camera Mode Setup
 When using **Camera** as the capture source:
@@ -220,6 +224,20 @@ that is playing or for all apps. A strip that is behind the picture cannot be fi
 delay: lower the smoothing or pick a faster capture method.
 
 ---
+
+### 8. Settings backup
+**Settings → Save settings to a file** writes `Download/universal-ambient-light-<date>-<time>.json`.
+On Android 8 and 9 the system file picker opens instead. **Restore settings from a file** replaces
+all current settings with the ones from the file.
+
+- The file holds all settings, additional controllers included, and the tokens and passwords of
+  your lights as plain text.
+- Pairing with the phone, ADB keys and system permissions are not in the file. They are set up again
+  after a reinstall.
+- A capture method that this build or device does not have is skipped, the current one stays.
+- Android TV may have no system file picker, then restoring needs a file manager. Without one, pair
+  the phone and use the same two items in its settings: the file stays on the phone, the settings go
+  to the TV.
 
 ### Controller-Specific Details
 

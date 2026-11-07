@@ -162,6 +162,94 @@ class BorderProcessorTest {
         assertNotNull(processor.currentBorder)
     }
 
+    @Test
+    fun `subtitles in the bottom bar count as picture by default`() {
+        val processor = BorderProcessor(initialStabilityDetections = 1)
+        val frame = subtitled(letterbox())
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        assertEquals(BorderRect(16, 0, 6, 0), processor.currentBorder)
+    }
+
+    @Test
+    fun `subtitles in the bottom bar do not reduce the crop when ignored`() {
+        val processor = subtitleProcessor()
+        val frame = subtitled(letterbox())
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        assertEquals(BorderRect(16, 0, 16, 0), processor.currentBorder)
+    }
+
+    @Test
+    fun `the encoder path passes the subtitle option to the processor`() {
+        val processor = BorderProcessor(initialStabilityDetections = 1)
+        val frame = subtitled(letterbox())
+        val options = options(ignoreSubtitles = true)
+        repeat(2) { processor.applyForEncoder(frame, SIZE, SIZE, options) }
+        assertEquals(BorderRect(16, 0, 16, 0), processor.currentBorder)
+    }
+
+    @Test
+    fun `a bottom bar smaller than the top one is kept when subtitles are ignored`() {
+        val processor = subtitleProcessor()
+        val frame = frame { _, y -> if (y < BAR || y >= SIZE - BAR / 2) 0 else LIT }
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        assertEquals(BorderRect(16, 0, 8, 0), processor.currentBorder)
+    }
+
+    @Test
+    fun `a bottom bar never exceeds the top one when subtitles are ignored`() {
+        val processor = subtitleProcessor()
+        val frame = frame { _, y -> if (y < BAR / 2 || y >= SIZE - BAR) 0 else LIT }
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        assertEquals(BorderRect(8, 0, 8, 0), processor.currentBorder)
+    }
+
+    @Test
+    fun `dark bottom corners of a full frame are not cropped when subtitles are ignored`() {
+        val processor = subtitleProcessor()
+        val frame = frame { x, y -> if (y >= SIZE / 2 && (x < 8 || x >= SIZE - 8)) 0 else LIT }
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        processor.parseBorderRgb(frame, SIZE, SIZE)
+        assertNull(processor.currentBorder)
+    }
+
+    @Test
+    fun `a dark scene drops the crop by default`() {
+        val processor = detectedLetterbox()
+        val dark = frame { _, _ -> 0 }
+        repeat(2) { processor.parseBorderRgb(dark, SIZE, SIZE) }
+        assertNull(processor.currentBorder)
+    }
+
+    @Test
+    fun `a dark scene with subtitles keeps the crop when they are ignored`() {
+        val processor = detectedLetterbox().apply { ignoreSubtitles = true }
+        val dark = subtitled(frame { _, _ -> 0 })
+        repeat(5) { processor.parseBorderRgb(dark, SIZE, SIZE) }
+        assertEquals(BorderRect(16, 0, 16, 0), processor.currentBorder)
+    }
+
+    @Test
+    fun `a dark frame does not invent a crop when subtitles are ignored`() {
+        val processor = subtitleProcessor()
+        val dark = subtitled(frame { _, _ -> 0 })
+        repeat(2) { processor.parseBorderRgb(dark, SIZE, SIZE) }
+        assertNull(processor.currentBorder)
+    }
+
+    @Test
+    fun `a full frame after a dark scene removes the kept crop`() {
+        val processor = detectedLetterbox().apply { ignoreSubtitles = true }
+        val dark = frame { _, _ -> 0 }
+        val full = frame { _, _ -> LIT }
+        repeat(2) { processor.parseBorderRgb(dark, SIZE, SIZE) }
+        repeat(2) { processor.parseBorderRgb(full, SIZE, SIZE) }
+        assertNull(processor.currentBorder)
+    }
+
     private fun detectedLetterbox(): BorderProcessor {
         val processor = BorderProcessor(initialStabilityDetections = 1)
         val frame = letterbox()
@@ -170,7 +258,14 @@ class BorderProcessorTest {
         return processor
     }
 
-    private fun options(enabled: Boolean = true, intervalFrames: Int = 1) = AppOptions(
+    private fun subtitleProcessor() =
+        BorderProcessor(initialStabilityDetections = 1).apply { ignoreSubtitles = true }
+
+    private fun options(
+        enabled: Boolean = true,
+        intervalFrames: Int = 1,
+        ignoreSubtitles: Boolean = false,
+    ) = AppOptions(
         horizontalLED = 20,
         verticalLED = 10,
         frameRate = 30,
@@ -179,10 +274,23 @@ class BorderProcessorTest {
         borderDetectionEnabled = enabled,
         borderThreshold = 18,
         borderCheckIntervalFrames = intervalFrames,
+        borderIgnoreSubtitles = ignoreSubtitles,
     )
 
     private fun letterbox(barLevel: Int = 0) =
         frame { _, y -> if (y < BAR || y >= SIZE - BAR) barLevel else LIT }
+
+    /** Две строки белого текста в нижней полосе: шире половины кадра, но не доходят до углов. */
+    private fun subtitled(base: ByteArray): ByteArray {
+        val data = base.copyOf()
+        for (y in intArrayOf(SIZE - 12, SIZE - 11, SIZE - 8, SIZE - 7)) {
+            for (x in SIZE / 4 until SIZE * 3 / 4) {
+                val offset = (y * SIZE + x) * 3
+                data.fill(LIT.toByte(), offset, offset + 3)
+            }
+        }
+        return data
+    }
 
     private fun pillarbox(barLevel: Int = 0) =
         frame { x, _ -> if (x < BAR || x >= SIZE - BAR) barLevel else LIT }

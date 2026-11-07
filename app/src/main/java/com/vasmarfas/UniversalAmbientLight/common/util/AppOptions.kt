@@ -25,6 +25,7 @@ class AppOptions(
     @Volatile var borderDetectionEnabled: Boolean = false,
     @Volatile var borderThreshold: Int = 18,
     @Volatile var borderCheckIntervalFrames: Int = 60,
+    @Volatile var borderIgnoreSubtitles: Boolean = false,
     // Автосон камеры. Изменяемый по той же причине, что и цвет: пороги подбираются только
     // вживую под работающей камерой.
     @Volatile var cameraIdleEnabled: Boolean = false,
@@ -76,6 +77,10 @@ class AppOptions(
             60
         )
             .coerceIn(1, 300)
+        borderIgnoreSubtitles = prefs.getBoolean(
+            com.vasmarfas.UniversalAmbientLight.R.string.pref_key_border_ignore_subtitles,
+            false
+        )
     }
 
     /** Перечитывает все поля цветокоррекции из настроек. Дёшево, вызывать можно из любого потока. */

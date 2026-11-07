@@ -1547,7 +1547,11 @@ class ScreenGrabberService : Service() {
             ),
             borderThreshold = prefs.getInt(R.string.pref_key_border_threshold, 18).coerceIn(0, 64),
             borderCheckIntervalFrames = prefs.getInt(R.string.pref_key_border_check_interval, 60)
-                .coerceIn(1, 300)
+                .coerceIn(1, 300),
+            borderIgnoreSubtitles = prefs.getBoolean(
+                R.string.pref_key_border_ignore_subtitles,
+                false
+            )
         )
         opts.refreshCameraIdleSettings(prefs)
         mActiveOptions = opts
@@ -1573,11 +1577,12 @@ class ScreenGrabberService : Service() {
         val keyBorderOn = getString(R.string.pref_key_border_detection_enabled)
         val keyBorderTh = getString(R.string.pref_key_border_threshold)
         val keyBorderIv = getString(R.string.pref_key_border_check_interval)
+        val keyBorderSubs = getString(R.string.pref_key_border_ignore_subtitles)
         val colorKeys = setOf(
             keyBrightness, keyContrast, keyBlack, keyWhite, keySaturation, keyEnabled,
             keyBr, keyBg, keyBb, keyGr, keyGg, keyGb
         )
-        val borderKeys = setOf(keyBorderOn, keyBorderTh, keyBorderIv)
+        val borderKeys = setOf(keyBorderOn, keyBorderTh, keyBorderIv, keyBorderSubs)
         // Пороги автосна настраиваются только вживую под камерой, поэтому идут тем же путём
         // «правка во время захвата», что и цветовые настройки.
         val cameraIdleKeys = setOf(

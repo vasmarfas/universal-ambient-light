@@ -30,6 +30,15 @@ class BorderProcessor(
     @Volatile
     var stabilityDetections: Int = initialStabilityDetections
 
+    /**
+     * Субтитры в нижней полосе не считаются картинкой: снизу проверяются только углы, куда
+     * центрированный текст не достаёт, а полоса не бывает больше верхней. Кадр, в котором
+     * верхняя полоса не измеряется, обрезку не снимает, иначе тёмная сцена открыла бы ленте
+     * субтитры.
+     */
+    @Volatile
+    var ignoreSubtitles: Boolean = false
+
     private var mPreviousBorder: BorderRect? = null
     var currentBorder: BorderRect? = null
         private set
@@ -66,7 +75,9 @@ class BorderProcessor(
 
     /** Путь для плоского RGB (3 байта на пиксель, построчно). */
     fun parseBorderRgb(rgb: ByteArray, width: Int, height: Int) {
-        checkNewBorder(findBorderRgb(rgb, width, height))
+        val border = findBorderRgb(rgb, width, height)
+        if (ignoreSubtitles && border.top < 0 && currentBorder != null) return
+        checkNewBorder(border)
     }
 
     /** Путь для ImageReader из MediaProjection (буфер RGBA со stride). */
@@ -140,6 +151,7 @@ class BorderProcessor(
             return CropResult(rgb, width, height)
         }
         blackThreshold = options.borderThreshold
+        ignoreSubtitles = options.borderIgnoreSubtitles
         val interval = options.borderCheckIntervalFrames.coerceAtLeast(1)
         if (++mDetectCounter >= interval) {
             mDetectCounter = 0
@@ -172,10 +184,17 @@ class BorderProcessor(
         }
         var bottom = -1
         for (y in height - 1 downTo height - maxV) {
-            if (!isRowBlack(rgb, rowBytes, y, width, xStep)) {
+            val black = if (ignoreSubtitles) {
+                areCornersBlack(rgb, rowBytes, y, width)
+            } else {
+                isRowBlack(rgb, rowBytes, y, width, xStep)
+            }
+            if (!black) {
                 bottom = height - 1 - y; break
             }
         }
+        // Углы бывают тёмными и в самой картинке, поэтому им верим только в меньшую сторону.
+        if (ignoreSubtitles && (bottom < 0 || bottom > top)) bottom = top
         var left = -1
         for (x in 0 until maxH) {
             if (!isColBlack(rgb, rowBytes, x, height, yStep)) {
@@ -220,6 +239,12 @@ class BorderProcessor(
             x += xStep
         }
         return samples > 0 && blacks * 100 >= samples * BLACK_PERCENT
+    }
+
+    private fun areCornersBlack(rgb: ByteArray, rowBytes: Int, y: Int, width: Int): Boolean {
+        val base = y * rowBytes
+        val inset = width / 10
+        return isBlackAt(rgb, base + inset * 3) && isBlackAt(rgb, base + (width - 1 - inset) * 3)
     }
 
     private fun isColBlack(

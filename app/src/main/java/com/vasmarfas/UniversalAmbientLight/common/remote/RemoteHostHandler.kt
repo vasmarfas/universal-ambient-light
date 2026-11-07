@@ -13,8 +13,6 @@ import com.vasmarfas.UniversalAmbientLight.BuildConfig
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.AccessibilityCaptureService
 import com.vasmarfas.UniversalAmbientLight.common.CaptureLauncher
-import com.vasmarfas.UniversalAmbientLight.common.MStarVssCaptureEncoder
-import com.vasmarfas.UniversalAmbientLight.common.MtkThalCaptureEncoder
 import com.vasmarfas.UniversalAmbientLight.common.ScreenGrabberService
 import com.vasmarfas.UniversalAmbientLight.common.network.OutputType
 import com.vasmarfas.UniversalAmbientLight.common.input.TvApps
@@ -268,9 +266,6 @@ internal class RemoteHostHandler(
     }
 
     private fun capabilities(): JSONObject {
-        val methods = mContext.resources.getStringArray(R.array.pref_list_capture_method_values)
-            .filter { (it != "mtk_thal_capture" || MtkThalCaptureEncoder.isAvailable()) &&
-                (it != "mstar_vss_capture" || MStarVssCaptureEncoder.isAvailable()) }
         return JSONObject()
             .put("sdk", Build.VERSION.SDK_INT)
             .put("app", BuildConfig.VERSION_NAME)
@@ -279,7 +274,7 @@ internal class RemoteHostHandler(
             .put("accessibilityOn", AccessibilityCaptureService.getInstance() != null)
             .put("projectMedia", PermissionHelper.hasProjectMediaPermission(mContext))
             .put("overlay", PermissionHelper.canDrawOverlays(mContext))
-            .put("methods", JSONArray(methods))
+            .put("methods", JSONArray(CaptureLauncher.availableMethods(mContext)))
             .put("features", JSONArray(FEATURES))
             .put("usageAccess", ForegroundApp.hasAccess(mContext))
     }

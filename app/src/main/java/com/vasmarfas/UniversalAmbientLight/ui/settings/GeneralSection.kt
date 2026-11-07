@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.vasmarfas.UniversalAmbientLight.common.remote.RemoteSession
 import com.vasmarfas.UniversalAmbientLight.common.util.AnalyticsHelper
 import com.vasmarfas.UniversalAmbientLight.common.util.DeviceProfile
 import com.vasmarfas.UniversalAmbientLight.common.util.LocaleHelper
@@ -22,7 +23,11 @@ import kotlinx.coroutines.launch
  * Общие настройки и отладочная информация.
  */
 @Composable
-internal fun ColumnScope.GeneralSection(prefs: Preferences, state: SettingsScreenState) {
+internal fun ColumnScope.GeneralSection(
+    prefs: Preferences,
+    state: SettingsScreenState,
+    backup: BackupActions,
+) {
     val context = LocalContext.current
     val remote = LocalRemote.current
     val scope = rememberCoroutineScope()
@@ -97,6 +102,20 @@ internal fun ColumnScope.GeneralSection(prefs: Preferences, state: SettingsScree
             title = stringResource(R.string.pref_title_reset_picture),
             summary = stringResource(R.string.pref_summary_reset_picture),
             onClick = { state.showResetPictureDialog = true }
+        )
+        // Без связи в зеркале лежит старый снимок ТВ
+        val online = remote == null || remote.connection == RemoteSession.Connection.CONNECTED
+        ClickablePreference(
+            title = stringResource(R.string.pref_title_backup_save),
+            summary = stringResource(R.string.pref_summary_backup_save),
+            enabled = online,
+            onClick = backup.save
+        )
+        ClickablePreference(
+            title = stringResource(R.string.pref_title_backup_restore),
+            summary = stringResource(R.string.pref_summary_backup_restore),
+            enabled = online,
+            onClick = backup.restore
         )
     }
 
