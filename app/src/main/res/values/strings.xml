@@ -281,6 +281,7 @@
   <string name="url_dialog_open_link">Open Link</string>
   <string name="help_readme_url">https://github.com/vasmarfas/universal-ambient-light/blob/master/README.md</string>
   <string name="support_url">https://github.com/vasmarfas/universal-ambient-light/blob/master/SUPPORT.md</string>
+  <string name="chat_url" translatable="false">https://t.me/vasmarfas_chat</string>
   <string name="notification_channel_label">Universal Ambient Light Notifications</string>
   <string name="notification_description">Currently grabbing screen content</string>
   <string name="pref_title_use_avg_color">Send Average Screen Color</string>
@@ -497,6 +498,7 @@
   <string name="help_title">How to use</string>
   <string name="help_message">Before using this app, you need to set up your LED controller:\n\n• WLED: Configure WLED firmware on your ESP8266/ESP32 device\n• Adalight: Connect Arduino with Adalight firmware via USB\n• Hyperion: Install and configure Hyperion server\n\nFor detailed setup instructions, please visit the GitHub repository.</string>
   <string name="help_open_github">Open GitHub</string>
+  <string name="help_open_chat">Telegram chat</string>
   <string name="help_close">Close</string>
   <string name="support_project_title">Support Project</string>
   <string name="support_project_message">Thank you for your interest in supporting this project!\n\nYou can support the development through:\n• Boosty\n• Cryptocurrency (TON)\n• Leave a review on Google Play\n\nClick below to see all available options.</string>

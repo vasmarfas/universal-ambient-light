@@ -232,6 +232,20 @@ fun AppNavHost(
             if (showHelpDialog) {
                 HelpDialog(
                     onDismiss = { showHelpDialog = false },
+                    onOpenChat = {
+                        val url = context.getString(R.string.chat_url)
+                        showHelpDialog = false
+
+                        if (isTv) {
+                            showUrlDialog = url
+                        } else {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            } catch (e: Exception) {
+                                showUrlDialog = url
+                            }
+                        }
+                    },
                     onOpenGitHub = {
                         AnalyticsHelper.logHelpLinkOpened(context)
                         val url = context.getString(R.string.help_readme_url)

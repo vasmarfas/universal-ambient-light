@@ -478,6 +478,7 @@
   <string name="help_title">Как использовать</string>
   <string name="help_message">Перед использованием приложения необходимо настроить контроллер подсветки:\n\n• WLED: Настройте прошивку WLED на вашем устройстве ESP8266/ESP32\n• Adalight: Подключите Arduino с прошивкой Adalight через USB\n• Hyperion: Установите и настройте сервер Hyperion\n\nПодробные инструкции по настройке смотрите в репозитории GitHub.</string>
   <string name="help_open_github">Открыть GitHub</string>
+  <string name="help_open_chat">Чат в Telegram</string>
   <string name="help_close">Закрыть</string>
   <string name="support_project_title">Поддержать проект</string>
   <string name="support_project_message">Спасибо за интерес к поддержке проекта!\n\nВы можете поддержать разработку через:\n• Boosty\n• Криптовалюту (TON)\n• Оставить отзыв в Google Play\n\nНажмите ниже, чтобы увидеть все доступные варианты.</string>

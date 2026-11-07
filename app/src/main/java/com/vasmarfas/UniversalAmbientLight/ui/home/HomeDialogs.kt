@@ -60,6 +60,7 @@ import kotlinx.coroutines.withContext
 fun HelpDialog(
     onDismiss: () -> Unit,
     onOpenGitHub: () -> Unit,
+    onOpenChat: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -70,6 +71,9 @@ fun HelpDialog(
             Text(stringResource(R.string.help_message))
         },
         confirmButton = {
+            TextButton(onClick = onOpenChat) {
+                Text(stringResource(R.string.help_open_chat))
+            }
             TextButton(onClick = onOpenGitHub) {
                 Text(stringResource(R.string.help_open_github))
             }

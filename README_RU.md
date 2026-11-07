@@ -7,7 +7,7 @@
 контроллер или умные лампы. Без захвата умеет крутить световые эффекты. Работает на
 Android 8.0 и новее, и на телефонах, и на Android TV.
 
-[Read in English](README.md) · [Поддержать проект](SUPPORT.md) ·
+[Read in English](README.md) · [Чат в Telegram](https://t.me/vasmarfas_chat) · [Поддержать проект](SUPPORT.md) ·
 [Лицензии сторонних компонентов](THIRD_PARTY_LICENSES.md)
 
 ## Возможности

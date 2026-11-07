@@ -7,7 +7,7 @@ device camera), extracts the edge colors and streams them to an LED strip, a con
 smart lights. Without capture it can also run light effects. Runs on Android 8.0 and newer,
 on both phones and Android TV.
 
-[Читать на русском](README_RU.md) · [Support the project](SUPPORT.md) ·
+[Читать на русском](README_RU.md) · [Telegram chat](https://t.me/vasmarfas_chat) · [Support the project](SUPPORT.md) ·
 [Third-party licenses](THIRD_PARTY_LICENSES.md)
 
 ## Features
