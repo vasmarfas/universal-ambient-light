@@ -151,7 +151,7 @@ class AdalightClient(
         // На этом этапе диалог уже должен быть показан активити,
         // поэтому из сервиса мы только проверяем флаг.
         if (!usbManager.hasPermission(device)) {
-            throw IOException("USB device permission denied. Please allow USB access when prompted, or grant permission manually in Android Settings > Apps > Hyperion Grabber > Permissions")
+            throw IOException("USB device permission denied. Please allow USB access when prompted, or grant permission manually in Android Settings > Apps > Universal Ambient Light > Permissions")
         }
 
         // Открываем порт

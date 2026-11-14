@@ -1,6 +1,3 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <resources>
-  <!-- Strings related to guided sequence activity -->
-  <!--This is the title for a custom launcher activity - hence including the app's name, with the action noted (toggle the grabber)-->
-  <string name="toggle_activity_label">Hyperion Grabber (Toggle)</string>
 </resources>

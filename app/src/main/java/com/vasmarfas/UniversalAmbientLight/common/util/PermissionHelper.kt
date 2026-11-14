@@ -131,7 +131,7 @@ object PermissionHelper {
             Log.e(TAG, "Cannot open app settings", e)
             Toast.makeText(
                 context,
-                "Please open Settings > Apps > Hyperion Grabber manually",
+                "Please open Settings > Apps > Universal Ambient Light manually",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -194,7 +194,7 @@ object PermissionHelper {
                Settings > Apps > Special access > Display over other apps
             
             2. APP PERMISSIONS:
-               Settings > Apps > Hyperion Grabber > Permissions
+               Settings > Apps > Universal Ambient Light > Permissions
             
             3. AUTO-START (TCL/Smart TVs):
                Settings > Privacy > Special app access > Auto-start
