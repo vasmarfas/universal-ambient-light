@@ -18,6 +18,22 @@ The app bundles the following third-party binary in `app/src/main/assets/`:
      - Copyright (C) 2018 Genymobile
      - Copyright (C) 2018-2025 Romain Vimont
 
+## Source Code From Other Projects
+
+Parts of the source code come from the following projects:
+
+1. **hyperion-android-grabber**  
+   - Upstream: https://github.com/abrenoch/hyperion-android-grabber  
+   - Used for: the original structure of the screen capture service and screen encoders, the boot, toggle and quick tile entry points, the notification, the preferences helper, the capture options and the black border detection. The code was translated to Kotlin and has been reworked and extended since.  
+   - License: **MIT**  
+   - Copyright: Copyright (c) 2018 Dave Anderson
+
+2. **Hyperion.ng** FlatBuffers protocol  
+   - Upstream: https://github.com/hyperion-project/hyperion.ng (`libsrc/flatbufserver/hyperion_request.fbs`, `hyperion_reply.fbs`)  
+   - Used for: the classes in `app/src/main/java/hyperionnet/`, built from the protocol schema  
+   - License: **MIT**  
+   - Copyright: Copyright (c) 2014-2026 Hyperion Project
+
 ## Direct Third-Party Dependencies (Gradle)
 
 The project also uses direct library dependencies from Maven/Google repositories:
