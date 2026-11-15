@@ -271,8 +271,10 @@ all current settings with the ones from the file.
   the bridge and **Pair** within 30 seconds.
 - If the Hue app has entertainment areas, the app offers to use one. The bridge then gets a
   DTLS stream on port `2100` up to 25 times per second, and every light of the area takes the
-  color of its place set in the Hue app: left to right, and floor, TV level or ceiling. An area
-  holds up to 10 lights. While the stream is on, other scenes and automations of the bridge
+  color of its place set in the Hue app: left to right, and floor, TV level or ceiling. Through
+  Hue API v2 a gradient lightstrip is split into several channels with their own places, so it
+  shows several colors along its length; bridges without API v2 and diyHue get the older stream,
+  where such a strip is one light with one color. An area holds up to 10 lights. While the stream is on, other scenes and automations of the bridge
   do not touch these lights.
 - Bridges paired by version 1.x of the app have no streaming key, such a bridge has to be
   paired again to use an area.

@@ -224,8 +224,14 @@ class HueClient(
         }
 
         @Throws(IOException::class)
-        internal fun request(method: String, url: String, body: String?): String {
-            val connection = URL(url).openConnection() as HttpURLConnection
+        internal fun request(method: String, url: String, body: String?): String =
+            exchange(URL(url).openConnection() as HttpURLConnection, method, body) { connection ->
+                connection.inputStream.bufferedReader().use { it.readText() }
+            }
+
+        /** Запрос по готовому соединению: [read] разбирает успешный ответ, пока соединение открыто. */
+        @Throws(IOException::class)
+        internal fun <T> exchange(connection: HttpURLConnection, method: String, body: String?, read: (HttpURLConnection) -> T): T {
             try {
                 connection.requestMethod = method
                 connection.connectTimeout = CONNECT_TIMEOUT_MS
@@ -236,10 +242,8 @@ class HueClient(
                     connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 }
                 val code = connection.responseCode
-                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                val text = stream?.use { it.readBytes().toString(Charsets.UTF_8) }.orEmpty()
                 if (code !in 200..299) throw IOException("HTTP $code from the Hue bridge")
-                return text
+                return read(connection)
             } finally {
                 connection.disconnect()
             }
