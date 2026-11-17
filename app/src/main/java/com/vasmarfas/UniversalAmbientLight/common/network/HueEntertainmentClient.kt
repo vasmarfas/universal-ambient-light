@@ -45,7 +45,8 @@ class HueEntertainmentClient(
     private val mClientKey: String,
     private val mAreaId: String,
     private val mTurnOffOnStop: Boolean,
-) : HyperionClient {
+    smoothing: LedStreamClient.SmoothingSettings,
+) : HyperionClient, StreamingClient {
 
     /** Лампа в потоке версии 1 или канал в версии 2. */
     private class Light(val id: Int, val u: Float, val v: Float)
@@ -64,6 +65,7 @@ class HueEntertainmentClient(
     private var mSequence = 0
     private var mDirty = false
     private val mTicker = Executors.newSingleThreadScheduledExecutor { Thread(it, "hue-stream-ticker") }
+    private val mSmoothing = ColorSmoothing { colors -> deliver(colors) }
 
     @Volatile
     private var mLastSendMs = 0L
@@ -72,6 +74,11 @@ class HueEntertainmentClient(
     private var mConnected = false
 
     init {
+        mSmoothing.applyPreset(smoothing.preset)
+        mSmoothing.setSettlingTime(smoothing.settlingTime)
+        mSmoothing.setOutputDelay(smoothing.outputDelayMs)
+        mSmoothing.setUpdateFrequency(smoothing.updateFrequency)
+        mSmoothing.setEnabled(smoothing.enabled)
         connect()
     }
 
@@ -181,8 +188,26 @@ class HueEntertainmentClient(
 
     override fun isConnected(): Boolean = mConnected
 
+    // Во сне ТВ кадры не приходят, поток к мосту держит тикер; гасить нужно только сглаживание
+    override fun pauseSending() {
+        mSmoothing.stop()
+    }
+
+    override fun resumeSending() {}
+
+    override val delaysOutput = true
+
+    override fun setOutputDelay(ms: Long) {
+        mSmoothing.setOutputDelay(ms)
+    }
+
+    override fun setSmoothingEnabled(enabled: Boolean) {
+        mSmoothing.setEnabled(enabled)
+    }
+
     @Throws(IOException::class)
     override fun disconnect() {
+        mSmoothing.stop()
         mTicker.shutdownNow()
         if (mConnected) {
             fill { 0 }
@@ -209,8 +234,7 @@ class HueEntertainmentClient(
     @Throws(IOException::class)
     override fun clear(priority: Int) {
         if (!mConnected) return
-        fill { 0 }
-        send()
+        mSmoothing.setTargetColors(Array(mLights.size) { ColorRgb(0, 0, 0) })
     }
 
     @Throws(IOException::class)
@@ -226,8 +250,7 @@ class HueEntertainmentClient(
     @Throws(IOException::class)
     override fun setColor(color: Int, priority: Int, duration_ms: Int) {
         if (!mConnected) return
-        fill { color and 0xFFFFFF }
-        send()
+        mSmoothing.setTargetColors(Array(mLights.size) { ColorRgb(color shr 16, color shr 8, color) })
     }
 
     @Throws(IOException::class)
@@ -238,14 +261,24 @@ class HueEntertainmentClient(
     @Throws(IOException::class)
     override fun setImage(data: ByteArray, width: Int, height: Int, priority: Int, duration_ms: Int) {
         if (!mConnected || width <= 0 || height <= 0) return
-        fill { light -> sample(data, width, height, light) }
-        if (System.currentTimeMillis() - mLastSendMs >= FRAME_INTERVAL_MS) send()
+        mSmoothing.setTargetColors(Array(mLights.size) { sample(data, width, height, mLights[it]) })
+    }
+
+    private fun deliver(colors: Array<ColorRgb>) {
+        if (!mConnected) return
+        fill { index -> colors.getOrNull(index)?.let { (it.red shl 16) or (it.green shl 8) or it.blue } ?: 0 }
+        if (System.currentTimeMillis() - mLastSendMs < FRAME_INTERVAL_MS) return
+        try {
+            send()
+        } catch (e: IOException) {
+            Log.w(TAG, "Hue stream send failed: ${e.message}")
+        }
     }
 
     @Synchronized
-    private fun fill(colorOf: (Light) -> Int) {
+    private fun fill(colorOf: (Int) -> Int) {
         for ((index, light) in mLights.withIndex()) {
-            writeLight(mMessage, index, light.id, colorOf(light))
+            writeLight(mMessage, index, light.id, colorOf(index))
         }
         mDirty = true
     }
@@ -294,7 +327,7 @@ class HueEntertainmentClient(
     }
 
     /** Средний цвет квадрата кадра вокруг места лампы. */
-    private fun sample(data: ByteArray, width: Int, height: Int, light: Light): Int {
+    private fun sample(data: ByteArray, width: Int, height: Int, light: Light): ColorRgb {
         val half = maxOf(width, height) / 8
         val cx = (light.u * (width - 1)).toInt()
         val cy = (light.v * (height - 1)).toInt()
@@ -313,8 +346,8 @@ class HueEntertainmentClient(
                 i += 3
             }
         }
-        if (count == 0) return 0
-        return ((r / count).toInt() shl 16) or ((g / count).toInt() shl 8) or (b / count).toInt()
+        if (count == 0) return ColorRgb(0, 0, 0)
+        return ColorRgb((r / count).toInt(), (g / count).toInt(), (b / count).toInt())
     }
 
     /**

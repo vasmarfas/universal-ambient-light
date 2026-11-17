@@ -520,7 +520,8 @@ class HyperionThread(
 
             OutputType.HUE -> if (mConfig.hueArea.isNotBlank()) {
                 HueEntertainmentClient(
-                    host, mConfig.hueUsername, mConfig.hueClientKey, mConfig.hueArea, mConfig.haTurnOffLights
+                    host, mConfig.hueUsername, mConfig.hueClientKey, mConfig.hueArea, mConfig.haTurnOffLights,
+                    streamSmoothing()
                 )
             } else {
                 HueClient(host, mConfig.hueUsername, mConfig.lamps, lampSettings())
