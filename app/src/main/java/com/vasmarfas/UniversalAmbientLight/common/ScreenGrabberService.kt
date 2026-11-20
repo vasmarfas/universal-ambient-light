@@ -1,5 +1,6 @@
 package com.vasmarfas.UniversalAmbientLight.common
 
+import android.Manifest
 import android.annotation.TargetApi
 import android.app.Notification
 import android.app.NotificationManager
@@ -8,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -22,7 +24,9 @@ import android.view.WindowManager
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import com.vasmarfas.UniversalAmbientLight.R
+import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
 import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.ConnectionConfig
 import com.vasmarfas.UniversalAmbientLight.common.network.HomeAssistantLamp
@@ -681,7 +685,7 @@ class ScreenGrabberService : Service() {
                     mEverConnected = false
                     notifyActivity()
                     mCaptureSource = "effect"
-                    if (!tryStartForegroundCompat(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)) {
+                    if (!tryStartForegroundCompat(effectForegroundType())) {
                         return stopWithoutForeground()
                     }
 
@@ -860,6 +864,7 @@ class ScreenGrabberService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     private fun initialForegroundTypeFor(action: String?): Int = when (action) {
         ACTION_START_CAMERA -> ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        ACTION_START_EFFECT -> effectForegroundType()
         ACTION_START -> {
             // Тип mediaProjection без выданного согласия роняет startForeground на 14+
             // (исключение глотается, но сервис остаётся не-foreground до повторной
@@ -1020,10 +1025,50 @@ class ScreenGrabberService : Service() {
 
     private fun startEffect() {
         val prefs = Preferences(this)
-        val encoder = EffectEncoder(newGate(), buildAppOptions(prefs), EffectConfig.from(prefs))
+        val config = EffectConfig.from(prefs)
+        val fromOutput = prefs.getString(R.string.pref_key_music_source) == "output"
+        val sound = when {
+            !config.effect.usesMicrophone -> null
+            fromOutput -> OutputSpectrum(config.sensitivity)
+            else -> MicrophoneSpectrum(config.sensitivity)
+        }
+        if (sound != null) {
+            val error = when {
+                !hasMicrophonePermission() -> R.string.music_permission_required
+                sound.start() -> null
+                fromOutput -> R.string.error_output_audio_unavailable
+                else -> R.string.error_microphone_unavailable
+            }
+            if (error != null) {
+                mStartError = getString(error)
+                haltStartup()
+                return
+            }
+        }
+        val encoder = EffectEncoder(newGate(), buildAppOptions(prefs), config, sound)
         mActiveBackend = encoder
         encoder.sendStatus()
     }
+
+    /**
+     * Цветомузыка слушает микрофон, а фоновому сервису без типа microphone система отдаёт
+     * тишину. Звук устройства через Visualizer система пускает по тому же разрешению
+     * RECORD_AUDIO, поэтому тип тот же. Без разрешения этот тип роняет startForeground, об
+     * отказе скажет startEffect.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun effectForegroundType(): Int {
+        val effect = Effect.byId(Preferences(this).getString(R.string.pref_key_effect))
+        return if (effect.usesMicrophone && hasMicrophonePermission()) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        } else {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        }
+    }
+
+    private fun hasMicrophonePermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
 
     /** Эффект просили не гасить вместе с экраном ТВ. */
     private fun effectStaysOn(): Boolean =
@@ -1608,6 +1653,7 @@ class ScreenGrabberService : Service() {
         val keyExtraOutputs = getString(R.string.pref_key_extra_outputs)
         val keyOutputDelay = getString(R.string.pref_key_output_delay)
         val keyDelayProfiles = getString(R.string.pref_key_delay_profiles)
+        val keyMusicSource = getString(R.string.pref_key_music_source)
         val listener =
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == null) return@OnSharedPreferenceChangeListener
@@ -1627,14 +1673,23 @@ class ScreenGrabberService : Service() {
                     if (DelayProfiles.parse(profiles).isEmpty()) stopAppWatch() else startAppWatch()
                 }
                 if (key == keyOutputDelay || key == keyDelayProfiles) applyOutputDelay()
+                var soundRestart = false
                 if (key in effectKeys) {
-                    (mActiveBackend as? EffectEncoder)?.setConfig(EffectConfig.from(prefs))
+                    val config = EffectConfig.from(prefs)
+                    val encoder = mActiveBackend as? EffectEncoder
+                    // Цветомузыке нужен другой тип foreground-сервиса и своё разрешение, а
+                    // другой источник звука - другой объект захвата: переходим перезапуском,
+                    // как при смене источника
+                    soundRestart = encoder != null &&
+                            (encoder.usesMicrophone != config.effect.usesMicrophone ||
+                                    key == keyMusicSource && encoder.usesMicrophone)
+                    if (!soundRestart) encoder?.setConfig(config)
                 }
                 // Остальное вступало в силу только после ручного перезапуска подсветки; с
                 // телефона правят посреди фильма, и ждать перезапуска там некому
                 val output = key in outputKeys
                 val capture = key in captureKeys
-                val session = key in sessionKeys
+                val session = key in sessionKeys || soundRestart
                 val extra = ExtraOutputs.isOutputKey(key)
                 if (output || capture || session || extra) {
                     mPendingOutputRestart = mPendingOutputRestart || output
@@ -1882,6 +1937,8 @@ class ScreenGrabberService : Service() {
             R.string.pref_key_effect_speed,
             R.string.pref_key_effect_brightness,
             R.string.pref_key_effect_temperature,
+            R.string.pref_key_effect_sensitivity,
+            R.string.pref_key_music_source,
             R.string.pref_key_led_start_corner,
             R.string.pref_key_led_direction,
         )

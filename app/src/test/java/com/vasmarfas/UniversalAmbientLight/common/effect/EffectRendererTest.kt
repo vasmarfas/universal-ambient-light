@@ -62,6 +62,26 @@ class EffectRendererTest {
     }
 
     @Test
+    fun `color music stays dark in silence`() {
+        renderer.render(EffectConfig(Effect.MUSIC), 0, frame, FloatArray(AudioSpectrum.BANDS))
+        assertArrayEquals(ByteArray(frame.size), frame)
+    }
+
+    @Test
+    fun `bass lights the bottom of the screen in red`() {
+        val bass = FloatArray(AudioSpectrum.BANDS).also { it[0] = 1f }
+        renderer.render(EffectConfig(Effect.MUSIC), 0, frame, bass)
+        assertEquals(listOf(255, 0, 0), rgb(WIDTH / 2, HEIGHT - 1))
+    }
+
+    @Test
+    fun `bass leaves the top of the screen dark`() {
+        val bass = FloatArray(AudioSpectrum.BANDS).also { it[0] = 1f }
+        renderer.render(EffectConfig(Effect.MUSIC), 0, frame, bass)
+        assertEquals(listOf(0, 0, 0), rgb(WIDTH / 2, 0))
+    }
+
+    @Test
     fun `a color string is read as rgb`() {
         assertEquals(0xFF8C3C, EffectConfig.parseColor("#FF8C3C", 0))
     }

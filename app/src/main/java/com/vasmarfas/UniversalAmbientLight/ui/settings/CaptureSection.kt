@@ -291,6 +291,12 @@ internal fun ColumnScope.CaptureSection(prefs: Preferences, state: SettingsScree
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
             )
+            Text(
+                text = stringResource(R.string.pref_summary_color_gamma),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
             listOf(
                 Triple(R.string.pref_key_color_brightness_r, R.string.pref_title_color_brightness_r, 0..200),
                 Triple(R.string.pref_key_color_brightness_g, R.string.pref_title_color_brightness_g, 0..200),

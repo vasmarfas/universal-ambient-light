@@ -193,6 +193,7 @@
   <string name="pref_title_color_brightness_b">Яркость B</string>
   <string name="pref_title_color_gamma_r">Гамма R</string>
   <string name="pref_title_color_gamma_g">Гамма G</string>
+  <string name="pref_summary_color_gamma">Гамма меньше 100% темнит полутона: цвета становятся сочнее, а тёмно-серое, в том числе чёрные полосы видео, перестаёт светиться. 45% соответствует гамме 2,2, с неё стоит начинать, если цвета на ленте белёсые. Больше 100% полутона светлее.</string>
   <string name="pref_title_color_gamma_b">Гамма B</string>
   <string name="pref_color_preview_title">Превью (с применением обработки)</string>
   <string name="pref_color_preview_hint">Отражает то, что будет отправлено на LED-ленту. Анимации на главном экране НЕ используют эти настройки.</string>
@@ -585,6 +586,7 @@
   <string name="effects_group_static">Статичные</string>
   <string name="effects_group_dynamic">Динамичные</string>
   <string name="effects_group_setup">Для настройки</string>
+  <string name="effects_group_sound">По звуку</string>
   <string name="effects_parameters">Настройки: %1$s</string>
   <string name="effects_now_off">Подсветка выключена. Выберите эффект, и он сразу включится.</string>
   <string name="effects_now_effect">Сейчас горит: %1$s</string>
@@ -598,6 +600,7 @@
   <string name="effects_speed">Скорость</string>
   <string name="effects_brightness">Яркость</string>
   <string name="effects_temperature">Цветовая температура</string>
+  <string name="effects_sensitivity">Чувствительность</string>
   <string name="effects_standby">Не гасить при выключенном экране</string>
   <string name="effects_standby_summary">Лента светит ночником, пока приставка не уснула. Часть телевизоров в режиме ожидания отключает сеть, тогда лента всё равно погаснет.</string>
   <string name="unit_kelvin">%1$d К</string>
@@ -615,6 +618,17 @@
   <string name="effect_plasma">Плазма</string>
   <string name="effect_comet">Комета</string>
   <string name="effect_layout_test">Проверка раскладки</string>
+  <string name="effect_music">Цветомузыка</string>
+  <string name="effect_music_hint">Раскладывает звук по частотам: бас зажигает низ экрана красным, высокие ноты верх синим. Лента отвечает на подъём звука: удары и смены вспыхивают, а ровный звук вроде шума в комнате за пару секунд гаснет. Звук разбирается на устройстве, не записывается и никуда не отправляется. Если лента почти не реагирует на музыку, прибавьте чувствительность, если мигает от шума в комнате, убавьте. На телефоне включите «Не гасить при выключенном экране», чтобы цветомузыка работала с погасшим экраном.</string>
+  <string name="effect_music_source">Источник звука</string>
+  <string-array name="pref_list_music_source">
+    <item>Микрофон</item>
+    <item>Звук этого устройства</item>
+  </string-array>
+  <string name="effect_music_source_hint">Микрофон слышит комнату: музыку с телевизора, колонок или телефона. Звук этого устройства - то, что играет сама приставка или телефон, микрофон не нужен. Звук, который уходит на ресивер битстримом Dolby или DTS (passthrough), идёт мимо Android, и так его не поймать.</string>
+  <string name="music_permission_required">Для цветомузыки нужен доступ к микрофону</string>
+  <string name="error_microphone_unavailable">Микрофон недоступен: его нет на устройстве или он занят другим приложением</string>
+  <string name="error_output_audio_unavailable">Звук этого устройства недоступен: прошивка не отдаёт его приложениям. Выберите источником микрофон</string>
   <string name="effect_layout_test_hint">Верх красный, правая сторона зелёная, низ синий, левая жёлтая. Белая точка бежит от первого светодиода в сторону нумерации. Если цвета или путь точки не совпадают с лентой, поправьте раскладку.</string>
   <string name="effect_layout_test_strip_hint">На ленте границы сторон в этом эффекте смещаются из-за глубины сканирования и отступов захвата. Точная проверка каждого светодиода: «Раскладка LED», переключатель «Адресная проверка светодиодов».</string>
   <string name="home_source_effect">Эффект: %1$s</string>

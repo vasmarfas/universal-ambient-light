@@ -191,6 +191,7 @@
   <string name="pref_title_color_brightness_b">Blue brightness</string>
   <string name="pref_title_color_gamma_r">Red gamma</string>
   <string name="pref_title_color_gamma_g">Green gamma</string>
+  <string name="pref_summary_color_gamma">Gamma below 100% darkens midtones: colors get richer, and dark grey, including the black bars of a video, stops glowing. 45% equals gamma 2.2, a good start for an LED strip with washed-out colors. Above 100% midtones get brighter.</string>
   <string name="pref_title_color_gamma_b">Blue gamma</string>
   <string name="pref_color_preview_title">Preview (after color processing)</string>
   <string name="pref_color_preview_hint">Reflects what will be sent to the LED strip. The animations on the Home screen do NOT use these settings.</string>
@@ -606,6 +607,7 @@
   <string name="effects_group_static">Static</string>
   <string name="effects_group_dynamic">Animated</string>
   <string name="effects_group_setup">For setup</string>
+  <string name="effects_group_sound">Sound</string>
   <string name="effects_parameters">Settings: %1$s</string>
   <string name="effects_now_off">The lighting is off. Pick an effect and it turns on.</string>
   <string name="effects_now_effect">Now on: %1$s</string>
@@ -619,6 +621,7 @@
   <string name="effects_speed">Speed</string>
   <string name="effects_brightness">Brightness</string>
   <string name="effects_temperature">Color temperature</string>
+  <string name="effects_sensitivity">Sensitivity</string>
   <string name="effects_standby">Keep on when the TV screen is off</string>
   <string name="effects_standby_summary">The strip keeps glowing like a night light while the TV box stays awake. Some TVs cut the network in standby, then it goes dark anyway.</string>
   <string name="unit_kelvin">%1$d K</string>
@@ -636,6 +639,17 @@
   <string name="effect_plasma">Plasma</string>
   <string name="effect_comet">Comet</string>
   <string name="effect_layout_test">Layout test</string>
+  <string name="effect_music">Color music</string>
+  <string name="effect_music_hint">Splits the sound by frequency: bass lights the bottom of the screen in red, high notes light the top in blue. The strip reacts when the sound rises: beats and changes flash, a steady sound like room noise fades within a couple of seconds. The sound is analyzed on the device, it is not recorded or sent anywhere. Raise the sensitivity if the strip barely reacts to music, lower it if it flickers from room noise. On a phone, turn on \"Keep on when the TV screen is off\" so the lights keep going with the phone screen off.</string>
+  <string name="effect_music_source">Sound source</string>
+  <string-array name="pref_list_music_source">
+    <item>Microphone</item>
+    <item>Sound of this device</item>
+  </string-array>
+  <string name="effect_music_source_hint">The microphone hears the room: music from the TV, speakers or a phone. Sound of this device is what this TV box or phone plays itself, no microphone needed. Sound sent to a receiver as a Dolby or DTS bitstream (passthrough) bypasses Android and cannot be caught this way.</string>
+  <string name="music_permission_required">Color music needs access to the microphone</string>
+  <string name="error_microphone_unavailable">The microphone is unavailable: the device has none, or another app is using it</string>
+  <string name="error_output_audio_unavailable">The sound of this device is unavailable: the firmware does not give it to apps. Choose the microphone as the sound source</string>
   <string name="effect_layout_test_hint">Top is red, right is green, bottom is blue, left is yellow. The white dot runs from the first LED in the numbering direction. If the colors or the path of the dot do not match the strip, fix the LED layout.</string>
   <string name="effect_layout_test_strip_hint">On an LED strip the side boundaries of this pattern shift with scan depth and capture margins. For an exact check of every LED, open LED Layout and turn on \"Show LED layout test\".</string>
   <string name="home_source_effect">Effect: %1$s</string>

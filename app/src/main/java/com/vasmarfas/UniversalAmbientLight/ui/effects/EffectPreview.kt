@@ -35,6 +35,7 @@ fun Effect.titleRes(): Int = when (this) {
     Effect.OCEAN -> R.string.effect_ocean
     Effect.PLASMA -> R.string.effect_plasma
     Effect.COMET -> R.string.effect_comet
+    Effect.MUSIC -> R.string.effect_music
     Effect.LAYOUT_TEST -> R.string.effect_layout_test
 }
 

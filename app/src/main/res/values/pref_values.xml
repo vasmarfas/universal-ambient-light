@@ -285,6 +285,14 @@
     <integer name="pref_default_effect_brightness" translatable="false">100</integer>
     <string name="pref_key_effect_temperature" translatable="false">pref_key_effect_temperature</string>
     <integer name="pref_default_effect_temperature" translatable="false">6500</integer>
+    <string name="pref_key_effect_sensitivity" translatable="false">pref_key_effect_sensitivity</string>
+    <integer name="pref_default_effect_sensitivity" translatable="false">50</integer>
+    <string name="pref_key_music_source" translatable="false">pref_key_music_source</string>
+    <string name="pref_default_music_source" translatable="false">microphone</string>
+    <string-array name="pref_list_music_source_values" translatable="false">
+        <item>microphone</item>
+        <item>output</item>
+    </string-array>
     <string name="pref_key_effect_standby" translatable="false">pref_key_effect_standby</string>
     <bool name="pref_default_effect_standby" translatable="false">false</bool>
 

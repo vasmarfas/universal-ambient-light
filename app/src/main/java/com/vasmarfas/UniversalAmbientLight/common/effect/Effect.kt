@@ -5,7 +5,8 @@ import com.vasmarfas.UniversalAmbientLight.common.util.Preferences
 
 /**
  * Эффекты без захвата экрана. [id] - значение настройки pref_key_effect; флаги говорят
- * экрану эффектов, какие параметры показывать.
+ * экрану эффектов, какие параметры показывать. [usesMicrophone] - цветомузыка: ей нужны
+ * разрешение на микрофон и foreground-сервис с типом microphone.
  */
 enum class Effect(
     val id: String,
@@ -13,6 +14,7 @@ enum class Effect(
     val usesColor: Boolean = false,
     val usesColor2: Boolean = false,
     val usesTemperature: Boolean = false,
+    val usesMicrophone: Boolean = false,
 ) {
     SOLID("solid", animated = false, usesColor = true),
     GRADIENT("gradient", animated = false, usesColor = true, usesColor2 = true),
@@ -26,6 +28,7 @@ enum class Effect(
     OCEAN("ocean"),
     PLASMA("plasma"),
     COMET("comet", usesColor = true),
+    MUSIC("music", usesMicrophone = true),
     LAYOUT_TEST("layout_test");
 
     companion object {
@@ -44,6 +47,8 @@ data class EffectConfig(
     val brightness: Int = 100,
     /** Цветовая температура белого, кельвины. */
     val temperature: Int = 6500,
+    /** 0..100, чувствительность микрофона цветомузыки. */
+    val sensitivity: Int = 50,
     /** Откуда и куда пронумерована лента - нужно только проверке раскладки. */
     val startCorner: String = "bottom_left",
     val direction: String = "clockwise",
@@ -59,6 +64,7 @@ data class EffectConfig(
             speed = prefs.getInt(R.string.pref_key_effect_speed).coerceIn(0, 100),
             brightness = prefs.getInt(R.string.pref_key_effect_brightness).coerceIn(1, 100),
             temperature = prefs.getInt(R.string.pref_key_effect_temperature).coerceIn(1500, 10000),
+            sensitivity = prefs.getInt(R.string.pref_key_effect_sensitivity).coerceIn(0, 100),
             startCorner = prefs.getString(R.string.pref_key_led_start_corner, "bottom_left")
                 ?: "bottom_left",
             direction = prefs.getString(R.string.pref_key_led_direction, "clockwise") ?: "clockwise",

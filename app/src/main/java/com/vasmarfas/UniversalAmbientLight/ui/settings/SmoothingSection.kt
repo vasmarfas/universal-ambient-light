@@ -24,8 +24,8 @@ internal fun ColumnScope.SmoothingSection(
 ) {
     val context = LocalContext.current
     SettingsGroup(title = stringResource(R.string.pref_group_smoothing)) {
-        // key: пресет «off» выключает сглаживание записью в prefs, и без пересоздания
-        // переключатель остался бы визуально включённым
+        // key: пресет включает и выключает сглаживание записью в prefs, и без пересоздания
+        // переключатель остался бы в прежнем положении
         key(state.smoothingPreset) {
             CheckBoxPreference(
                 prefs = prefs,
@@ -51,7 +51,8 @@ internal fun ColumnScope.SmoothingSection(
             entryValuesRes = R.array.pref_list_smoothing_preset_values,
             onValueChange = { preset ->
                 state.smoothingPreset = preset
-                val enabled = prefs.getBoolean(R.string.pref_key_smoothing_enabled, false)
+                // Выбранный «Плавный» при выключенном переключателе ничего бы не сглаживал
+                val enabled = preset.lowercase() != "off"
                 AnalyticsHelper.logSmoothingChanged(context, enabled, preset)
                 AnalyticsHelper.logSettingChanged(context, "smoothing_preset", preset)
 
@@ -66,10 +67,7 @@ internal fun ColumnScope.SmoothingSection(
                 prefs.putInt(R.string.pref_key_settling_time, presetValues.first)
                 prefs.putInt(R.string.pref_key_output_delay, presetValues.second)
                 prefs.putInt(R.string.pref_key_update_frequency, presetValues.third)
-
-                if (preset.lowercase() == "off") {
-                    prefs.putBoolean(R.string.pref_key_smoothing_enabled, false)
-                }
+                prefs.putBoolean(R.string.pref_key_smoothing_enabled, enabled)
             }
         )
         key(state.smoothingPreset) {

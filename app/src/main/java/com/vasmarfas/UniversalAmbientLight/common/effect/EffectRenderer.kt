@@ -39,6 +39,8 @@ class EffectRenderer(val width: Int, val height: Int) {
 
     private val mRgb = FloatArray(3)
 
+    private var mSpectrum: FloatArray? = null
+
     init {
         val perimeter = 4 * mAspect + 4
         for (y in 0 until height) {
@@ -76,8 +78,12 @@ class EffectRenderer(val width: Int, val height: Int) {
         }
     }
 
-    /** Рисует кадр в момент [timeMs] от начала эффекта; [out] длиной не меньше width*height*3. */
-    fun render(config: EffectConfig, timeMs: Long, out: ByteArray) {
+    /**
+     * Рисует кадр в момент [timeMs] от начала эффекта; [out] длиной не меньше width*height*3.
+     * [spectrum] - уровни полос [AudioSpectrum] для цветомузыки; без него она рисует эскиз.
+     */
+    fun render(config: EffectConfig, timeMs: Long, out: ByteArray, spectrum: FloatArray? = null) {
+        mSpectrum = spectrum
         val t = timeMs / 1000.0
         // Скорость по экспоненте: 50 - обычная, каждые 25 делений вдвое быстрее или медленнее
         val speed = 2.0.pow((config.speed - 50) / 25.0)
@@ -194,6 +200,13 @@ class EffectRenderer(val width: Int, val height: Int) {
                 rgb[2] = (rgb[2] + (1f - rgb[2]) * burn) * intensity
             }
 
+            Effect.MUSIC -> {
+                val pitch = pitch(i)
+                val level = mSpectrum?.let { band(it, pitch) } ?: demoLevel(pitch, t)
+                // Классическая цветомузыка: бас красный, середина зелёная, верха синие
+                hsv(rgb, pitch * 0.7f, 1f, level)
+            }
+
             Effect.LAYOUT_TEST -> {
                 setRgb(rgb, SIDE_COLORS[mSide[i].toInt()])
                 scale(rgb, 0.35f)
@@ -210,6 +223,35 @@ class EffectRenderer(val width: Int, val height: Int) {
                 }
             }
         }
+    }
+
+    /**
+     * Место пикселя в спектре: 0 - нижняя сторона и низ боковых (бас), дальше вверх по
+     * боковым сторонам и по верхней к её середине, где 1. Бас внизу виден и там, где
+     * ленты под телевизором нет: боковые стороны начинаются с него же.
+     */
+    private fun pitch(i: Int): Float {
+        val nx = abs(mNx[i])
+        val ny = mNy[i]
+        val path = when (mSide[i].toInt()) {
+            0 -> 2 + mAspect - mAspect * nx / -ny
+            2 -> 0f
+            else -> 1 - ny / nx
+        }
+        return path / (2 + mAspect)
+    }
+
+    private fun band(levels: FloatArray, pitch: Float): Float {
+        val x = pitch * (levels.size - 1)
+        val low = x.toInt().coerceAtMost(levels.size - 2)
+        return lerp(levels[low], levels[low + 1], x - low)
+    }
+
+    /** Эскиз цветомузыки без микрофона: удары баса и рябь верхов, чтобы карточка жила. */
+    private fun demoLevel(pitch: Float, t: Double): Float {
+        val beat = (1 - frac(t * 2)).let { it * it * it }
+        val ripple = 0.5f + 0.5f * sin(t * 9 + pitch * 14).toFloat()
+        return (beat * (1 - pitch) + ripple * pitch * 0.8f).coerceIn(0f, 1f)
     }
 
     /** Положение угла начала ленты на периметре в тех же долях, что и [mAround]. */

@@ -1,5 +1,10 @@
 package com.vasmarfas.UniversalAmbientLight.ui.effects
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,6 +58,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.vasmarfas.UniversalAmbientLight.R
 import com.vasmarfas.UniversalAmbientLight.common.effect.Effect
 import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
@@ -63,12 +69,14 @@ import com.vasmarfas.UniversalAmbientLight.ui.components.ValueSlider
 import com.vasmarfas.UniversalAmbientLight.ui.remote.LocalRemote
 import com.vasmarfas.UniversalAmbientLight.ui.remote.rememberSettingsPreferences
 import com.vasmarfas.UniversalAmbientLight.ui.settings.CheckBoxPreference
+import com.vasmarfas.UniversalAmbientLight.ui.settings.ListPreference
 
 private val STATIC_EFFECTS = listOf(Effect.SOLID, Effect.GRADIENT, Effect.WHITE)
 private val DYNAMIC_EFFECTS = listOf(
     Effect.RAINBOW, Effect.COLOR_CYCLE, Effect.BREATHING, Effect.CANDLE, Effect.FIRE,
     Effect.AURORA, Effect.OCEAN, Effect.PLASMA, Effect.COMET,
 )
+private val SOUND_EFFECTS = listOf(Effect.MUSIC)
 private val SETUP_EFFECTS = listOf(Effect.LAYOUT_TEST)
 
 /**
@@ -103,6 +111,26 @@ fun EffectsScreen(
             source = "effect"
         }
         if (!running) onStart()
+    }
+
+    val microphonePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            select(Effect.MUSIC)
+        } else {
+            Toast.makeText(context, R.string.music_permission_required, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun onEffectClick(effect: Effect) {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        if (effect.usesMicrophone && !granted) {
+            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            select(effect)
+        }
     }
 
     Scaffold(
@@ -166,9 +194,12 @@ fun EffectsScreen(
                 }
             }
 
-            for ((titleRes, effects) in listOf(
+            for ((titleRes, effects) in listOfNotNull(
                 R.string.effects_group_static to STATIC_EFFECTS,
                 R.string.effects_group_dynamic to DYNAMIC_EFFECTS,
+                // С пульта эффект играет телевизор, а микрофона у ТВ обычно нет, и разрешение
+                // на нём отсюда не спросить
+                if (remote == null) R.string.effects_group_sound to SOUND_EFFECTS else null,
                 R.string.effects_group_setup to SETUP_EFFECTS,
             )) {
                 GroupTitle(stringResource(titleRes))
@@ -182,7 +213,7 @@ fun EffectsScreen(
                             effect = effect,
                             config = config,
                             selected = selected,
-                            onClick = { select(effect) },
+                            onClick = { onEffectClick(effect) },
                             modifier = if (selected) Modifier.focusRequester(selectedFocus) else Modifier
                         )
                     }
@@ -205,6 +236,36 @@ fun EffectsScreen(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
+            }
+            if (config.effect.usesMicrophone) {
+                Text(
+                    text = stringResource(R.string.effect_music_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                ListPreference(
+                    prefs = prefs,
+                    keyRes = R.string.pref_key_music_source,
+                    title = stringResource(R.string.effect_music_source),
+                    entriesRes = R.array.pref_list_music_source,
+                    entryValuesRes = R.array.pref_list_music_source_values
+                )
+                Text(
+                    text = stringResource(R.string.effect_music_source_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                ValueSlider(
+                    title = stringResource(R.string.effects_sensitivity),
+                    value = config.sensitivity,
+                    onValueChange = {
+                        prefs.putInt(R.string.pref_key_effect_sensitivity, it)
+                        config = config.copy(sensitivity = it)
+                    },
+                    range = 0..100
+                )
             }
             if (config.effect.usesColor) {
                 ColorPicker(stringResource(R.string.effects_color), config.color) { rgb ->
@@ -237,7 +298,7 @@ fun EffectsScreen(
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
-            if (config.effect.animated) {
+            if (config.effect.animated && !config.effect.usesMicrophone) {
                 ValueSlider(
                     title = stringResource(R.string.effects_speed),
                     value = config.speed,

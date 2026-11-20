@@ -25,6 +25,8 @@ on both phones and Android TV.
   corners, for TVs where screen capture is unavailable.
 - **Light effects without capture**: solid color, gradient, movie white, rainbow, fire,
   candle, aurora and more.
+- **Color music**: the effect lights the strip by frequency, bass at the bottom, high notes at
+  the top, from the microphone or from the sound the device itself plays.
 - **Lighting delay per app**, with auto-tuning: a phone camera films the TV and the glow and
   measures how far the strip is ahead of the picture on the movie that is playing.
 - **Tunable pipeline**: capture quality, frame rate, color smoothing and latency.
@@ -132,6 +134,9 @@ stop the others; it retries in the background and shows up only in the log.
     - *High (256px)* — For powerful devices only.
     - *Ultra (512px)* — Maximum quality for high-end devices.
 - **Send Average Color**: Enable for maximum performance (sends a single color for the whole strip).
+- **Black bar detection**: off by default. Turn it on for movies with bars at the top and bottom or
+  at the sides: the edges are taken from the picture, not from the screen border. **Black threshold**
+  18 suits most sources; if the bars are not found, raise it to 24–30.
 - **Ignore subtitles in the bottom bar**: an option of black bar detection, off by default. The bar
   height comes from the top edge, the bottom is only checked near the corners, and dark scenes keep
   the crop. Subtitles over the picture still reach the LEDs.
@@ -186,12 +191,31 @@ consecutive samples above the threshold, so a single noisy frame cannot flash th
 four settings can be adjusted while capture is running, since they can only be calibrated
 against a live feed.
 
+### 3.3. Color and brightness
+**Color processing** is off by default, and the strip gets the screen colors as they are. The
+Adalight sketch and most USB boards pass them to the LEDs without gamma correction, so midtones
+look brighter on the strip than on the screen, colors are washed out, and the black bars of a video
+(black there is often 16 of 255) glow slightly. For such a strip, start with:
+
+- **Color processing**: on.
+- **Gamma R**, **Gamma G**, **Gamma B**: 45%. The scale is inverted: below 100% midtones get darker,
+  colors richer and dark grey goes out; 45% equals gamma 2.2.
+- **Saturation**: 120–140%.
+- **Brightness**: lower it here or with the `BRIGHTNESS` constant in the sketch.
+
+The preview under the sliders shows the result on pure R, G, B and a grey ramp. Hyperion does gamma
+correction on its side, so color processing is usually left alone there.
+
 ### 4. Smoothing
-- **Enable Smoothing**: Enabled by default. Reduces LED flickering.
-- **Preset**: "Balanced" (default). Options: Off, Responsive, Balanced, Smooth.
-- **Settling Time**: 200 ms (default, range: 50-500 ms).
-- **Output Delay**: 2 frames (default, range: 0-10).
-- **Update Frequency**: 25 Hz (default, options: 20, 25, 30, 40, 50, 60 Hz).
+- **Enable Smoothing**: off by default. Without it the strip repeats every frame, which looks like
+  flicker on scene changes; turn it on for movies.
+- **Preset**: "Off" by default. Picking a preset turns smoothing on or off by itself. "Responsive":
+  50 ms transition, 60 Hz. "Balanced": 200 ms, 80 ms output delay, 25 Hz. "Smooth": 500 ms, 200 ms,
+  20 Hz.
+- **Settling Time**: 50 ms by default, 0–1000 ms.
+- **Output Delay**: 0 ms by default, 0–1000 ms. Raise it if the strip runs ahead of the picture
+  (**Lighting delay**, section 7, does it per app).
+- **Update Frequency**: 60 Hz by default (20, 25, 30, 40, 50, 60 Hz).
 
 ### 5. Launch
 1. Grant **Screen Capture / Casting** permission when prompted.
@@ -204,6 +228,17 @@ color, gradient, movie white (color temperature, 6500 K is the reference white).
 rainbow, color cycle, breathing, candle, fire, aurora, ocean, plasma, comet. **Layout test**
 paints the sides in different colors and runs a white dot from the first LED, which makes a
 wrong LED layout obvious.
+
+**Color music** takes the sound from the microphone of the device the app runs on, or from
+what the device itself plays (Sound source: Sound of this device, no microphone needed). The
+second option does not see sound sent to a receiver as a Dolby or DTS bitstream (passthrough):
+it bypasses Android. The sound is split into 16 frequency bands: bass lights the
+bottom of the screen in red, the bands go up the sides and reach the middle of the top edge
+in blue. The strip reacts to the sound rising above its average of the last second and a half:
+beats and changes flash, a steady sound such as room noise fades within a couple of seconds.
+Sensitivity sets how big a rise lights the strip. The sound is analyzed on the device and is
+not recorded. Both sources need the audio recording permission; the effect is not offered in
+the phone remote, because the permission would have to be granted on the TV.
 
 **Keep on when the TV screen is off** leaves the effect running as a night light while the TV
 box stays awake. Some TVs cut the network in standby, the strip goes dark then anyway.
@@ -322,14 +357,14 @@ A ready-to-use Arduino sketch compatible with the app is available in [`adalight
 2. **Configure the sketch:**
     - Open `adalight-sketch/adalight-sketch.ino`
     - Modify constants at the top of the file:
-        - `DATA_PIN` — pin for LED strip connection (default 6)
+        - `DATA_PIN` — pin for LED strip connection (default 9 on Uno/Nano, 2 on ESP32 and ESP8266)
         - `NUM_LEDS` — number of LEDs in the strip (must match app settings!)
         - `LED_TYPE` — LED strip type (WS2812B, WS2811, SK6812, etc.)
         - `COLOR_ORDER` — color order (GRB for WS2812B, RGB for others)
         - `BRIGHTNESS` — brightness (0-255)
 
 3. **Wiring:**
-    - LED strip DATA → Arduino pin (default 6)
+    - LED strip DATA → Arduino pin (default 9)
     - LED strip VCC → 5V Arduino (or external power supply for long strips)
     - LED strip GND → GND Arduino
     - **Important:** For long strips (>10 leds), use an external 5V power supply!
@@ -349,7 +384,7 @@ A ready-to-use Arduino sketch compatible with the app is available in [`adalight
 
 **WS2812B Wiring Example:**
 ```
-WS2812B DATA → Pin 6 Arduino
+WS2812B DATA → Pin 9 Arduino
 WS2812B VCC  → 5V Arduino (or external 5V)
 WS2812B GND  → GND Arduino
 ```

@@ -11,6 +11,11 @@ Our Service uses the Android Media Projection API (`FOREGROUND_SERVICE_MEDIA_PRO
 *   **Purpose:** This data is used solely in real-time to calculate the average colors for controlling your ambient lighting hardware (e.g., USB or Network-connected LEDs).
 *   **Privacy:** This screen data is processed locally on your device in volatile memory (RAM). It is **never** saved to storage, recorded, or transmitted to any external server or third party.
 
+### Microphone (Color Music)
+The Color music effect uses the microphone (`RECORD_AUDIO`, `FOREGROUND_SERVICE_MICROPHONE`) or, if you choose "Sound of this device", the audio output of the device (Android Visualizer, `MODIFY_AUDIO_SETTINGS`) only while that effect is running.
+*   **Purpose:** The sound is split into frequency bands to set the colors and brightness of your lighting.
+*   **Privacy:** Audio is processed locally in memory, block by block. It is **never** recorded, saved to storage, or transmitted to any external server or third party.
+
 ### USB and Network Communication
 The app communicates with external hardware (LED controllers) via USB (`android.hardware.usb.host`) or local network.
 *   **Data Transmitted:** Only color values and control commands are sent to your configured hardware.

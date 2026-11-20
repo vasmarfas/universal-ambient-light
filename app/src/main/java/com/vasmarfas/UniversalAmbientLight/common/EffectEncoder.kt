@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
 import android.os.SystemClock
+import com.vasmarfas.UniversalAmbientLight.common.effect.AudioSpectrum
 import com.vasmarfas.UniversalAmbientLight.common.effect.EffectConfig
 import com.vasmarfas.UniversalAmbientLight.common.effect.EffectRenderer
 import com.vasmarfas.UniversalAmbientLight.common.network.HyperionThread
@@ -14,11 +15,15 @@ import com.vasmarfas.UniversalAmbientLight.common.util.ColorProcessor
  * Источник кадров без захвата экрана: эффект рисуется здесь же. Кадры идут на ленту тем
  * же путём, что и снимки экрана, поэтому раскладка, цветокоррекция и все протоколы
  * работают как есть, а запуск не требует ни согласия на запись экрана, ни ADB.
+ *
+ * Цветомузыке сервис передаёт уже запущенный [SoundSpectrum]; дальше энкодер сам
+ * останавливает и возобновляет его вместе с эффектом.
  */
 class EffectEncoder(
     private val mListener: HyperionThread.HyperionThreadListener,
     private val mOptions: AppOptions,
     config: EffectConfig,
+    private val mSound: SoundSpectrum? = null,
 ) : CaptureBackend {
 
     @Volatile
@@ -29,6 +34,7 @@ class EffectEncoder(
 
     private val mRenderer = EffectRenderer(WIDTH, HEIGHT)
     private val mFrame = ByteArray(WIDTH * HEIGHT * 3)
+    private val mLevels = FloatArray(AudioSpectrum.BANDS)
     private val mThread = HandlerThread(TAG, Process.THREAD_PRIORITY_DISPLAY).apply { start() }
     private val mHandler = Handler(mThread.looper)
     private val mStartMs = SystemClock.elapsedRealtime()
@@ -37,7 +43,11 @@ class EffectEncoder(
         override fun run() {
             if (!mRunning) return
             val config = mConfig
-            mRenderer.render(config, SystemClock.elapsedRealtime() - mStartMs, mFrame)
+            val spectrum = mSound?.let {
+                it.levels(mLevels)
+                mLevels
+            }
+            mRenderer.render(config, SystemClock.elapsedRealtime() - mStartMs, mFrame, spectrum)
             ColorProcessor.processRgbData(mFrame, mOptions)
             mListener.sendFrame(mFrame, WIDTH, HEIGHT)
             // Неподвижный эффект перерисовывать незачем, но и замолкать нельзя: без кадров
@@ -52,8 +62,11 @@ class EffectEncoder(
         mHandler.post(mTick)
     }
 
+    val usesMicrophone: Boolean get() = mSound != null
+
     fun setConfig(config: EffectConfig) {
         mConfig = config
+        mSound?.sensitivity = config.sensitivity
         // Неподвижный эффект иначе показал бы новый цвет только через секунду
         mHandler.removeCallbacks(mTick)
         if (mRunning) mHandler.post(mTick)
@@ -63,6 +76,7 @@ class EffectEncoder(
     fun pause() {
         mRunning = false
         mHandler.removeCallbacks(mTick)
+        mSound?.stop()
         clearLights()
     }
 
@@ -79,12 +93,14 @@ class EffectEncoder(
     override fun stopRecording() {
         mRunning = false
         mHandler.removeCallbacks(mTick)
+        mSound?.stop()
         mThread.quitSafely()
         sendBlack(disconnect = true)
     }
 
     override fun resumeRecording() {
         if (mRunning || !mThread.isAlive) return
+        mSound?.start()
         mRunning = true
         mHandler.post(mTick)
     }
